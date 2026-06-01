@@ -19,7 +19,7 @@ services:
       - fleet_pgdata:/var/lib/postgresql/data
       # Schema + seed are applied automatically on first init.
       - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
-      - ./database/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+      - ./database/seed_data.sql:/docker-entrypoint-initdb.d/02-seed_data.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-fleet} -d ${DB_NAME:-fleet_dispatcher}"]
       interval: 5s

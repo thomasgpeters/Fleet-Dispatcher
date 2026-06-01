@@ -16,7 +16,7 @@ With PostgreSQL up and the schema loaded:
 # 1. Bring up the database and load schema + seed
 docker compose up -d db
 psql "$DATABASE_URL" -f ../database/schema.sql
-psql "$DATABASE_URL" -f ../database/seed.sql
+psql "$DATABASE_URL" -f ../database/seed_data.sql
 
 # 2. Generate the ApiLogicServer project from the schema, into this directory
 pip install ApiLogicServer

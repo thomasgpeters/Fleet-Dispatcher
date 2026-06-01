@@ -56,7 +56,7 @@ cp .env.example .env          # adjust ports / credentials if needed
 docker compose up -d db       # start PostgreSQL on :5432
 # load the schema + seed data
 psql "$DATABASE_URL" -f database/schema.sql
-psql "$DATABASE_URL" -f database/seed.sql
+psql "$DATABASE_URL" -f database/seed_data.sql
 ```
 
 See each tier's own `README.md` for middleware and portal setup.
