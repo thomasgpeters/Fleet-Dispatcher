@@ -37,7 +37,7 @@ schema, the API, and both portals to keep design and discussion aligned:
 | Path                          | Tier       | Description                                                            |
 | ----------------------------- | ---------- | ---------------------------------------------------------------------- |
 | `middleware/`                 | middleware | ApiLogicServer project (JSON:API / SAFRS) generated from the schema, on `:5656`. |
-| `database/`                   | backend    | PostgreSQL schema (`schema.sql`) and seed data (`seed.sql`).           |
+| `database/`                   | backend    | PostgreSQL schema (`schema.sql`) and seed data (`seed_data.sql`).      |
 | `portals/dispatcher-desktop/` | client     | Desktop dispatcher portal — C++ / Wt.                                  |
 | `portals/mobile/`             | client     | Driver & Updater mobile app — React / Ionic / Capacitor.              |
 | `docs/`                       | —          | Architecture, domain model, and DDD pattern notes.                     |
@@ -60,6 +60,35 @@ psql "$DATABASE_URL" -f database/seed_data.sql
 ```
 
 See each tier's own `README.md` for middleware and portal setup.
+
+## Mobile module (`Fleet-Dispatcher-Mobile`)
+
+The mobile app is developed here in `portals/mobile`, but also lives in its own
+repository, **`Fleet-Dispatcher-Mobile`**, which VCP builds and deploys. This
+monorepo is the source of truth; we publish the folder to the standalone repo
+with **git subtree** (the `portals/mobile` prefix is stripped, so `package.json`
+lands at that repo's root).
+
+```bash
+# Publish portals/mobile -> Fleet-Dispatcher-Mobile (set the URL once if needed)
+make publish-mobile MOBILE_REMOTE_URL=git@github.com:thomasgpeters/Fleet-Dispatcher-Mobile.git
+
+# Or call the script directly:
+MOBILE_REMOTE_URL=... scripts/publish-mobile.sh
+
+# If anyone commits directly in the standalone repo, pull it back (squashed):
+make pull-mobile
+```
+
+The URL/branch/remote-name are configurable via `MOBILE_REMOTE_URL`,
+`MOBILE_BRANCH`, and `MOBILE_REMOTE_NAME` (see [`Makefile`](Makefile) and
+[`scripts/publish-mobile.sh`](scripts/publish-mobile.sh)).
+
+> If `git subtree push` is ever rejected because the standalone repo has
+> diverged, force a clean overwrite with a split:
+> ```bash
+> git push mobile "$(git subtree split --prefix=portals/mobile HEAD)":main --force
+> ```
 
 ## Domain at a glance
 
