@@ -1,0 +1,30 @@
+/* Fleet Dispatcher — desktop portal app-specific styles.
+ *
+ * Loaded on top of the Wt Bootstrap theme (see src/main.cpp). The Bootstrap
+ * CSS/JS itself comes from the deployed Wt resources/ folder; put only project
+ * overrides and custom components here.
+ *
+ * This file is served from the docroot at runtime; CMake copies the docroot/
+ * tree next to the executable on build.
+ */
+
+:root {
+    /* Dispatcher brand accents — tweak to taste. */
+    --fd-accent: #0d6efd;       /* Bootstrap primary */
+    --fd-board-gap: 0.75rem;
+}
+
+body {
+    background-color: #f5f6f8;
+}
+
+/* Weekly board grid placeholder (Mon -> Mon). */
+.fd-week-board {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: var(--fd-board-gap);
+}
+
+.fd-load-card {
+    border-left: 4px solid var(--fd-accent);
+}
