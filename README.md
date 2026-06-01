@@ -36,7 +36,7 @@ schema, the API, and both portals to keep design and discussion aligned:
 
 | Path                          | Tier       | Description                                                            |
 | ----------------------------- | ---------- | ---------------------------------------------------------------------- |
-| `middleware/`                 | middleware | ApiLogicServer project (JSON:API / SAFRS) generated from the schema, on `:5656`. |
+| `docs/MIDDLEWARE_SETUP.md`    | middleware | How to generate/run the ApiLogicServer middleware (managed outside this repo) on `:5656`. |
 | `database/`                   | backend    | PostgreSQL schema (`schema.sql`) and seed data (`seed_data.sql`).      |
 | `portals/dispatcher-desktop/` | client     | Desktop dispatcher portal — C++ / Wt.                                  |
 | `portals/mobile/`             | client     | Driver & Updater mobile app — React / Ionic / Capacitor.              |
@@ -48,6 +48,8 @@ schema, the API, and both portals to keep design and discussion aligned:
 - [`docs/domain-model.md`](docs/domain-model.md) — the shared domain language:
   ubiquitous terms, bounded contexts, aggregates, and invariants. This is the
   vocabulary we use to keep design and conversation consistent.
+- [`docs/MIDDLEWARE_SETUP.md`](docs/MIDDLEWARE_SETUP.md) — generating and running
+  the ApiLogicServer middleware from the schema (managed outside this repo).
 
 ## Getting started
 
@@ -59,7 +61,8 @@ psql "$DATABASE_URL" -f database/schema.sql
 psql "$DATABASE_URL" -f database/seed_data.sql
 ```
 
-See each tier's own `README.md` for middleware and portal setup.
+See [`docs/MIDDLEWARE_SETUP.md`](docs/MIDDLEWARE_SETUP.md) for the middleware,
+and each portal's own `README.md` for portal setup.
 
 ## Mobile module (`Fleet-Dispatcher-Mobile`)
 
