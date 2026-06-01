@@ -1,8 +1,9 @@
 # Domain Model
 
-This is the heart of the project. Every layer — the `domain/` Python package,
-`database/schema.sql`, and the ApiLogicServer/LogicBank rules — uses the nouns
-and verbs defined here. Change the language here first, then propagate.
+This is the heart of the project: the **shared domain language**. The schema
+(`database/schema.sql`), the generated ApiLogicServer API, both portals, and our
+conversations all use the nouns and verbs defined here. Change the language here
+first, then propagate. Consistent terms keep design unambiguous and reviews fast.
 
 ## Ubiquitous language
 
@@ -142,20 +143,30 @@ Behavior that doesn't naturally belong to a single entity:
 - **`SettlementCalculator`** — computes driver pay from a load's rate and the
   driver's contract percentage.
 
-## Enumerations
+## Enumerations (realized as lookup tables)
 
-- `DriverType`: `COMPANY` (30%), `OWNER_OPERATOR` (70%).
-- `RunType`: `LONG_HAUL`, `REGIONAL`.
-- `PowerUnit`: `TRACTOR`, `RAM_3500`, `RAM_4500`.
-- `TrailerType`: `STEP_DECK_52`, `RGN_LOWBOY`, `FLATBED_52`, `CAR_CARRIER`, `NONE`.
-- `LoadStatus`: `DRAFT`, `DISPATCHED`, `IN_TRANSIT`, `DELIVERED`, `SETTLED`,
-  `CANCELLED`.
-- `Role`: `DISPATCHER`, `DRIVER`, `UPDATER`.
+Each of these is a **lookup table** with a sequential integer key, referenced by
+FK from the domain objects (so ApiLogicServer generates them as related
+resources). Codes shown below match the `code` column in
+`database/seed_data.sql`.
+
+- `driver_type`: `company` (30%), `owner_operator` (70%) — carries
+  `default_percent` and `owner_bears_costs`.
+- `run_type`: `long_haul`, `regional`.
+- `power_unit`: `tractor`, `ram_3500`, `ram_4500`.
+- `trailer_type`: `step_deck_52`, `rgn_lowboy`, `flatbed_52`, `car_carrier`, `none`.
+- `load_status`: `draft`, `dispatched`, `in_transit`, `delivered`, `settled`,
+  `cancelled`.
+- `app_role`: `dispatcher`, `driver`, `updater`.
+- `commodity_category`: `vehicles`, `heavy_equipment`, `farm_equipment`,
+  `generators`, `lifts`.
 
 ## Policies / business rules (canonical list)
 
-These are the invariants the LogicBank rules in `middleware/` must enforce, and
-the `domain/` package must reproduce:
+These are the invariants the model must uphold. Structural ones live in
+`database/schema.sql` (CHECK constraints, FK relationships, the Monday-only
+`week_start`); cross-row and computed ones (weekly load cap, `driver_pay`) are
+declared as ApiLogicServer/LogicBank rules in the generated middleware:
 
 1. **Contract percentage** is derived from `DriverType` (30 / 70) — never set
    directly on a settlement.

@@ -53,21 +53,20 @@ All ports and credentials are configurable through environment variables; see
 
 ## Why this shape
 
-ApiLogicServer is **database-first**: it generates the API and ORM from the
-schema. To keep DDD meaningful in that world we treat the model in three aligned
-layers, all speaking the same ubiquitous language:
+ApiLogicServer is **database-first**: it generates the API and ORM directly from
+the schema. So there are only two artifacts to keep aligned, both speaking the
+same ubiquitous language:
 
-1. `docs/domain-model.md` — the model in prose (bounded contexts, aggregates,
-   invariants).
-2. `domain/` — the model in pure Python (value objects, entities, aggregate
-   roots, domain services). This is the reference for *behavior* and *invariants*
-   independent of any framework.
-3. `database/schema.sql` + `middleware/` — the model as persisted tables and as
-   LogicBank rules. ApiLogicServer enforces, at runtime, the same invariants the
-   `domain/` package describes.
+1. `docs/domain-model.md` — the model in prose: bounded contexts, aggregates,
+   invariants, and the shared vocabulary we use when talking about the app.
+2. `database/schema.sql` — that model made physical (tables, lookups, FK
+   relationships, CHECK constraints). ApiLogicServer generates the running
+   middleware from it.
 
-Keeping these three in sync — same nouns, same rules — is the discipline that
-makes this a DDD project rather than a CRUD-over-tables project.
+Keeping the prose and the schema in sync — same nouns, same rules — is what
+makes this a domain-led project rather than CRUD-over-tables. The ubiquitous
+language is also how we communicate: consistent terms keep design discussions
+unambiguous.
 
 ## Request flow (example: dispatch a load)
 

@@ -4,7 +4,9 @@ Fleet Dispatcher lets organizations manage a fleet of drivers running varied
 truck/trailer configurations, dispatch loads across a Monday-to-Monday week, and
 settle driver pay based on contract type.
 
-It is a **three-tier application** built around **Domain-Driven Design (DDD)**:
+It is a **three-tier application**. We use a **consistent domain language** (the
+ubiquitous terms in [`docs/domain-model.md`](docs/domain-model.md)) across the
+schema, the API, and both portals to keep design and discussion aligned:
 
 ```
 ┌──────────────────────────────┐   ┌──────────────────────────────┐
@@ -34,8 +36,7 @@ It is a **three-tier application** built around **Domain-Driven Design (DDD)**:
 
 | Path                          | Tier       | Description                                                            |
 | ----------------------------- | ---------- | ---------------------------------------------------------------------- |
-| `domain/`                     | core       | Pure-Python DDD model — the ubiquitous language expressed in code.     |
-| `middleware/`                 | middleware | ApiLogicServer project (JSON:API / SAFRS, LogicBank rules) on `:5656`. |
+| `middleware/`                 | middleware | ApiLogicServer project (JSON:API / SAFRS) generated from the schema, on `:5656`. |
 | `database/`                   | backend    | PostgreSQL schema (`schema.sql`) and seed data (`seed.sql`).           |
 | `portals/dispatcher-desktop/` | client     | Desktop dispatcher portal — C++ / Wt.                                  |
 | `portals/mobile/`             | client     | Driver & Updater mobile app — React / Ionic / Capacitor.              |
@@ -44,10 +45,9 @@ It is a **three-tier application** built around **Domain-Driven Design (DDD)**:
 ## Key documents
 
 - [`docs/architecture.md`](docs/architecture.md) — three-tier topology and ports.
-- [`docs/domain-model.md`](docs/domain-model.md) — ubiquitous language, bounded
-  contexts, aggregates, and invariants.
-- [`docs/ddd-patterns.md`](docs/ddd-patterns.md) — how the tactical DDD patterns
-  are realized in this codebase.
+- [`docs/domain-model.md`](docs/domain-model.md) — the shared domain language:
+  ubiquitous terms, bounded contexts, aggregates, and invariants. This is the
+  vocabulary we use to keep design and conversation consistent.
 
 ## Getting started
 

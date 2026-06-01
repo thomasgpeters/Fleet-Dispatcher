@@ -39,40 +39,18 @@ middleware/
   config/
 ```
 
-## Business rules to declare in `logic/`
+## Business rules
 
-These re-state, at the transaction boundary, the invariants from
-[`../docs/domain-model.md`](../docs/domain-model.md) and the
-[`../domain/`](../domain) package. Sketch (LogicBank):
+The structural invariants from [`../docs/domain-model.md`](../docs/domain-model.md)
+are already enforced by the schema (FK relationships, CHECK constraints, the
+Monday-only `week_start`), so the generated API honors them out of the box.
 
-```python
-from logic_bank.logic_bank import Rule
-
-def declare_logic():
-    # Driver pay = gross_rate × contract_percent / 100, rounded to cents.
-    Rule.formula(derive=models.Settlement.driver_pay,
-                 as_expression=lambda row: round(row.gross_rate * row.contract_percent / 100, 2))
-
-    # Settlement percentage must match the driver's contract percentage.
-    Rule.copy(derive=models.Settlement.contract_percent,
-              from_parent=models.Driver.contract_percent)
-
-    # Weekly load cap: ≤ 4 non-cancelled loads per driver per dispatch week.
-    Rule.count(derive=models.DispatchWeekDriver.load_count,
-               as_count_of=models.Load)            # via an association/derived view
-    Rule.constraint(validate=models.DispatchWeekDriver,
-                    as_condition=lambda row: row.load_count <= 4,
-                    error_msg="Driver exceeds 4 loads in dispatch week")
-
-    # Structural guards mirrored from CHECK constraints.
-    Rule.constraint(validate=models.Load,
-                    as_condition=lambda row: row.rate >= 0 and row.pickup_id != row.dropoff_id,
-                    error_msg="Invalid load: negative rate or same pickup/dropoff")
-```
-
-> The exact model/attribute names depend on the generated SQLAlchemy classes;
-> adjust after generation. Keep the rule set aligned with the `domain/` tests —
-> those tests are the executable specification.
+The cross-row / computed invariants — weekly load cap (≤ 4), `driver_pay =
+rate × contract_percent`, copying the percentage and cost-responsibility from
+`driver_type` — are the kind of thing ApiLogicServer expresses as declarative
+LogicBank rules in `logic/declare_logic.py` if/when you want them enforced at
+the API tier. They're listed under "Policies / business rules" in the domain
+model for reference.
 
 ## Configuration
 
