@@ -1,0 +1,47 @@
+# Fleet Dispatcher — local development stack.
+#
+#   docker compose up -d db    # PostgreSQL only
+#   docker compose up          # PostgreSQL + ApiLogicServer (once built)
+#
+# The 'api' service is scaffolded; see middleware/README.md for creating the
+# ApiLogicServer project that populates middleware/.
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ${DB_NAME:-fleet_dispatcher}
+      POSTGRES_USER: ${DB_USER:-fleet}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-fleet}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - fleet_pgdata:/var/lib/postgresql/data
+      # Schema + seed are applied automatically on first init.
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./database/seed_data.sql:/docker-entrypoint-initdb.d/02-seed_data.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-fleet} -d ${DB_NAME:-fleet_dispatcher}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    # Build context is the ApiLogicServer project under middleware/.
+    # Uncomment once the project has been created (see middleware/README.md).
+    # build: ./middleware
+    image: apilogicserver/api_logic_server:latest
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      APILOGICSERVER_DATABASE_URI: postgresql://${DB_USER:-fleet}:${DB_PASSWORD:-fleet}@db:5432/${DB_NAME:-fleet_dispatcher}
+      APILOGICPROJECT_PORT: ${API_PORT:-5656}
+    ports:
+      - "${API_PORT:-5656}:5656"
+    volumes:
+      - ./middleware:/app
+    profiles: ["full"]   # not started by default until the project exists
+
+volumes:
+  fleet_pgdata:

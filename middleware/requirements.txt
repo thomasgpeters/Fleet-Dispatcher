@@ -1,0 +1,7 @@
+# Fleet Dispatcher middleware (ApiLogicServer) dependencies.
+# Pin exact versions after `ApiLogicServer create` generates the project and a
+# working set is confirmed. ApiLogicServer transitively provides SAFRS,
+# LogicBank, Flask, and SQLAlchemy.
+ApiLogicServer
+psycopg2-binary
+python-dotenv
