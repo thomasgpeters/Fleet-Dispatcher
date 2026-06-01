@@ -1,0 +1,38 @@
+# --- Environment ---
+.env
+*.local
+
+# --- Python (domain + middleware) ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# --- Node / mobile portal ---
+node_modules/
+portals/mobile/dist/
+portals/mobile/.vite/
+*.log
+
+# --- Capacitor native ---
+portals/mobile/ios/
+portals/mobile/android/
+
+# --- C++ / desktop portal ---
+portals/dispatcher-desktop/build/
+*.o
+*.obj
+
+# --- Editors / OS ---
+.idea/
+.vscode/
+.DS_Store
