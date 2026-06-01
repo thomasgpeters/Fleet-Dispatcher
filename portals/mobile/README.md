@@ -1,11 +1,16 @@
-# Mobile portal — Drivers & Updaters
+# Fleet Dispatcher — Mobile
 
 The mobile client for the **Driver** and **Updater** roles.
 
 **Stack:** React 18 · Ionic 8 · Capacitor 6 · TypeScript 5.5 · Vite 5.
 
+This is a **self-contained module**. It lives in the Fleet Dispatcher monorepo
+under `portals/mobile/` during development, and is also published on its own to
+the **`Fleet-Dispatcher-Mobile`** repository, from which VCP builds and deploys
+it. Nothing here depends on files outside this folder.
+
 It talks to the shared middleware over **JSON:API** (ApiLogicServer / SAFRS) at
-`VITE_API_BASE_URL` (default `http://localhost:5656/api`). It never touches
+`VITE_API_BASE_URL` (default `http://localhost:5656/api`) and never touches
 PostgreSQL directly.
 
 ## What this portal does
@@ -18,13 +23,21 @@ PostgreSQL directly.
 ## Develop
 
 ```bash
-cd portals/mobile
 npm install
-cp ../../.env.example .env.local   # ensure VITE_API_BASE_URL points at the API
-npm run dev                        # Vite dev server
+cp .env.example .env.local      # point VITE_API_BASE_URL at your middleware
+npm run dev                     # Vite dev server on http://localhost:5173
 ```
 
-Native shells (after `npm run build`):
+## Build
+
+```bash
+npm run build                   # type-checks (tsc) then builds to dist/
+npm run preview                 # serve the production build locally
+```
+
+`dist/` is a static SPA — the artifact VCP serves in its managed container.
+
+Native shells (Capacitor):
 
 ```bash
 npx cap add ios
@@ -32,16 +45,27 @@ npx cap add android
 npm run cap:sync
 ```
 
+## Layout
+
+```
+index.html              Vite entry
+src/
+  main.tsx              Ionic React bootstrap
+  App.tsx               app shell
+  pages/LoadsPage.tsx   driver board (lists loads from the JSON:API)
+  api/
+    client.ts           thin JSON:API client (VITE_API_BASE_URL)
+    types.ts            resource types mirroring the database schema
+capacitor.config.ts     Capacitor app id / web dir
+```
+
 ## JSON:API integration
 
-A thin typed client lives in [`src/api/`](src/api). JSON:API resources map 1:1
-to the domain aggregates exposed by ApiLogicServer (`Driver`, `Load`,
-`DispatchWeek`, `Settlement`, …). Example: a driver's loads for the current week
+Resources map 1:1 to the domain objects exposed by ApiLogicServer (`Driver`,
+`Load`, `DispatchWeek`, `Settlement`, …); lookup tables (`DriverType`,
+`RunType`, `LoadStatus`, …) are referenced by integer `*_id` and can be pulled
+in with JSON:API `include`. Example — a driver's loads for a week:
 
 ```
 GET /api/Load?filter[driver_id]=<id>&filter[dispatch_week_id]=<id>
 ```
-
-> This directory is a scaffold: `package.json`, `tsconfig`, `vite.config.ts`,
-> and a starter API client. Run `npm install` to materialize `node_modules`,
-> then build out the Ionic pages.

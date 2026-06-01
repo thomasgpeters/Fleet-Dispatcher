@@ -6,7 +6,7 @@
 
 import type { Driver, JsonApiDocument, Load } from "./types";
 
-const BASE_URL =
+export const API_BASE_URL: string =
   import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5656/api";
 
 async function getCollection<T>(
@@ -18,7 +18,7 @@ async function getCollection<T>(
     params.set(`filter[${key}]`, value);
   }
   const qs = params.toString();
-  const res = await fetch(`${BASE_URL}/${resource}${qs ? `?${qs}` : ""}`, {
+  const res = await fetch(`${API_BASE_URL}/${resource}${qs ? `?${qs}` : ""}`, {
     headers: { Accept: "application/vnd.api+json" },
   });
   if (!res.ok) {
@@ -30,6 +30,11 @@ async function getCollection<T>(
 }
 
 export const api = {
+  /** All loads (the dispatch board). */
+  listLoads(): Promise<Load[]> {
+    return getCollection<Load>("Load");
+  },
+
   /** Loads a driver holds in a given dispatch week (the driver's board). */
   loadsForDriverWeek(driverId: string, dispatchWeekId: string): Promise<Load[]> {
     return getCollection<Load>("Load", {

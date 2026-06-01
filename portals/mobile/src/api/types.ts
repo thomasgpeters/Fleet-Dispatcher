@@ -1,22 +1,42 @@
 // Domain resource types as exposed by the JSON:API (ApiLogicServer / SAFRS).
-// These mirror the aggregates in docs/domain-model.md and the `domain/` package.
+// These mirror the tables in ../../database/schema.sql: domain objects carry
+// UUID ids and reference lookup tables by integer FK (…_id). Use JSON:API
+// `include` to pull related lookup/resource rows when you need their labels.
 
-export type DriverType = "company" | "owner_operator";
-export type RunType = "long_haul" | "regional";
-export type LoadStatus =
-  | "draft"
-  | "dispatched"
-  | "in_transit"
-  | "delivered"
-  | "settled"
-  | "cancelled";
-export type Role = "dispatcher" | "driver" | "updater";
+// --- Lookup resources (sequential integer ids) ---
+export interface DriverType {
+  id: number;
+  code: "company" | "owner_operator";
+  name: string;
+  default_percent: number; // 30 | 70
+  owner_bears_costs: boolean;
+}
 
+export interface RunType {
+  id: number;
+  code: "long_haul" | "regional";
+  name: string;
+}
+
+export interface LoadStatus {
+  id: number;
+  code:
+    | "draft"
+    | "dispatched"
+    | "in_transit"
+    | "delivered"
+    | "settled"
+    | "cancelled";
+  name: string;
+}
+
+// --- Domain resources (UUID ids, lookup FKs) ---
 export interface Driver {
   id: string;
   name: string;
-  driver_type: DriverType;
-  contract_percent: number; // derived: 30 (company) | 70 (owner-operator)
+  driver_type_id: number; // -> DriverType
+  phone?: string;
+  email?: string;
   home_base?: string;
   active: boolean;
 }
@@ -31,12 +51,12 @@ export interface Load {
   commodity_id: string;
   pickup_id: string;
   dropoff_id: string;
-  run_type: RunType;
+  run_type_id: number; // -> RunType
+  load_status_id: number; // -> LoadStatus
   deadhead_miles: number;
   loaded_miles: number;
   rate: number; // post-broker
   currency: string;
-  status: LoadStatus;
 }
 
 export interface Settlement {
