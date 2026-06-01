@@ -70,8 +70,9 @@ with **git subtree** (the `portals/mobile` prefix is stripped, so `package.json`
 lands at that repo's root).
 
 ```bash
-# Publish portals/mobile -> Fleet-Dispatcher-Mobile (set the URL once if needed)
-make publish-mobile MOBILE_REMOTE_URL=git@github.com:thomasgpeters/Fleet-Dispatcher-Mobile.git
+# Publish portals/mobile -> Fleet-Dispatcher-Mobile
+# (defaults to https://github.com/thomasgpeters/Fleet-Dispatcher-Mobile.git)
+make publish-mobile
 
 # Or call the script directly:
 MOBILE_REMOTE_URL=... scripts/publish-mobile.sh

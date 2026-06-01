@@ -8,19 +8,19 @@
 #
 # Config (env vars, all optional):
 #   MOBILE_REMOTE_URL   git URL of Fleet-Dispatcher-Mobile
-#                       (default: git@github.com:thomasgpeters/Fleet-Dispatcher-Mobile.git)
+#                       (default: https://github.com/thomasgpeters/Fleet-Dispatcher-Mobile.git)
 #   MOBILE_REMOTE_NAME  local remote name (default: mobile)
 #   MOBILE_BRANCH       target branch (default: main)
 #
 # Usage:
 #   scripts/publish-mobile.sh
-#   MOBILE_REMOTE_URL=https://github.com/thomasgpeters/Fleet-Dispatcher-Mobile.git scripts/publish-mobile.sh
+#   MOBILE_REMOTE_URL=git@github.com:thomasgpeters/Fleet-Dispatcher-Mobile.git scripts/publish-mobile.sh   # SSH override
 
 set -euo pipefail
 
 PREFIX="portals/mobile"
 REMOTE_NAME="${MOBILE_REMOTE_NAME:-mobile}"
-REMOTE_URL="${MOBILE_REMOTE_URL:-git@github.com:thomasgpeters/Fleet-Dispatcher-Mobile.git}"
+REMOTE_URL="${MOBILE_REMOTE_URL:-https://github.com/thomasgpeters/Fleet-Dispatcher-Mobile.git}"
 BRANCH="${MOBILE_BRANCH:-main}"
 
 # Run from the repo root regardless of where the script is invoked from.

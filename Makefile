@@ -5,7 +5,7 @@
 
 # Override the mobile repo URL if it differs from the default:
 #   make publish-mobile MOBILE_REMOTE_URL=https://github.com/thomasgpeters/Fleet-Dispatcher-Mobile.git
-MOBILE_REMOTE_URL ?= git@github.com:thomasgpeters/Fleet-Dispatcher-Mobile.git
+MOBILE_REMOTE_URL ?= https://github.com/thomasgpeters/Fleet-Dispatcher-Mobile.git
 MOBILE_REMOTE_NAME ?= mobile
 MOBILE_BRANCH ?= main
 MOBILE_PREFIX := portals/mobile

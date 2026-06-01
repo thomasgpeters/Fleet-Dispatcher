@@ -72,3 +72,57 @@ install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/docroot/" DESTINATION bin)
 if(WT_RESOURCES_DIR)
     install(DIRECTORY "${WT_RESOURCES_DIR}/" DESTINATION bin/resources)
 endif()
+
+# ---------------------------------------------------------------------------
+# Mobile module publishing (git subtree)
+#
+# Exposes the monorepo's `make publish-mobile` to CMake so the mobile app
+# (portals/mobile) can be published to the Fleet-Dispatcher-Mobile repo from the
+# build:
+#
+#   * On demand:   cmake --build build --target publish-mobile
+#   * As a step:   configure with -DFLEET_PUBLISH_MOBILE=ON to run it
+#                  POST_BUILD, after the desktop binary is linked.
+#
+# Publishing pushes to a remote (outward-facing), so the POST_BUILD step is OFF
+# by default. Forward the remote/branch with -DMOBILE_REMOTE_URL / -DMOBILE_BRANCH.
+# Gracefully no-ops if built outside the monorepo (no top-level Makefile).
+# ---------------------------------------------------------------------------
+get_filename_component(FLEET_MONOREPO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
+
+option(FLEET_PUBLISH_MOBILE "Run 'make publish-mobile' as a POST_BUILD step" OFF)
+set(MOBILE_REMOTE_URL "" CACHE STRING "git URL of Fleet-Dispatcher-Mobile (forwarded to make publish-mobile)")
+set(MOBILE_BRANCH "main" CACHE STRING "Target branch for the mobile subtree publish")
+
+find_program(MAKE_EXECUTABLE NAMES make gmake)
+
+if(EXISTS "${FLEET_MONOREPO_ROOT}/Makefile" AND MAKE_EXECUTABLE)
+    set(_publish_cmd ${MAKE_EXECUTABLE} -C "${FLEET_MONOREPO_ROOT}" publish-mobile "MOBILE_BRANCH=${MOBILE_BRANCH}")
+    if(MOBILE_REMOTE_URL)
+        list(APPEND _publish_cmd "MOBILE_REMOTE_URL=${MOBILE_REMOTE_URL}")
+    endif()
+
+    # On-demand target.
+    add_custom_target(publish-mobile
+        COMMAND ${_publish_cmd}
+        WORKING_DIRECTORY "${FLEET_MONOREPO_ROOT}"
+        COMMENT "Publishing portals/mobile -> Fleet-Dispatcher-Mobile (git subtree)"
+        VERBATIM
+        USES_TERMINAL
+    )
+
+    # Optional automatic step after the desktop build.
+    if(FLEET_PUBLISH_MOBILE)
+        message(STATUS "Mobile publish: will run 'make publish-mobile' POST_BUILD")
+        add_custom_command(TARGET fleet_dispatcher_desktop POST_BUILD
+            COMMAND ${_publish_cmd}
+            WORKING_DIRECTORY "${FLEET_MONOREPO_ROOT}"
+            COMMENT "POST_BUILD: publishing mobile module via git subtree"
+            VERBATIM
+        )
+    endif()
+else()
+    message(STATUS
+        "Mobile publish target unavailable (no Makefile at ${FLEET_MONOREPO_ROOT} "
+        "or 'make' not found) — expected when building the desktop app standalone.")
+endif()
