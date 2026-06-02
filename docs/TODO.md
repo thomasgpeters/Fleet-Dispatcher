@@ -25,10 +25,12 @@ Working plan, sequenced. Check items off as they ship and add a dated entry to
 - [x] Mobile publishing via git subtree (`make publish-mobile`, CMake target)
 - [x] Middleware setup offloaded to `docs/MIDDLEWARE_SETUP.md`
 
-## Feature 1 — Messaging & Content (CMS)
+## Feature 1 — Messaging & Content (CMS)  — Phase 1 CLOSED (2026-06-02)
 
-Schema/CMS foundation is in. Building out the experience next.
+Mobile messaging + CMS vertical is complete for what doesn't depend on auth /
+realtime / the desktop portal. Those are carried over below to their owners.
 
+Done:
 - [x] Schema: `channel`, `channel_member`, `message`; CMS `document` + FK link
       tables (`message_document`, `load_document`)
 - [x] Mobile: list → detail navigation (channels list + channel detail) with
@@ -36,20 +38,39 @@ Schema/CMS foundation is in. Building out the experience next.
 - [x] Mobile: compose & send a message (write-side)
 - [x] Mobile: attachment upload (create `document` + `message_document` link)
 - [x] Mobile: attachment preview / download (bytea ↔ base64, data URL)
-- [ ] Optimize attachment loading (sparse fieldsets; lazy `data` on tap)
-- [ ] Unread counts via `channel_member.last_read_at` + mark-as-read (Badge)
-- [ ] Clickable message **toasts** (`IonToast`, 2–3s) that deep-link to the
-      channel from any view; needs realtime/polling. See `MOBILE_UI_WIDGETS.md`.
-- [ ] Direct (1:1) channel creation + membership management
-- [ ] Current-user identity (replace hardcoded placeholder) — depends on auth
-- [ ] Realtime delivery (websockets/push) — currently JSON:API polling
-- [ ] Desktop (dispatcher) messaging view
+- [x] Optimize attachment loading (sparse fieldsets; lazy `data` on tap)
+- [x] Unread counts via `channel_member.last_read_at` + mark-as-read (Badge)
+- [x] Pull-to-refresh (`IonRefresher`) on channel list + detail
+
+Carried over (blocked / owned elsewhere):
+- [ ] Direct (1:1) channel creation + membership management — needs a user
+      directory (→ auth)
+- [ ] Current-user identity (replace `src/currentUser.ts` placeholder) → auth
+- [ ] Clickable message **toasts** (`IonToast`, 2–3s, deep-link) → realtime
+- [ ] Realtime delivery (websockets/push) — currently polling/pull-to-refresh
+- [ ] Desktop (dispatcher) messaging view → desktop portal work
+- [ ] Server-side `unread_count` (LogicBank) to replace client-side computation
 - [ ] More CMS links as needed: `driver_document`, `equipment_document`,
       `inspection_document`
 
+## Dispatcher Desktop Portal (C++/Wt)  — NEXT
+
+Pivot here after Phase 1. Talks to the same JSON:API; Bootstrap theme + Wt
+`resources/` deploy already wired.
+
+- [ ] Dispatcher shell: navigation, layout, auth-aware (auth later)
+- [ ] Weekly board (Mon→Mon): drivers × days grid of loads
+- [ ] Load intake form (new load) + driver/equipment assignment
+- [ ] Dispatcher messaging view (mirrors mobile Feature 1)
+- [ ] **HUD**: fleet **truck locations** on a map + at-a-glance fleet data
+      (active loads, status). Truck-location data depends on Feature 2 telemetry
+      + the geospatial endpoint; until then, HUD can render loads/board data.
+
 ## Feature 2 — Truck Location & Dispatcher HUD
 
-Planned; pivot here after messaging. See "Planned" in `domain-model.md`.
+Powers the HUD's map. See "Planned" in `domain-model.md`.
+**Decided (2026-06-02):** PostGIS spatial data is separated from the ALS APIs
+(see [`SPATIAL_GIS_DATA_CONSIDERATIONS.md`](SPATIAL_GIS_DATA_CONSIDERATIONS.md)).
 **Decided (2026-06-02):** PostGIS spatial data is separated from the ALS APIs
 (see [`SPATIAL_GIS_DATA_CONSIDERATIONS.md`](SPATIAL_GIS_DATA_CONSIDERATIONS.md)).
 

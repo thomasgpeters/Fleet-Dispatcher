@@ -15,18 +15,18 @@ import {
   IonList,
   IonNote,
   IonPage,
+  IonRefresher,
+  IonRefresherContent,
   IonText,
   IonTitle,
   IonToolbar,
 } from "@ionic/react";
+import type { RefresherCustomEvent } from "@ionic/react";
 import { attachOutline, documentOutline, send } from "ionicons/icons";
 
 import { api } from "../api/client";
 import type { Channel, Document, Message } from "../api/types";
-
-// Placeholder for the signed-in user (driver1 from the seed). Replace with the
-// authenticated identity once auth lands (see TODO.md).
-const CURRENT_USER_ID = "22222222-2222-2222-2222-222222222222";
+import { CURRENT_USER_ID } from "../currentUser";
 
 /** Strip the "data:<mime>;base64," prefix, returning just the base64 payload. */
 function fileToBase64(file: File): Promise<string> {
@@ -64,20 +64,29 @@ export function ChannelPage() {
       const sorted = [...msgs].sort((a, b) => a.posted_at.localeCompare(b.posted_at));
       setMessages(sorted);
 
-      // Resolve attachments per message (metadata + base64 for small docs).
+      // Resolve attachment metadata per message (no base64 `data` — fetched
+      // on tap to keep the timeline light).
       const map: Record<string, Document[]> = {};
       for (const m of sorted) {
         const links = await api.attachmentsForMessage(m.id);
         if (links.length) {
           map[m.id] = await Promise.all(
-            links.map((l) => api.getDocument(l.document_id)),
+            links.map((l) => api.getDocumentMeta(l.document_id)),
           );
         }
       }
       setDocsByMessage(map);
+
+      // Entering a channel marks it read for the current user.
+      void api.markChannelRead(channelId, CURRENT_USER_ID).catch(() => {});
     } catch (e) {
       fail(e);
     }
+  };
+
+  const refresh = async (e: RefresherCustomEvent) => {
+    await load();
+    await e.detail.complete();
   };
 
   useEffect(() => {
@@ -124,9 +133,15 @@ export function ChannelPage() {
     }
   };
 
-  const openDocument = (doc: Document) => {
-    if (!doc.data) return;
-    window.open(`data:${doc.content_type};base64,${doc.data}`, "_blank");
+  const openDocument = async (doc: Document) => {
+    try {
+      const full = doc.data ? doc : await api.getDocument(doc.id);
+      if (full.data) {
+        window.open(`data:${full.content_type};base64,${full.data}`, "_blank");
+      }
+    } catch (e) {
+      fail(e);
+    }
   };
 
   return (
@@ -141,6 +156,9 @@ export function ChannelPage() {
       </IonHeader>
 
       <IonContent className="ion-padding">
+        <IonRefresher slot="fixed" onIonRefresh={(e) => void refresh(e)}>
+          <IonRefresherContent />
+        </IonRefresher>
         {error && (
           <IonText color="danger">
             <p>Could not reach the middleware: {error}</p>
@@ -152,7 +170,7 @@ export function ChannelPage() {
               <IonLabel className="ion-text-wrap">
                 <p>{m.body}</p>
                 {(docsByMessage[m.id] ?? []).map((doc) => (
-                  <IonChip key={doc.id} onClick={() => openDocument(doc)}>
+                  <IonChip key={doc.id} onClick={() => void openDocument(doc)}>
                     <IonIcon icon={documentOutline} />
                     <IonLabel>{doc.filename}</IonLabel>
                   </IonChip>

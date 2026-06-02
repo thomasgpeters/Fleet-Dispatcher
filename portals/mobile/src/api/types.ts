@@ -89,6 +89,15 @@ export interface Message {
   edited_at?: string;
 }
 
+export interface ChannelMember {
+  id: string;
+  channel_id: string;
+  user_id: string;
+  member_role_id: number;
+  joined_at?: string;
+  last_read_at?: string | null;
+}
+
 // --- Content (CMS) context ---
 export interface Document {
   id: string;

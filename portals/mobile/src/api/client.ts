@@ -6,6 +6,7 @@
 
 import type {
   Channel,
+  ChannelMember,
   Document,
   Driver,
   JsonApiDocument,
@@ -62,13 +63,40 @@ async function createResource<T>(
   return { id: r.id, ...r.attributes } as T;
 }
 
-/** Fetch a single resource by id (GET /Resource/{id}). */
-async function getOne<T>(resource: string, id: string): Promise<T> {
-  const res = await fetch(`${API_BASE_URL}/${resource}/${id}`, {
+/** Fetch a single resource by id (GET /Resource/{id}), optional sparse fields. */
+async function getOne<T>(
+  resource: string,
+  id: string,
+  fields?: string[],
+): Promise<T> {
+  const qs = fields ? `?${new URLSearchParams({ [`fields[${resource}]`]: fields.join(",") })}` : "";
+  const res = await fetch(`${API_BASE_URL}/${resource}/${id}${qs}`, {
     headers: { Accept: "application/vnd.api+json" },
   });
   if (!res.ok) {
     throw new Error(`JSON:API ${resource}/${id} failed: ${res.status}`);
+  }
+  const doc = (await res.json()) as JsonApiDocument<T>;
+  const r = Array.isArray(doc.data) ? doc.data[0] : doc.data;
+  return { id: r.id, ...r.attributes } as T;
+}
+
+/** Update a resource via JSON:API (PATCH /Resource/{id}). */
+async function updateResource<T>(
+  resource: string,
+  id: string,
+  attributes: Record<string, unknown>,
+): Promise<T> {
+  const res = await fetch(`${API_BASE_URL}/${resource}/${id}`, {
+    method: "PATCH",
+    headers: {
+      Accept: "application/vnd.api+json",
+      "Content-Type": "application/vnd.api+json",
+    },
+    body: JSON.stringify({ data: { type: resource, id, attributes } }),
+  });
+  if (!res.ok) {
+    throw new Error(`JSON:API update ${resource}/${id} failed: ${res.status}`);
   }
   const doc = (await res.json()) as JsonApiDocument<T>;
   const r = Array.isArray(doc.data) ? doc.data[0] : doc.data;
@@ -126,6 +154,27 @@ export const api = {
     });
   },
 
+  /** The current user's membership row for a channel (for read state). */
+  async myMembership(
+    channelId: string,
+    userId: string,
+  ): Promise<ChannelMember | null> {
+    const rows = await getCollection<ChannelMember>("ChannelMember", {
+      channel_id: channelId,
+      user_id: userId,
+    });
+    return rows[0] ?? null;
+  },
+
+  /** Mark a channel read for a user by stamping last_read_at = now. */
+  async markChannelRead(channelId: string, userId: string): Promise<void> {
+    const membership = await this.myMembership(channelId, userId);
+    if (!membership) return;
+    await updateResource<ChannelMember>("ChannelMember", membership.id, {
+      last_read_at: new Date().toISOString(),
+    });
+  },
+
   // --- Content (CMS) ---
 
   /** Attachment links for a message (FK join rows). */
@@ -133,6 +182,18 @@ export const api = {
     return getCollection<MessageDocument>("MessageDocument", {
       message_id: messageId,
     });
+  },
+
+  /** Document metadata only (no `data`) — light, for list rendering. */
+  getDocumentMeta(documentId: string): Promise<Document> {
+    return getOne<Document>("Document", documentId, [
+      "title",
+      "filename",
+      "content_type",
+      "byte_size",
+      "document_type_id",
+      "uploaded_by",
+    ]);
   },
 
   /** A single document, including its base64 `data` (for download/preview). */

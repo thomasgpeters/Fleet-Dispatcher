@@ -5,6 +5,18 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-06-02
 
+### Messaging Phase 1 CLOSED
+- Finished the unblocked Phase-1 items: **unread counts + mark-as-read**
+  (`channel_member.last_read_at`, `IonBadge`), **pull-to-refresh**
+  (`IonRefresher`) on channel list + detail, and **attachment-load optimization**
+  (sparse fieldsets via `getDocumentMeta`; full `data` fetched lazily on tap).
+- Extracted the placeholder identity to `src/currentUser.ts`.
+- Carried over to their owners: channel/DM creation + membership and current-user
+  (→ auth), clickable toasts + realtime delivery (→ realtime), desktop messaging
+  view (→ desktop), server-side `unread_count` (→ LogicBank).
+- TODO: added the **Dispatcher Desktop Portal** section as the next pivot.
+- Verified: mobile `npm run build` (tsc + Vite) passes.
+
 ### Messaging: attachment upload + list→detail navigation
 - Restructured mobile nav to **list → detail** with native transitions and
   `IonBackButton` (KISS): `ChannelsPage` + `ChannelPage` (replacing the combined

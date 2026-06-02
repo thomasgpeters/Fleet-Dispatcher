@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import {
+  IonBadge,
   IonContent,
   IonHeader,
   IonItem,
@@ -7,30 +8,65 @@ import {
   IonList,
   IonNote,
   IonPage,
+  IonRefresher,
+  IonRefresherContent,
   IonText,
   IonTitle,
   IonToolbar,
 } from "@ionic/react";
+import type { RefresherCustomEvent } from "@ionic/react";
 
 import { api } from "../api/client";
 import type { Channel } from "../api/types";
+import { CURRENT_USER_ID } from "../currentUser";
 
 /**
- * Message board — channel list. Tapping a channel pushes its detail page
- * (`/messages/:channelId`) with a native transition + back button.
+ * Message board — channel list with unread badges. Tapping a channel pushes its
+ * detail page (`/messages/:channelId`) with a native transition + back button.
+ *
+ * Unread is computed client-side from `channel_member.last_read_at` vs message
+ * times. A server-side `unread_count` (LogicBank) is the production approach
+ * (see docs/TODO.md → middleware rules).
  */
 export function ChannelsPage() {
   const [channels, setChannels] = useState<Channel[]>([]);
+  const [unread, setUnread] = useState<Record<string, number>>({});
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    api
-      .listChannels()
-      .then(setChannels)
-      .catch((e: unknown) =>
-        setError(e instanceof Error ? e.message : String(e)),
+  const load = async () => {
+    try {
+      const chs = await api.listChannels();
+      setChannels(chs);
+
+      const counts: Record<string, number> = {};
+      await Promise.all(
+        chs.map(async (ch) => {
+          const [membership, messages] = await Promise.all([
+            api.myMembership(ch.id, CURRENT_USER_ID),
+            api.messagesForChannel(ch.id),
+          ]);
+          const lastRead = membership?.last_read_at ?? null;
+          counts[ch.id] = messages.filter(
+            (m) =>
+              m.author_id !== CURRENT_USER_ID &&
+              (!lastRead || m.posted_at > lastRead),
+          ).length;
+        }),
       );
+      setUnread(counts);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  useEffect(() => {
+    void load();
   }, []);
+
+  const refresh = async (e: RefresherCustomEvent) => {
+    await load();
+    await e.detail.complete();
+  };
 
   return (
     <IonPage>
@@ -40,6 +76,9 @@ export function ChannelsPage() {
         </IonToolbar>
       </IonHeader>
       <IonContent>
+        <IonRefresher slot="fixed" onIonRefresh={(e) => void refresh(e)}>
+          <IonRefresherContent />
+        </IonRefresher>
         {error && (
           <IonText color="danger">
             <p className="ion-padding">Could not reach the middleware: {error}</p>
@@ -52,6 +91,11 @@ export function ChannelsPage() {
                 <h2>{ch.name}</h2>
                 <IonNote>channel #{ch.channel_type_id}</IonNote>
               </IonLabel>
+              {unread[ch.id] > 0 && (
+                <IonBadge slot="end" color="primary">
+                  {unread[ch.id]}
+                </IonBadge>
+              )}
             </IonItem>
           ))}
         </IonList>
