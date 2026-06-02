@@ -5,6 +5,10 @@
 > dedicated endpoint over a `gis` schema. Accepted that this is more to stand up;
 > it's the right long-term shape. Pairs with `MIDDLEWARE_SETUP.md` → "Database
 > schema layout". Remaining items are the sub-choices under "Open questions".
+>
+> **Deep dive:** see [`SPACIAL_GIS_DATA_CONSIDERATIONS.md`](SPACIAL_GIS_DATA_CONSIDERATIONS.md)
+> for the detailed considerations (conflict internals, indexing, ingestion, ops,
+> bootstrap).
 
 ## The concern
 

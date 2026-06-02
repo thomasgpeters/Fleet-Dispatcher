@@ -5,6 +5,12 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-06-02
 
+### GIS considerations doc
+- Added `docs/SPACIAL_GIS_DATA_CONSIDERATIONS.md` — detailed considerations
+  (ALS/PostGIS conflict internals, data model, indexing, geospatial endpoint,
+  HERE, ingestion, ops/security, bootstrap) as a companion to `GEOSPATIAL.md`;
+  cross-linked both ways.
+
 ### Decision ACCEPTED: separate PostGIS spatial data from ALS APIs
 - Locked in the two-path approach: relational map data via ALS, spatial (PostGIS)
   via a dedicated endpoint over a `gis` schema. Accepted the added standup cost.
