@@ -48,8 +48,13 @@ Schema/CMS foundation is in. Building out the experience next.
 Planned; pivot here after messaging. See "Planned" in `domain-model.md`.
 
 - [ ] Schema: `location_source` lookup (`airtag`, `google_device`,
-      `phone_push`), `position_report` time series (PostGIS)
-- [ ] Decide PostGIS reflection approach for ALS (geography vs lat/lng columns)
+      `phone_push`), `position_report` time series — **lat/lng numeric on ALS
+      tables** (no geometry); geometry lives in a `gis` schema. See
+      [`GEOSPATIAL.md`](GEOSPATIAL.md).
+- [ ] Install PostGIS into its own `gis` schema; exclude it (and
+      `spatial_ref_sys`) from ALS reflection.
+- [ ] Stand up the separate geospatial endpoint (PostGIS `ST_*`, not ALS);
+      decide view vs. trigger-maintained geometry mirror.
 - [ ] Ingestion endpoints/adapters for AirTag / Google / phone-push sources
 - [ ] HERE routing/maps integration (trips, waypoints, truck-legal routes,
       bridge heights, truck stops)

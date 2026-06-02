@@ -5,6 +5,15 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-06-02
 
+### Decision captured: geospatial / PostGIS strategy
+- Added `docs/GEOSPATIAL.md`: to avoid the ALS↔PostGIS conflicts (PostGIS
+  metadata reflected as junk resources; geometry types unmappable), use two
+  access paths — relational map data (trips, waypoints, POIs, truck-stops,
+  routes, position_report) via ALS with **plain lat/lng numeric** columns, and a
+  **separate geospatial endpoint** for PostGIS `ST_*` over a dedicated `gis`
+  schema (PostGIS installed there; excluded from ALS reflection). HERE handles
+  truck-legal routing. Linked from `domain-model.md`; TODO items refined.
+
 ### Decision captured: multi-schema database layout
 - Noted ALS multi-schema support. Documented a candidate split (peel `cms`
   out from `app`/ops; `telemetry` later) in `MIDDLEWARE_SETUP.md` and added a
