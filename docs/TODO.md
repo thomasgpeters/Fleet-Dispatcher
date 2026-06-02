@@ -47,12 +47,12 @@ Schema/CMS foundation is in. Building out the experience next.
 
 Planned; pivot here after messaging. See "Planned" in `domain-model.md`.
 **Decided (2026-06-02):** PostGIS spatial data is separated from the ALS APIs
-(see [`GEOSPATIAL.md`](GEOSPATIAL.md)).
+(see [`SPATIAL_GIS_DATA_CONSIDERATIONS.md`](SPATIAL_GIS_DATA_CONSIDERATIONS.md)).
 
 - [ ] Schema: `location_source` lookup (`airtag`, `google_device`,
       `phone_push`), `position_report` time series — **lat/lng numeric on ALS
       tables** (no geometry); geometry lives in a `gis` schema. See
-      [`GEOSPATIAL.md`](GEOSPATIAL.md).
+      [`SPATIAL_GIS_DATA_CONSIDERATIONS.md`](SPATIAL_GIS_DATA_CONSIDERATIONS.md).
 - [ ] Install PostGIS into its own `gis` schema; exclude it (and
       `spatial_ref_sys`) from ALS reflection.
 - [ ] Stand up the separate geospatial endpoint (PostGIS `ST_*`, not ALS);

@@ -216,8 +216,9 @@ they can be reached from anywhere in the app.
 
 > Not yet built — captured here so the schema and portals can grow into it.
 > Pairs with the GPS/navigation feature (HERE provider, PostGIS storage). See
-> [`GEOSPATIAL.md`](GEOSPATIAL.md) for the ALS↔PostGIS strategy (two access
-> paths: relational map data via ALS, spatial queries via a separate endpoint).
+> [`SPATIAL_GIS_DATA_CONSIDERATIONS.md`](SPATIAL_GIS_DATA_CONSIDERATIONS.md) for
+> the ALS↔PostGIS strategy + details (two access paths: relational map data via
+> ALS, spatial queries via a separate endpoint).
 
 - **Truck Location (telemetry)** — realtime vehicle positions, ingested from
   **multiple, interchangeable sources**: Apple AirTags, Google devices, or a

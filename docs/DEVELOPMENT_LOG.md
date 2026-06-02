@@ -5,20 +5,25 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-06-02
 
+### Merged the geospatial docs into one
+- Combined the former `GEOSPATIAL.md` (decision + strategy) into
+  `SPATIAL_GIS_DATA_CONSIDERATIONS.md` as the single source; removed
+  `GEOSPATIAL.md`; repointed references in `domain-model.md` and `TODO.md`.
+
 ### GIS considerations doc
 - Added `docs/SPATIAL_GIS_DATA_CONSIDERATIONS.md` — detailed considerations
   (ALS/PostGIS conflict internals, data model, indexing, geospatial endpoint,
-  HERE, ingestion, ops/security, bootstrap) as a companion to `GEOSPATIAL.md`;
-  cross-linked both ways.
+  HERE, ingestion, ops/security, bootstrap), originally a companion to the
+  geospatial strategy doc (later merged in).
 
 ### Decision ACCEPTED: separate PostGIS spatial data from ALS APIs
 - Locked in the two-path approach: relational map data via ALS, spatial (PostGIS)
   via a dedicated endpoint over a `gis` schema. Accepted the added standup cost.
-- Flipped `GEOSPATIAL.md` status to DECIDED; noted standup cost; marked the
+- Flipped `SPATIAL_GIS_DATA_CONSIDERATIONS.md` status to DECIDED; noted standup cost; marked the
   Feature 2 TODO section accordingly.
 
 ### Decision captured: geospatial / PostGIS strategy
-- Added `docs/GEOSPATIAL.md`: to avoid the ALS↔PostGIS conflicts (PostGIS
+- Added `docs/SPATIAL_GIS_DATA_CONSIDERATIONS.md`: to avoid the ALS↔PostGIS conflicts (PostGIS
   metadata reflected as junk resources; geometry types unmappable), use two
   access paths — relational map data (trips, waypoints, POIs, truck-stops,
   routes, position_report) via ALS with **plain lat/lng numeric** columns, and a

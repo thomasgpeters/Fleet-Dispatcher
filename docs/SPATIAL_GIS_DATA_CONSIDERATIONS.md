@@ -1,19 +1,53 @@
 # Spatial / GIS Data Considerations
 
-Detailed considerations behind the **decision to separate PostGIS spatial data
-from the ALS APIs**. This is the "why / details / gotchas" companion to
-[`GEOSPATIAL.md`](GEOSPATIAL.md) (the concise decision + strategy). Read that
-first for the summary and the two-path diagram.
+The single source for the Fleet Dispatcher geospatial strategy — both the
+**decision** and the **detailed considerations** behind separating PostGIS
+spatial data from the ApiLogicServer (ALS) APIs. Pairs with
+[`MIDDLEWARE_SETUP.md`](MIDDLEWARE_SETUP.md) → "Database schema layout".
 
-> Decision: **separate** spatial (PostGIS) data from ALS — relational map data
-> via ALS (plain lat/lng), spatial queries via a dedicated endpoint over a `gis`
-> schema. Accepted as more to stand up, but the right long-term shape.
+> **Status: DECIDED (2026-06-02).** Spatial (PostGIS) data is separated from the
+> ALS APIs — relational map data flows through ALS (plain lat/lng), spatial
+> queries through a dedicated endpoint over a `gis` schema. Accepted that this is
+> more to stand up; it's the right long-term shape. Remaining items are the
+> sub-choices under "Open questions".
 
 ---
 
-## 1. Why ALS and PostGIS conflict (in detail)
+## 1. Decision & principle: two access paths
 
-### 1.1 PostGIS metadata pollutes ALS reflection
+```
+                 ┌──────────────────────────── clients ───────────────────────────┐
+                 │ mobile (Ionic)                         desktop HUD (C++/Wt)      │
+                 └───────────┬───────────────────────────────────┬─────────────────┘
+                             │ relational map data (JSON:API)     │ spatial queries
+                             ▼                                    ▼
+                  ┌────────────────────┐              ┌──────────────────────────┐
+                  │  ApiLogicServer    │              │  Geospatial endpoint      │
+                  │  (JSON:API/SAFRS)  │              │  (PostGIS ST_* — NOT ALS) │
+                  └─────────┬──────────┘              └─────────────┬────────────┘
+                            │ app/cms/telemetry schemas             │ gis schema
+                            ▼                                       ▼
+                  ┌─────────────────────────── PostgreSQL ──────────────────────────┐
+                  │ lat/lng numeric columns on ALS tables   │  PostGIS geometry +    │
+                  │ (trips, waypoints, POIs, truck-stops,   │  GiST indexes in `gis` │
+                  │  routes, position_report)               │  (views/mirror tables) │
+                  └──────────────────────────────────────────────────────────────────┘
+              External: HERE for truck-legal routing (bridge heights, restrictions).
+```
+
+- **ALS path (JSON:API):** all relational/CRUD map data, stored with plain
+  numeric `lat` / `lng` (`double precision`). **No geometry columns on
+  ALS-managed tables.** ALS serves these with full relationships.
+- **Spatial path (not ALS):** a dedicated geospatial endpoint runs PostGIS
+  `ST_*` queries against geometry in the `gis` schema. Clients call it for
+  nearest / within / route-geometry questions. Routing itself (truck-legal
+  roads, bridge clearances, recommended routes) comes from **HERE**.
+
+---
+
+## 2. Why ALS and PostGIS conflict (in detail)
+
+### 2.1 PostGIS metadata pollutes ALS reflection
 `CREATE EXTENSION postgis` installs, into its target schema:
 - `spatial_ref_sys` — a real **table** (~8500 SRID rows).
 - `geometry_columns`, `geography_columns` — **views**.
@@ -24,21 +58,46 @@ resource per object. Left in `public`, these become junk endpoints and are the
 **naming conflicts** seen in past projects. Mitigation: install PostGIS in its
 own `gis` schema and **do not** include `gis` in ALS reflection.
 
-### 1.2 Geometry types have no JSON:API mapping
+### 2.2 Geometry types have no JSON:API mapping
 `geometry` / `geography` columns are not understood by plain SQLAlchemy/SAFRS;
 they need **GeoAlchemy2**, and even then the value is WKB/EWKB — not something
 JSON:API should emit. A geometry column on an ALS-managed table therefore breaks
 reflection or serialization. Mitigation: **no geometry columns on ALS tables**;
 store `lat`/`lng` as `double precision` and derive geometry in `gis`.
 
-### 1.3 Spatial work is functional, not CRUD
+### 2.3 Spatial work is functional, not CRUD
 `ST_DWithin`, `ST_Distance`, KNN nearest-neighbor, route geometry, geofencing —
 these are query operations, not the row CRUD ALS auto-generates. They belong
 behind a purpose-built endpoint.
 
 ---
 
-## 2. Data model considerations
+## 3. Database layout
+
+- Install PostGIS into its **own schema**, so its metadata never reaches the app:
+  ```sql
+  CREATE SCHEMA IF NOT EXISTS gis;
+  CREATE EXTENSION IF NOT EXISTS postgis SCHEMA gis;
+  ```
+- **ALS reflects `app` / `cms` / `telemetry` only — never `gis`.** (Pass the
+  schema list to `ApiLogicServer create`; keep `gis` and `spatial_ref_sys` out.)
+
+### What goes where
+
+| Resource                         | Schema      | Via ALS? | Geometry?                         |
+| -------------------------------- | ----------- | -------- | --------------------------------- |
+| `trip`, `trip_stop` / waypoint   | telemetry   | ✅ yes   | lat/lng numeric                   |
+| `point_of_interest`, `truck_stop`| telemetry   | ✅ yes   | lat/lng numeric                   |
+| `route` (metadata, HERE polyline)| telemetry   | ✅ yes   | encoded polyline as text          |
+| `position_report`                | telemetry   | ✅ yes   | lat/lng numeric                   |
+| `location_source` (lookup)       | telemetry   | ✅ yes   | —                                 |
+| spatial mirrors / views, indexes | `gis`       | ❌ no    | PostGIS geometry/geography + GiST |
+| PostGIS extension + metadata     | `gis`       | ❌ no    | (engine internals)                |
+| Truck-legal routing              | external    | —        | HERE API                          |
+
+---
+
+## 4. Data model considerations
 
 - **Coordinates on ALS tables:** `lat double precision`, `lng double precision`,
   WGS84 (SRID 4326). Keep a consistent column naming convention everywhere
@@ -57,7 +116,7 @@ behind a purpose-built endpoint.
 
 ---
 
-## 3. Geometry derivation & indexing (in `gis`)
+## 5. Geometry derivation & indexing (in `gis`)
 
 Geometry is **derived from the ALS lat/lng — never hand-duplicated**:
 
@@ -67,6 +126,9 @@ Geometry is **derived from the ALS lat/lng — never hand-duplicated**:
 | **materialized view**            | on refresh  | yes       | periodic refresh acceptable                |
 | **mirror table + trigger**       | live        | yes (GiST)| indexed nearest-neighbor at fleet scale    |
 
+- Example view: `gis.position_geog AS SELECT id, equipment_id, recorded_at,
+  ST_SetSRID(ST_MakePoint(lng, lat), 4326)::geography AS geog FROM
+  telemetry.position_report;` — zero storage, always in sync, cannot be indexed.
 - `ST_MakePoint` / `ST_SetSRID` are immutable, so a `STORED` generated geometry
   column is possible — but only on a `gis`-schema table, never an ALS one.
 - Index geometry with **GiST** (or SP-GiST); use the `<->` KNN operator for
@@ -74,7 +136,7 @@ Geometry is **derived from the ALS lat/lng — never hand-duplicated**:
 
 ---
 
-## 4. The geospatial endpoint
+## 6. The geospatial endpoint
 
 - **Responsibility:** all PostGIS `ST_*` queries (nearest, within, route
   geometry, geofence). The only component that imports GeoAlchemy2 / raw PostGIS.
@@ -88,7 +150,7 @@ Geometry is **derived from the ALS lat/lng — never hand-duplicated**:
 
 ---
 
-## 5. Routing provider (HERE) considerations
+## 7. Routing provider (HERE) considerations
 
 - Truck routing inputs: height, weight, length, axle count, hazmat, trailer
   count → drives bridge-clearance and truck-legal routing.
@@ -102,7 +164,7 @@ Geometry is **derived from the ALS lat/lng — never hand-duplicated**:
 
 ---
 
-## 6. Ingestion (source-agnostic positions)
+## 8. Ingestion (source-agnostic positions)
 
 - Sources are interchangeable: **Apple AirTag, Google devices, driver phone
   push** → all normalized into `position_report` (lookup `location_source`).
@@ -116,7 +178,7 @@ Geometry is **derived from the ALS lat/lng — never hand-duplicated**:
 
 ---
 
-## 7. Ops, security, backup
+## 9. Ops, security, backup
 
 - **PostGIS version pinning:** the DB image must include PostGIS (the plain
   `postgres:16` image does **not**); use `postgis/postgis` or install the
@@ -126,11 +188,24 @@ Geometry is **derived from the ALS lat/lng — never hand-duplicated**:
   large `bytea` documents (CMS) and high-volume `position_report` affect backup
   size — consider separate backup cadences per schema.
 - **Search path:** set `search_path` so unqualified calls resolve; or always
-  schema-qualify (`gis.ST_*` is not needed if `gis` is on the path).
+  schema-qualify (`gis.ST_*`).
 
 ---
 
-## 8. Standing it up (bootstrap, to be scripted with Feature 2)
+## 10. Consequences & accepted standup cost
+
+- ALS stays clean: no geometry types, no PostGIS internals, no naming clashes.
+- The spatial endpoint is the only place that needs GeoAlchemy2 / raw PostGIS.
+- Clients use two endpoints for maps: JSON:API (data) + the spatial endpoint
+  (queries). The HUD reads latest `position_report` per rig via JSON:API and, if
+  it needs "trucks near X", asks the spatial endpoint.
+- **Standup cost (accepted):** one extra deployable (the geospatial endpoint)
+  and a `gis` bootstrap. More to stand up, deliberately chosen for the cleaner
+  long-term separation.
+
+---
+
+## 11. Standing it up (bootstrap, to be scripted with Feature 2)
 
 ```sql
 CREATE SCHEMA IF NOT EXISTS gis;
@@ -144,9 +219,9 @@ be added when Feature 2 is built, so a fresh environment comes up repeatably.
 
 ---
 
-## 9. Open questions (carried from GEOSPATIAL.md)
+## 12. Open questions (to settle before building Feature 2)
 
-- Geospatial endpoint host: FastAPI vs PostgREST vs module beside ALS.
+- Geospatial endpoint host: FastAPI vs PostgREST vs a module beside ALS.
 - `position_report` geometry: live view vs. trigger-maintained mirror (driven by
   indexed nearest-neighbor needs at fleet scale).
 - Truck-stops: imported reference data (and from where) vs. HERE POI lookups at
