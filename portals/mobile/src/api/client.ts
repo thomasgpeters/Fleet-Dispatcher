@@ -29,6 +29,31 @@ async function getCollection<T>(
   return data.map((r) => ({ id: r.id, ...r.attributes }) as T);
 }
 
+/**
+ * Create a resource via JSON:API (POST). SAFRS/ApiLogicServer exposes foreign
+ * keys as attributes, so we pass `*_id` columns directly in `attributes`. If the
+ * API is configured to require JSON:API `relationships`, switch to that form.
+ */
+async function createResource<T>(
+  resource: string,
+  attributes: Record<string, unknown>,
+): Promise<T> {
+  const res = await fetch(`${API_BASE_URL}/${resource}`, {
+    method: "POST",
+    headers: {
+      Accept: "application/vnd.api+json",
+      "Content-Type": "application/vnd.api+json",
+    },
+    body: JSON.stringify({ data: { type: resource, attributes } }),
+  });
+  if (!res.ok) {
+    throw new Error(`JSON:API create ${resource} failed: ${res.status}`);
+  }
+  const doc = (await res.json()) as JsonApiDocument<T>;
+  const r = Array.isArray(doc.data) ? doc.data[0] : doc.data;
+  return { id: r.id, ...r.attributes } as T;
+}
+
 export const api = {
   /** All loads (the dispatch board). */
   listLoads(): Promise<Load[]> {
@@ -55,5 +80,18 @@ export const api = {
   /** Messages in a channel (oldest-first; sort handled client-side for now). */
   messagesForChannel(channelId: string): Promise<Message[]> {
     return getCollection<Message>("Message", { channel_id: channelId });
+  },
+
+  /** Post a new text message to a channel. */
+  createMessage(
+    channelId: string,
+    authorId: string,
+    body: string,
+  ): Promise<Message> {
+    return createResource<Message>("Message", {
+      channel_id: channelId,
+      author_id: authorId,
+      body,
+    });
   },
 };
