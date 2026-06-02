@@ -58,6 +58,10 @@ Planned; pivot here after messaging. See "Planned" in `domain-model.md`.
 
 ## Cross-cutting
 
+- [ ] **Decide DB schema separation** (ALS multi-schema): peel `cms` (content)
+      out from `app` (ops); `telemetry` later. Cross-schema FKs are fine. Apply
+      when configuring the DB — see `MIDDLEWARE_SETUP.md` → "Database schema
+      layout".
 - [ ] AuthN/AuthZ (roles: dispatcher, driver, updater) — gates current-user,
       messaging, and HUD
 - [ ] LogicBank rules in generated middleware (weekly cap, settlement math)

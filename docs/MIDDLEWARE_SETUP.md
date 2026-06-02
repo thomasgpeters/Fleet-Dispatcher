@@ -63,6 +63,32 @@ Port and database come from the environment (see [`../.env.example`](../.env.exa
 [`../docker-compose.yml`](../docker-compose.yml) brings up PostgreSQL with the
 schema + seed applied for local development.
 
+## Database schema layout (single vs. multiple Postgres schemas)
+
+ApiLogicServer can reflect **multiple Postgres schemas**, so we can logically
+separate concerns at the database level. Today everything is in `public`.
+
+Candidate split (decision pending — see `TODO.md`), to apply when the database
+is configured:
+
+| Postgres schema   | Contents                                                              |
+| ----------------- | -------------------------------------------------------------------- |
+| `cms`             | `document`, `document_type` — the reusable content store.            |
+| `app` / `public`  | fleet, dispatch, settlement, messaging tables + their lookups.       |
+| `telemetry` (later) | `position_report`, `location_source` (truck locations).           |
+| `identity` (opt.) | `app_user`, `app_role` if shared access control is wanted.          |
+
+Notes:
+- **Cross-schema FKs are fully supported** in Postgres — e.g.
+  `messaging.message_document` → `cms.document`, `app.load_document` →
+  `cms.document`. Referential integrity (and thus ALS-generated relationships)
+  still holds across schemas.
+- The cost is schema-qualified DDL and setting the connection `search_path`;
+  point ALS at the schemas to include when generating the project.
+- Rationale for separating `cms` first: `document` is an app-wide reusable
+  resource, so an independent schema gives it its own access control / backup
+  boundary and signals "shared service."
+
 ## Dependencies
 
 `ApiLogicServer` (installed via `pip install ApiLogicServer`) transitively

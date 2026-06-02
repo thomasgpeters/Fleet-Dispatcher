@@ -5,6 +5,12 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-06-02
 
+### Decision captured: multi-schema database layout
+- Noted ALS multi-schema support. Documented a candidate split (peel `cms`
+  out from `app`/ops; `telemetry` later) in `MIDDLEWARE_SETUP.md` and added a
+  decision item to `TODO.md`. No DDL change yet — to apply when the DB is
+  configured. Cross-schema FKs are supported, so relationships still hold.
+
 ### Messaging: send-message composer
 - Mobile `MessagesPage` gains a composer (input + send) backed by a new
   `createMessage` JSON:API client helper (POST `/Message`).
