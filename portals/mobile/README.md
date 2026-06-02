@@ -48,15 +48,16 @@ npm run cap:sync
 ## Layout
 
 ```
-index.html              Vite entry
+index.html               Vite entry
 src/
-  main.tsx              Ionic React bootstrap
-  App.tsx               app shell
-  pages/LoadsPage.tsx   driver board (lists loads from the JSON:API)
+  main.tsx               Ionic React bootstrap
+  App.tsx                app shell — tabbed nav (Loads, Messages)
+  pages/LoadsPage.tsx    driver board (lists loads from the JSON:API)
+  pages/MessagesPage.tsx message board (channels + messages; CMS documents)
   api/
-    client.ts           thin JSON:API client (VITE_API_BASE_URL)
-    types.ts            resource types mirroring the database schema
-capacitor.config.ts     Capacitor app id / web dir
+    client.ts            thin JSON:API client (VITE_API_BASE_URL)
+    types.ts             resource types mirroring the database schema
+capacitor.config.ts      Capacitor app id / web dir
 ```
 
 ## JSON:API integration

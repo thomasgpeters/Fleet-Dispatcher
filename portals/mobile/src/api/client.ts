@@ -4,7 +4,7 @@
 // portals share this one API; this client speaks JSON:API conventions
 // (resource collections, filter[...] query params).
 
-import type { Driver, JsonApiDocument, Load } from "./types";
+import type { Channel, Driver, JsonApiDocument, Load, Message } from "./types";
 
 export const API_BASE_URL: string =
   import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5656/api";
@@ -45,5 +45,15 @@ export const api = {
 
   activeDrivers(): Promise<Driver[]> {
     return getCollection<Driver>("Driver", { active: "true" });
+  },
+
+  /** Channels (message board: groups, direct threads, broadcasts). */
+  listChannels(): Promise<Channel[]> {
+    return getCollection<Channel>("Channel");
+  },
+
+  /** Messages in a channel (oldest-first; sort handled client-side for now). */
+  messagesForChannel(channelId: string): Promise<Message[]> {
+    return getCollection<Message>("Message", { channel_id: channelId });
   },
 };

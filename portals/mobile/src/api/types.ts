@@ -70,6 +70,38 @@ export interface Settlement {
   currency: string;
 }
 
+// --- Messaging context ---
+export interface Channel {
+  id: string;
+  name: string;
+  channel_type_id: number; // -> ChannelType (direct | group | broadcast)
+  created_by: string;
+  is_archived: boolean;
+}
+
+export interface Message {
+  id: string;
+  channel_id: string;
+  author_id: string;
+  reply_to_id?: string;
+  body: string;
+  posted_at: string;
+  edited_at?: string;
+}
+
+// --- Content (CMS) context ---
+export interface Document {
+  id: string;
+  title: string;
+  document_type_id: number; // -> DocumentType
+  filename: string;
+  content_type: string; // MIME type
+  byte_size: number;
+  checksum?: string;
+  // `data` (bytea) is returned base64-encoded by JSON:API; omit from list views.
+  uploaded_by: string;
+}
+
 // JSON:API envelope (subset).
 export interface JsonApiResource<T> {
   id: string;
