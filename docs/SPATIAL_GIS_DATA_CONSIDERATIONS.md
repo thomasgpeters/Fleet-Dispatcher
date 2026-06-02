@@ -1,4 +1,4 @@
-# Spacial / GIS Data Considerations
+# Spatial / GIS Data Considerations
 
 Detailed considerations behind the **decision to separate PostGIS spatial data
 from the ALS APIs**. This is the "why / details / gotchas" companion to

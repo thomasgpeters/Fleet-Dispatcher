@@ -6,7 +6,7 @@
 > it's the right long-term shape. Pairs with `MIDDLEWARE_SETUP.md` → "Database
 > schema layout". Remaining items are the sub-choices under "Open questions".
 >
-> **Deep dive:** see [`SPACIAL_GIS_DATA_CONSIDERATIONS.md`](SPACIAL_GIS_DATA_CONSIDERATIONS.md)
+> **Deep dive:** see [`SPATIAL_GIS_DATA_CONSIDERATIONS.md`](SPATIAL_GIS_DATA_CONSIDERATIONS.md)
 > for the detailed considerations (conflict internals, indexing, ingestion, ops,
 > bootstrap).
 

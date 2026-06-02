@@ -6,7 +6,7 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 ## 2026-06-02
 
 ### GIS considerations doc
-- Added `docs/SPACIAL_GIS_DATA_CONSIDERATIONS.md` — detailed considerations
+- Added `docs/SPATIAL_GIS_DATA_CONSIDERATIONS.md` — detailed considerations
   (ALS/PostGIS conflict internals, data model, indexing, geospatial endpoint,
   HERE, ingestion, ops/security, bootstrap) as a companion to `GEOSPATIAL.md`;
   cross-linked both ways.
