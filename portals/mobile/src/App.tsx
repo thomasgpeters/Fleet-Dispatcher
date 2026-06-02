@@ -12,15 +12,17 @@ import { IonReactRouter } from "@ionic/react-router";
 import { chatbubblesOutline, listOutline } from "ionicons/icons";
 
 import { LoadsPage } from "./pages/LoadsPage";
-import { MessagesPage } from "./pages/MessagesPage";
+import { LoadDetailPage } from "./pages/LoadDetailPage";
+import { ChannelsPage } from "./pages/ChannelsPage";
+import { ChannelPage } from "./pages/ChannelPage";
 
 /* Ionic router add-on CSS. */
 import "@ionic/react/css/padding.css";
 
 /**
- * Root of the Driver / Updater mobile app: tabbed navigation over the
- * shared JSON:API. Add more tabs (schedule, post-trip inspection, fuel/DEF log,
- * navigation) as the portal grows.
+ * Root of the Driver / Updater mobile app: tabbed nav, each tab a list → detail
+ * stack with native transitions and back buttons (KISS). Add more tabs
+ * (schedule, navigation) as the portal grows.
  */
 export default function App() {
   return (
@@ -29,7 +31,9 @@ export default function App() {
         <IonTabs>
           <IonRouterOutlet>
             <Route exact path="/loads" component={LoadsPage} />
-            <Route exact path="/messages" component={MessagesPage} />
+            <Route exact path="/loads/:loadId" component={LoadDetailPage} />
+            <Route exact path="/messages" component={ChannelsPage} />
+            <Route exact path="/messages/:channelId" component={ChannelPage} />
             <Route exact path="/">
               <Redirect to="/loads" />
             </Route>

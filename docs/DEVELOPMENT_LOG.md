@@ -5,6 +5,20 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-06-02
 
+### Messaging: attachment upload + list→detail navigation
+- Restructured mobile nav to **list → detail** with native transitions and
+  `IonBackButton` (KISS): `ChannelsPage` + `ChannelPage` (replacing the combined
+  `MessagesPage`), and `LoadsPage` + `LoadDetailPage`; routes nested per tab.
+- Attachment **upload**: file picker → base64 → create message + CMS `document`
+  + `message_document` link. Attachments render as chips; tapping opens a
+  base64 data URL (preview/download).
+- Client: `getOne`, `getLoad`, `getChannel`, `getDocument`, `createDocument`,
+  `linkMessageDocument`, `attachmentsForMessage`.
+- Added `docs/MOBILE_UI_WIDGETS.md` — Ionic 8 widget vocabulary for UX language.
+- Captured the planned **clickable message toast** pattern (deep-links to a
+  channel; needs realtime) in TODO + the widget doc.
+- Verified: mobile `npm run build` (tsc + Vite) passes.
+
 ### Merged the geospatial docs into one
 - Combined the former `GEOSPATIAL.md` (decision + strategy) into
   `SPATIAL_GIS_DATA_CONSIDERATIONS.md` as the single source; removed

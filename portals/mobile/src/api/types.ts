@@ -98,8 +98,17 @@ export interface Document {
   content_type: string; // MIME type
   byte_size: number;
   checksum?: string;
-  // `data` (bytea) is returned base64-encoded by JSON:API; omit from list views.
+  // `data` (bytea) is returned base64-encoded by JSON:API; present when a single
+  // document is fetched, omitted from list views to keep payloads small.
+  data?: string;
   uploaded_by: string;
+}
+
+// Link between a message and a CMS document (FK join).
+export interface MessageDocument {
+  id: string;
+  message_id: string;
+  document_id: string;
 }
 
 // JSON:API envelope (subset).

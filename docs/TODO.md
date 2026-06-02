@@ -31,11 +31,15 @@ Schema/CMS foundation is in. Building out the experience next.
 
 - [x] Schema: `channel`, `channel_member`, `message`; CMS `document` + FK link
       tables (`message_document`, `load_document`)
-- [x] Mobile: Messages tab — list channels, view a channel's messages
+- [x] Mobile: list → detail navigation (channels list + channel detail) with
+      native transitions and back buttons (KISS); same pattern for Loads
 - [x] Mobile: compose & send a message (write-side)
-- [ ] Mobile: attachment upload (create `document` + `message_document` link)
-- [ ] Mobile: attachment preview / download (bytea ↔ base64)
-- [ ] Unread counts via `channel_member.last_read_at` + mark-as-read
+- [x] Mobile: attachment upload (create `document` + `message_document` link)
+- [x] Mobile: attachment preview / download (bytea ↔ base64, data URL)
+- [ ] Optimize attachment loading (sparse fieldsets; lazy `data` on tap)
+- [ ] Unread counts via `channel_member.last_read_at` + mark-as-read (Badge)
+- [ ] Clickable message **toasts** (`IonToast`, 2–3s) that deep-link to the
+      channel from any view; needs realtime/polling. See `MOBILE_UI_WIDGETS.md`.
 - [ ] Direct (1:1) channel creation + membership management
 - [ ] Current-user identity (replace hardcoded placeholder) — depends on auth
 - [ ] Realtime delivery (websockets/push) — currently JSON:API polling

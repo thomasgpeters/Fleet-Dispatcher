@@ -48,17 +48,24 @@ npm run cap:sync
 ## Layout
 
 ```
-index.html               Vite entry
+index.html                Vite entry
 src/
-  main.tsx               Ionic React bootstrap
-  App.tsx                app shell — tabbed nav (Loads, Messages)
-  pages/LoadsPage.tsx    driver board (lists loads from the JSON:API)
-  pages/MessagesPage.tsx message board (channels + messages; CMS documents)
+  main.tsx                Ionic React bootstrap
+  App.tsx                 app shell — tabbed nav; each tab is a list → detail stack
+  pages/
+    LoadsPage.tsx         loads list (taps push the detail)
+    LoadDetailPage.tsx    load detail (back button)
+    ChannelsPage.tsx      message board — channel list
+    ChannelPage.tsx       channel detail — messages, attachments, composer + upload
   api/
-    client.ts            thin JSON:API client (VITE_API_BASE_URL)
-    types.ts             resource types mirroring the database schema
-capacitor.config.ts      Capacitor app id / web dir
+    client.ts             thin JSON:API client (VITE_API_BASE_URL)
+    types.ts              resource types mirroring the database schema
+capacitor.config.ts       Capacitor app id / web dir
 ```
+
+Navigation is **list → detail** with native transitions and `IonBackButton`
+(KISS). See [`../../docs/MOBILE_UI_WIDGETS.md`](../../docs/MOBILE_UI_WIDGETS.md)
+for the UX widget vocabulary.
 
 ## JSON:API integration
 
