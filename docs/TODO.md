@@ -46,6 +46,8 @@ Schema/CMS foundation is in. Building out the experience next.
 ## Feature 2 — Truck Location & Dispatcher HUD
 
 Planned; pivot here after messaging. See "Planned" in `domain-model.md`.
+**Decided (2026-06-02):** PostGIS spatial data is separated from the ALS APIs
+(see [`GEOSPATIAL.md`](GEOSPATIAL.md)).
 
 - [ ] Schema: `location_source` lookup (`airtag`, `google_device`,
       `phone_push`), `position_report` time series — **lat/lng numeric on ALS

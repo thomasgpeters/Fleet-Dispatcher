@@ -5,6 +5,12 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-06-02
 
+### Decision ACCEPTED: separate PostGIS spatial data from ALS APIs
+- Locked in the two-path approach: relational map data via ALS, spatial (PostGIS)
+  via a dedicated endpoint over a `gis` schema. Accepted the added standup cost.
+- Flipped `GEOSPATIAL.md` status to DECIDED; noted standup cost; marked the
+  Feature 2 TODO section accordingly.
+
 ### Decision captured: geospatial / PostGIS strategy
 - Added `docs/GEOSPATIAL.md`: to avoid the ALS↔PostGIS conflicts (PostGIS
   metadata reflected as junk resources; geometry types unmappable), use two

@@ -1,9 +1,10 @@
 # Geospatial strategy — ALS ↔ PostGIS
 
-> Status: **proposed / decision pending.** Captured before standing up the DB so
-> the truck-location & navigation feature (Feature 2) avoids the ALS/PostGIS
-> conflicts seen in past projects. Pairs with `MIDDLEWARE_SETUP.md` → "Database
-> schema layout".
+> Status: **DECIDED (2026-06-02).** Spatial (PostGIS) data is separated from the
+> ALS APIs — relational map data flows through ALS, spatial queries through a
+> dedicated endpoint over a `gis` schema. Accepted that this is more to stand up;
+> it's the right long-term shape. Pairs with `MIDDLEWARE_SETUP.md` → "Database
+> schema layout". Remaining items are the sub-choices under "Open questions".
 
 ## The concern
 
@@ -95,6 +96,11 @@ JSON:API. PostGIS fights that in three ways:
 - Clients use two endpoints for maps: JSON:API (data) + the spatial endpoint
   (queries). The HUD reads latest `position_report` per rig via JSON:API and, if
   it needs "trucks near X", asks the spatial endpoint.
+- **Standup cost (accepted):** one extra deployable (the geospatial endpoint)
+  and a `gis` schema bootstrap (`CREATE EXTENSION postgis SCHEMA gis;` + views/
+  mirror + GiST). The bootstrap SQL and a compose/VCP entry for the endpoint
+  will be added when Feature 2 is built, so a fresh environment comes up
+  repeatably.
 
 ## Open questions (to settle before building Feature 2)
 
