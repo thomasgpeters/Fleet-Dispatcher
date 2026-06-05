@@ -57,6 +57,8 @@ export interface Load {
   loaded_miles: number;
   rate: number; // post-broker
   currency: string;
+  pickup_date?: string; // YYYY-MM-DD, within the dispatch week
+  delivery_date?: string;
 }
 
 export interface Settlement {

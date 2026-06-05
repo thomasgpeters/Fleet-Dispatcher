@@ -58,18 +58,27 @@ Carried over (blocked / owned elsewhere):
 Pivot here after Phase 1. Talks to the same JSON:API; Bootstrap theme + Wt
 `resources/` deploy already wired. Design: [`DISPATCHER_DESKTOP.md`](DISPATCHER_DESKTOP.md).
 
-- [ ] **Shell**: app bar (week selector, health, user), nav, content outlet,
-      command bar; wire the JSON:API client + app-wide state
-- [ ] **Board** with a **Today | Week** toggle (today's runs vs Mon→Mon grid)
+- [x] Schema: `load.pickup_date` / `delivery_date` (drives Today vs Week)
+- [x] **Shell**: app bar (API/health), nav (Board/Loads/Drivers/Messages),
+      command bar, content outlet; owns the JSON:API client + mode state
+      (not compiled in-sandbox — no Wt; see note below)
+- [x] **Board** with a **Today | Week** toggle (today's runs vs Mon→Mon grid),
+      fed by an async `ApiClient` (Wt::Http::Client + Wt::Json)
+- [ ] Add app-bar week selector + user/role/health (with auth)
 - [ ] Load intake form (new load) + driver/equipment assignment
 - [ ] **HUD** surface (`/hud`) + `HudControlBus` (Wt server push): controls on the
       console publish commands (`SetMode`, …); HUD auto-switches Today/Week
+- [ ] **Distributed HUD (decided):** also persist commands as a `hud_command`
+      JSON:API resource so a remote HUD can subscribe (audit/replay)
 - [ ] Extend the command bus to more commands (`FocusDriver`, `HighlightLoad`)
 - [ ] Dispatcher messaging view (mirrors mobile Feature 1)
 - [ ] **HUD map**: fleet **truck locations** — depends on Feature 2 telemetry +
       the geospatial endpoint; until then the HUD renders board/load/status data
-- [ ] (Optional, distributed HUD) persist commands as a `hud_command` JSON:API
-      resource for audit/replay
+
+> Wt isn't installable in the dev sandbox, so the C++ above is **not compiled
+> here**. Version-sensitive spots are flagged in `ApiClient.cpp` (Http `done()`
+> error_code type; `Json::Type::Null` enum) and `main.cpp`/theme (`WBootstrap5Theme`
+> needs Wt ≥ 4.5).
 
 ## Feature 2 — Truck Location & Dispatcher HUD
 

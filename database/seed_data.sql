@@ -109,7 +109,7 @@ INSERT INTO dispatch_week (id, week_start) VALUES
 INSERT INTO load (
   id, dispatch_week_id, driver_id, equipment_id, shipper_id, receiver_id,
   commodity_id, pickup_id, dropoff_id, run_type_id, load_status_id,
-  deadhead_miles, loaded_miles, rate
+  deadhead_miles, loaded_miles, rate, pickup_date, delivery_date
 ) VALUES (
   '88888888-0000-0000-0000-000000000001',
   '99999999-0000-0000-0000-000000000001',
@@ -122,7 +122,8 @@ INSERT INTO load (
   'cccccccc-0000-0000-0000-000000000002',  -- dropoff: Denver
   1,  -- run_type = long_haul
   2,  -- load_status = dispatched
-  85.0, 780.0, 4200.00
+  85.0, 780.0, 4200.00,
+  DATE '2026-06-02', DATE '2026-06-04'    -- within week of 2026-06-01
 );
 
 -- ===========================================================================

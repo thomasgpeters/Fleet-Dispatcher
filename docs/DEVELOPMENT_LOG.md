@@ -5,6 +5,19 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-06-02
 
+### Dispatcher desktop: shell + Today/Week board (build start)
+- Schema: added `load.pickup_date` / `delivery_date` (+ `delivery_after_pickup`
+  CHECK, pickup-date index) to drive the board; seed updated. Verified on
+  PostgreSQL 16. Synced the mobile `Load` type.
+- C++/Wt: `Shell` (app bar, nav, Today|Week command bar, content outlet),
+  `BoardView` (Today list vs Mon→Mon grid), and an async `ApiClient`
+  (Wt::Http::Client + Wt::Json) reading `Driver`/`Load`. `main.cpp` enables
+  server push; CMake builds the new sources.
+- Decision: HUD will be **distributed-capable** — commands also persisted as a
+  `hud_command` JSON:API resource (built with the bus, later).
+- NOT compiled here (no Wt in the sandbox); version-sensitive lines flagged in
+  `ApiClient.cpp` and the Bootstrap-5 theme.
+
 ### Dispatcher Desktop & HUD design
 - Added `docs/DISPATCHER_DESKTOP.md`: the app **shell**, the **Today | Week**
   board modes, and the **control → command → HUD** mechanism — a Wt server-push

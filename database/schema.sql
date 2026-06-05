@@ -175,11 +175,19 @@ CREATE TABLE load (
     loaded_miles     NUMERIC(8,1) NOT NULL DEFAULT 0 CHECK (loaded_miles >= 0),
     rate             NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (rate >= 0),  -- post-broker
     currency         TEXT NOT NULL DEFAULT 'USD',
+    -- Scheduling within the dispatch week: drives the desktop board's
+    -- Today (pickup_date = today) vs Week (placed by pickup_date) views.
+    pickup_date      DATE,
+    delivery_date    DATE,
     created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
-    CONSTRAINT distinct_pickup_dropoff CHECK (pickup_id <> dropoff_id)
+    CONSTRAINT distinct_pickup_dropoff CHECK (pickup_id <> dropoff_id),
+    CONSTRAINT delivery_after_pickup CHECK (
+        delivery_date IS NULL OR pickup_date IS NULL OR delivery_date >= pickup_date
+    )
 );
 
 CREATE INDEX idx_load_driver_week ON load (driver_id, dispatch_week_id);
+CREATE INDEX idx_load_pickup_date ON load (pickup_date);
 
 -- ===========================================================================
 -- Settlement context
