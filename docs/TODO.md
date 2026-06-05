@@ -15,6 +15,9 @@ Working plan, sequenced. Check items off as they ship and add a dated entry to
 - Mobile is published to `Fleet-Dispatcher-Mobile` via `make publish-mobile`.
 - Validate schema/seed against PostgreSQL 16; build the mobile app (`tsc` +
   Vite) before every push.
+- **Desktop C++/Wt is not compiled in the dev sandbox (no Wt); it is built and
+  run on the Linux box.** Standing decision — version-sensitive lines are flagged
+  inline; no per-change "not compiled" disclaimer.
 
 ## Foundation  ✅
 
