@@ -1,0 +1,43 @@
+# Fleet Dispatcher — Dispatcher Desktop (Wt) systemd unit.
+#
+# Install procedure (see portals/dispatcher-desktop/README.md):
+#   sudo cmake --install build --prefix /opt/fleet-dispatcher
+#   sudo useradd --system --no-create-home --shell /usr/sbin/nologin fleet   # once
+#   sudo mkdir -p /etc/fleet-dispatcher
+#   sudo cp deploy/desktop.env.example /etc/fleet-dispatcher/desktop.env      # edit as needed
+#   sudo cp deploy/fleet-dispatcher-desktop.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now fleet-dispatcher-desktop
+#
+# Logs:   journalctl -u fleet-dispatcher-desktop -f
+
+[Unit]
+Description=Fleet Dispatcher — Dispatcher Desktop (Wt)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=fleet
+Group=fleet
+
+# Install prefix from `cmake --install ... --prefix /opt/fleet-dispatcher`.
+# WorkingDirectory == docroot, which contains resources/ and css/ beside the binary.
+WorkingDirectory=/opt/fleet-dispatcher/bin
+EnvironmentFile=-/etc/fleet-dispatcher/desktop.env
+ExecStart=/opt/fleet-dispatcher/bin/fleet_dispatcher_desktop \
+    --docroot /opt/fleet-dispatcher/bin \
+    --http-address 0.0.0.0 \
+    --http-port 8080
+
+Restart=on-failure
+RestartSec=2
+
+# Hardening (optional; relax if it interferes with your setup).
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

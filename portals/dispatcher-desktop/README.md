@@ -45,6 +45,34 @@ build/
 Requires a C++17 compiler, CMake ≥ 3.16, and Wt (built with the HTTP connector
 and Bootstrap theme support).
 
+### Dependencies (Linux)
+
+**Debian / Ubuntu:**
+
+```bash
+sudo apt-get update
+sudo apt-get install -y build-essential cmake libwt-dev libwthttp-dev
+# Boost is pulled in as a Wt dependency; if not, add: libboost-all-dev
+```
+
+**Fedora / RHEL:**
+
+```bash
+sudo dnf install -y gcc-c++ cmake wt-devel
+```
+
+Wt installs its `resources/` tree under `/usr/share/Wt/resources` (Debian) or
+`/usr/share/Wt/resources` / `/usr/local/share/Wt/resources` — CMake auto-detects
+it (override with `-DWT_RESOURCES_DIR=...`).
+
+> **Bootstrap 5 theme note:** `Wt::WBootstrap5Theme` needs **Wt ≥ 4.5**. Check
+> with `pkg-config --modversion wt` (or `dpkg -l libwt-dev`). If your distro ships
+> an older Wt, either build Wt from source, or switch the theme to
+> `Wt::WBootstrapTheme` with `setVersion(Wt::BootstrapVersion::v3)` in
+> `src/main.cpp` (a comment there marks the spot).
+
+### Configure, build, run
+
 ```bash
 cd portals/dispatcher-desktop
 cmake -S . -B build
@@ -68,11 +96,47 @@ not render until you set `WT_RESOURCES_DIR`.
 ### Install
 
 ```bash
-cmake --install build --prefix /opt/fleet-dispatcher
+sudo cmake --install build --prefix /opt/fleet-dispatcher
 # -> /opt/fleet-dispatcher/bin/fleet_dispatcher_desktop
 #    /opt/fleet-dispatcher/bin/resources/...   (Wt resources)
 #    /opt/fleet-dispatcher/bin/css/...          (app docroot)
 ```
+
+Run the installed build (docroot is the install `bin/` so `resources/` resolves):
+
+```bash
+FLEET_API_BASE_URL=http://localhost:5656/api \
+  /opt/fleet-dispatcher/bin/fleet_dispatcher_desktop \
+  --docroot /opt/fleet-dispatcher/bin --http-address 0.0.0.0 --http-port 8080
+```
+
+### Run as a systemd service
+
+A ready-to-edit unit and env template live in [`deploy/`](deploy):
+
+```bash
+# 1. Install the app to a prefix (above), then create a service user:
+sudo useradd --system --no-create-home --shell /usr/sbin/nologin fleet
+sudo chown -R fleet:fleet /opt/fleet-dispatcher
+
+# 2. Environment (endpoint, etc.):
+sudo mkdir -p /etc/fleet-dispatcher
+sudo cp deploy/desktop.env.example /etc/fleet-dispatcher/desktop.env   # edit as needed
+
+# 3. Install + start the unit:
+sudo cp deploy/fleet-dispatcher-desktop.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now fleet-dispatcher-desktop
+
+# 4. Check it:
+systemctl status fleet-dispatcher-desktop
+journalctl -u fleet-dispatcher-desktop -f
+```
+
+The unit runs the binary with `--docroot /opt/fleet-dispatcher/bin` so the Wt
+`resources/` (Bootstrap CSS/JS) resolve. Adjust the prefix, port
+(`--http-port`), user, and `EnvironmentFile` to taste — see
+[`deploy/fleet-dispatcher-desktop.service`](deploy/fleet-dispatcher-desktop.service).
 
 ### Publishing the mobile module from CMake
 

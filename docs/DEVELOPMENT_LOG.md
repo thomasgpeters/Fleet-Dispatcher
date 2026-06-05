@@ -5,6 +5,14 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-06-02
 
+### Desktop build/run procedure + systemd
+- Expanded the dispatcher-desktop README with Linux dependency install
+  (Debian/Ubuntu `libwt-dev`/`libwthttp-dev`, Fedora `wt-devel`), a Wt ≥ 4.5
+  note for the Bootstrap 5 theme, configure/build/run, install-prefix run, and a
+  systemd service procedure.
+- Added `deploy/fleet-dispatcher-desktop.service` (hardened unit, runs with the
+  install-prefix docroot so Wt `resources/` resolve) and `deploy/desktop.env.example`.
+
 ### Messaging Phase 1 CLOSED
 - Finished the unblocked Phase-1 items: **unread counts + mark-as-read**
   (`channel_member.last_read_at`, `IonBadge`), **pull-to-refresh**
