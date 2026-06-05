@@ -4,7 +4,16 @@
 // portals share this one API; this client speaks JSON:API conventions
 // (resource collections, filter[...] query params).
 
-import type { Driver, JsonApiDocument, Load } from "./types";
+import type {
+  Channel,
+  ChannelMember,
+  Document,
+  Driver,
+  JsonApiDocument,
+  Load,
+  Message,
+  MessageDocument,
+} from "./types";
 
 export const API_BASE_URL: string =
   import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5656/api";
@@ -29,10 +38,80 @@ async function getCollection<T>(
   return data.map((r) => ({ id: r.id, ...r.attributes }) as T);
 }
 
+/**
+ * Create a resource via JSON:API (POST). SAFRS/ApiLogicServer exposes foreign
+ * keys as attributes, so we pass `*_id` columns directly in `attributes`. If the
+ * API is configured to require JSON:API `relationships`, switch to that form.
+ */
+async function createResource<T>(
+  resource: string,
+  attributes: Record<string, unknown>,
+): Promise<T> {
+  const res = await fetch(`${API_BASE_URL}/${resource}`, {
+    method: "POST",
+    headers: {
+      Accept: "application/vnd.api+json",
+      "Content-Type": "application/vnd.api+json",
+    },
+    body: JSON.stringify({ data: { type: resource, attributes } }),
+  });
+  if (!res.ok) {
+    throw new Error(`JSON:API create ${resource} failed: ${res.status}`);
+  }
+  const doc = (await res.json()) as JsonApiDocument<T>;
+  const r = Array.isArray(doc.data) ? doc.data[0] : doc.data;
+  return { id: r.id, ...r.attributes } as T;
+}
+
+/** Fetch a single resource by id (GET /Resource/{id}), optional sparse fields. */
+async function getOne<T>(
+  resource: string,
+  id: string,
+  fields?: string[],
+): Promise<T> {
+  const qs = fields ? `?${new URLSearchParams({ [`fields[${resource}]`]: fields.join(",") })}` : "";
+  const res = await fetch(`${API_BASE_URL}/${resource}/${id}${qs}`, {
+    headers: { Accept: "application/vnd.api+json" },
+  });
+  if (!res.ok) {
+    throw new Error(`JSON:API ${resource}/${id} failed: ${res.status}`);
+  }
+  const doc = (await res.json()) as JsonApiDocument<T>;
+  const r = Array.isArray(doc.data) ? doc.data[0] : doc.data;
+  return { id: r.id, ...r.attributes } as T;
+}
+
+/** Update a resource via JSON:API (PATCH /Resource/{id}). */
+async function updateResource<T>(
+  resource: string,
+  id: string,
+  attributes: Record<string, unknown>,
+): Promise<T> {
+  const res = await fetch(`${API_BASE_URL}/${resource}/${id}`, {
+    method: "PATCH",
+    headers: {
+      Accept: "application/vnd.api+json",
+      "Content-Type": "application/vnd.api+json",
+    },
+    body: JSON.stringify({ data: { type: resource, id, attributes } }),
+  });
+  if (!res.ok) {
+    throw new Error(`JSON:API update ${resource}/${id} failed: ${res.status}`);
+  }
+  const doc = (await res.json()) as JsonApiDocument<T>;
+  const r = Array.isArray(doc.data) ? doc.data[0] : doc.data;
+  return { id: r.id, ...r.attributes } as T;
+}
+
 export const api = {
   /** All loads (the dispatch board). */
   listLoads(): Promise<Load[]> {
     return getCollection<Load>("Load");
+  },
+
+  /** A single load (detail page). */
+  getLoad(loadId: string): Promise<Load> {
+    return getOne<Load>("Load", loadId);
   },
 
   /** Loads a driver holds in a given dispatch week (the driver's board). */
@@ -45,5 +124,104 @@ export const api = {
 
   activeDrivers(): Promise<Driver[]> {
     return getCollection<Driver>("Driver", { active: "true" });
+  },
+
+  /** Channels (message board: groups, direct threads, broadcasts). */
+  listChannels(): Promise<Channel[]> {
+    return getCollection<Channel>("Channel");
+  },
+
+  /** A single channel (detail page header). */
+  getChannel(channelId: string): Promise<Channel> {
+    return getOne<Channel>("Channel", channelId);
+  },
+
+  /** Messages in a channel (oldest-first; sort handled client-side for now). */
+  messagesForChannel(channelId: string): Promise<Message[]> {
+    return getCollection<Message>("Message", { channel_id: channelId });
+  },
+
+  /** Post a new text message to a channel. */
+  createMessage(
+    channelId: string,
+    authorId: string,
+    body: string,
+  ): Promise<Message> {
+    return createResource<Message>("Message", {
+      channel_id: channelId,
+      author_id: authorId,
+      body,
+    });
+  },
+
+  /** The current user's membership row for a channel (for read state). */
+  async myMembership(
+    channelId: string,
+    userId: string,
+  ): Promise<ChannelMember | null> {
+    const rows = await getCollection<ChannelMember>("ChannelMember", {
+      channel_id: channelId,
+      user_id: userId,
+    });
+    return rows[0] ?? null;
+  },
+
+  /** Mark a channel read for a user by stamping last_read_at = now. */
+  async markChannelRead(channelId: string, userId: string): Promise<void> {
+    const membership = await this.myMembership(channelId, userId);
+    if (!membership) return;
+    await updateResource<ChannelMember>("ChannelMember", membership.id, {
+      last_read_at: new Date().toISOString(),
+    });
+  },
+
+  // --- Content (CMS) ---
+
+  /** Attachment links for a message (FK join rows). */
+  attachmentsForMessage(messageId: string): Promise<MessageDocument[]> {
+    return getCollection<MessageDocument>("MessageDocument", {
+      message_id: messageId,
+    });
+  },
+
+  /** Document metadata only (no `data`) — light, for list rendering. */
+  getDocumentMeta(documentId: string): Promise<Document> {
+    return getOne<Document>("Document", documentId, [
+      "title",
+      "filename",
+      "content_type",
+      "byte_size",
+      "document_type_id",
+      "uploaded_by",
+    ]);
+  },
+
+  /** A single document, including its base64 `data` (for download/preview). */
+  getDocument(documentId: string): Promise<Document> {
+    return getOne<Document>("Document", documentId);
+  },
+
+  /** Create a CMS document from base64-encoded bytes. */
+  createDocument(attrs: {
+    title: string;
+    document_type_id: number;
+    filename: string;
+    content_type: string;
+    byte_size: number;
+    data: string; // base64 (maps to bytea)
+    uploaded_by: string;
+  }): Promise<Document> {
+    return createResource<Document>("Document", attrs);
+  },
+
+  /** Link an existing document to a message. */
+  linkMessageDocument(
+    messageId: string,
+    documentId: string,
+  ): Promise<MessageDocument> {
+    return createResource<MessageDocument>("MessageDocument", {
+      message_id: messageId,
+      document_id: documentId,
+    });
   },
 };

@@ -125,4 +125,56 @@ INSERT INTO load (
   85.0, 780.0, 4200.00
 );
 
+-- ===========================================================================
+-- Messaging (lookups + a sample group channel with messages and an attachment)
+-- ===========================================================================
+INSERT INTO channel_type (id, code, name) VALUES
+  (1, 'direct',    'Direct message'),
+  (2, 'group',     'Group'),
+  (3, 'broadcast', 'Broadcast');
+
+INSERT INTO channel_member_role (id, code, name) VALUES
+  (1, 'owner',  'Owner'),
+  (2, 'member', 'Member');
+
+INSERT INTO document_type (id, code, name) VALUES
+  (1, 'document',         'Document'),
+  (2, 'image',            'Image'),
+  (3, 'bill_of_lading',   'Bill of Lading'),
+  (4, 'invoice',          'Invoice'),
+  (5, 'inspection_photo', 'Inspection photo'),
+  (6, 'license',          'License / permit'),
+  (7, 'other',            'Other');
+
+SELECT setval(pg_get_serial_sequence('channel_type', 'id'),        (SELECT max(id) FROM channel_type));
+SELECT setval(pg_get_serial_sequence('channel_member_role', 'id'), (SELECT max(id) FROM channel_member_role));
+SELECT setval(pg_get_serial_sequence('document_type', 'id'),       (SELECT max(id) FROM document_type));
+
+-- A group channel for the week's dispatch chatter.
+INSERT INTO channel (id, name, channel_type_id, created_by) VALUES
+  ('c4a11e10-0000-0000-0000-000000000001', 'Week of 2026-06-01 Dispatch', 2,
+   '11111111-1111-1111-1111-111111111111');  -- created by Dana (dispatcher)
+
+INSERT INTO channel_member (id, channel_id, user_id, member_role_id) VALUES
+  ('c4e3b001-0000-0000-0000-000000000001', 'c4a11e10-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111', 1),  -- Dana owner
+  ('c4e3b001-0000-0000-0000-000000000002', 'c4a11e10-0000-0000-0000-000000000001', '22222222-2222-2222-2222-222222222222', 2),  -- Pat (driver)
+  ('c4e3b001-0000-0000-0000-000000000003', 'c4a11e10-0000-0000-0000-000000000001', '33333333-3333-3333-3333-333333333333', 2);  -- Uma (updater)
+
+INSERT INTO message (id, channel_id, author_id, body) VALUES
+  ('5e55a6e0-0000-0000-0000-000000000001', 'c4a11e10-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111', 'Pat, your Lubbock -> Denver load is dispatched. BOL attached.'),
+  ('5e55a6e0-0000-0000-0000-000000000002', 'c4a11e10-0000-0000-0000-000000000001', '22222222-2222-2222-2222-222222222222', 'Got it, rolling out Monday AM.');
+
+-- A CMS document (a tiny text artifact stands in for a scanned BOL).
+INSERT INTO document (id, title, document_type_id, filename, content_type, byte_size, checksum, data, uploaded_by) VALUES
+  ('d0c00000-0000-0000-0000-000000000001', 'Bill of Lading — Lubbock to Denver', 3,
+   'bol.txt', 'text/plain', 9, md5('BOL: scan'), decode('Qk9MOiBzY2Fu', 'base64'),
+   '11111111-1111-1111-1111-111111111111');
+
+-- The same document, reachable from the message AND from the load (CMS reuse).
+INSERT INTO message_document (id, message_id, document_id) VALUES
+  ('111d0c00-0000-0000-0000-000000000001', '5e55a6e0-0000-0000-0000-000000000001', 'd0c00000-0000-0000-0000-000000000001');
+
+INSERT INTO load_document (id, load_id, document_id) VALUES
+  ('222d0c00-0000-0000-0000-000000000001', '88888888-0000-0000-0000-000000000001', 'd0c00000-0000-0000-0000-000000000001');
+
 COMMIT;

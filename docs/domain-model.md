@@ -160,6 +160,10 @@ resources). Codes shown below match the `code` column in
 - `app_role`: `dispatcher`, `driver`, `updater`.
 - `commodity_category`: `vehicles`, `heavy_equipment`, `farm_equipment`,
   `generators`, `lifts`.
+- `channel_type`: `direct`, `group`, `broadcast`.
+- `channel_member_role`: `owner`, `member`.
+- `document_type`: `document`, `image`, `bill_of_lading`, `invoice`,
+  `inspection_photo`, `license`, `other`.
 
 ## Policies / business rules (canonical list)
 
@@ -177,3 +181,52 @@ declared as ApiLogicServer/LogicBank rules in the generated middleware:
 6. **Equipment/commodity compatibility.**
 7. **Driver pay** = `rate × contract_percentage`.
 8. **Cost responsibility** follows `DriverType` (company vs. owner).
+
+## Messaging context
+
+A **message board** for the three roles. Participants are `app_user`s, so
+drivers, dispatchers, and updaters all converse through one model.
+
+- **Channel** *(aggregate root)* — a conversation space: a `group`/board, a 1:1
+  `direct` thread, or a `broadcast`. Holds members and messages.
+- **ChannelMember** — a user's membership in a channel, with `member_role`
+  (`owner`/`member`) and `last_read_at` (drives per-user unread counts).
+- **Message** — text posted to a channel by an author; `reply_to` supports
+  threaded replies; may be empty when it only carries documents.
+
+A message references **Documents** (below) through the `message_document` link,
+so attachments are shared content rather than message-private blobs.
+
+## Content (CMS) context
+
+Attachments are **first-class, reusable content**, not message-only blobs, so
+they can be reached from anywhere in the app.
+
+- **Document** *(aggregate root)* — a digital scan / image / artifact (BOL,
+  invoice, license, inspection photo, …). The binary lives in the DB (`bytea`)
+  with metadata (`title`, `document_type`, `filename`, `content_type`,
+  `byte_size`, `checksum`, `uploaded_by`).
+- **Links** — FK join tables connect a document to other resources, one per
+  related type, keeping referential integrity and letting ApiLogicServer
+  generate the relationships: `message_document`, `load_document` today; add
+  `driver_document`, `equipment_document`, `inspection_document`, … as needed.
+  The *same* document can be linked from several places at once.
+
+## Planned: Truck Location & Dispatcher HUD
+
+> Not yet built — captured here so the schema and portals can grow into it.
+> Pairs with the GPS/navigation feature (HERE provider, PostGIS storage). See
+> [`SPATIAL_GIS_DATA_CONSIDERATIONS.md`](SPATIAL_GIS_DATA_CONSIDERATIONS.md) for
+> the ALS↔PostGIS strategy + details (two access paths: relational map data via
+> ALS, spatial queries via a separate endpoint).
+
+- **Truck Location (telemetry)** — realtime vehicle positions, ingested from
+  **multiple, interchangeable sources**: Apple AirTags, Google devices, or a
+  driver's phone pushing location. Model this **source-agnostic**: a
+  `location_source` lookup (`airtag`, `google_device`, `phone_push`, …) plus a
+  `position_report` time series (equipment/driver, lat/lng, heading, speed,
+  accuracy, recorded_at, source). Geospatial data stored with **PostGIS**.
+- **Dispatcher HUD** — a desktop (C++/Wt) heads-up display showing **truck
+  locations** for the whole fleet on a map, plus at-a-glance fleet data (active
+  loads, status, this week's board). Reads the latest `position_report` per rig
+  and the dispatch/load resources via the shared JSON:API.

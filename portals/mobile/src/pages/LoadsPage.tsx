@@ -61,7 +61,7 @@ export function LoadsPage() {
 
         <IonList>
           {loads.map((load) => (
-            <IonItem key={load.id}>
+            <IonItem key={load.id} routerLink={`/loads/${load.id}`} detail>
               <IonLabel>
                 <h2>
                   {load.currency} {load.rate.toFixed(2)}

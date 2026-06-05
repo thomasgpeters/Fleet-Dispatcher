@@ -50,6 +50,8 @@ schema, the API, and both portals to keep design and discussion aligned:
   vocabulary we use to keep design and conversation consistent.
 - [`docs/MIDDLEWARE_SETUP.md`](docs/MIDDLEWARE_SETUP.md) — generating and running
   the ApiLogicServer middleware from the schema (managed outside this repo).
+- [`docs/TODO.md`](docs/TODO.md) — sequenced plan of approach (checklist).
+- [`docs/DEVELOPMENT_LOG.md`](docs/DEVELOPMENT_LOG.md) — dated record of changes.
 
 ## Getting started
 
