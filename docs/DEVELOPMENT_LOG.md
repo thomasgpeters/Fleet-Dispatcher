@@ -5,6 +5,14 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-06-02
 
+### Dispatcher Desktop & HUD design
+- Added `docs/DISPATCHER_DESKTOP.md`: the app **shell**, the **Today | Week**
+  board modes, and the **control → command → HUD** mechanism — a Wt server-push
+  `HudControlBus` where the control console publishes commands and HUD sessions
+  auto-react (generalizable to `FocusDriver`, `HighlightLoad`, …). Notes the
+  same-server (in-process bus) vs distributed (`hud_command` JSON:API) options.
+- TODO desktop section refined accordingly.
+
 ### Desktop build/run procedure + systemd
 - Expanded the dispatcher-desktop README with Linux dependency install
   (Debian/Ubuntu `libwt-dev`/`libwthttp-dev`, Fedora `wt-devel`), a Wt ≥ 4.5

@@ -56,15 +56,20 @@ Carried over (blocked / owned elsewhere):
 ## Dispatcher Desktop Portal (C++/Wt)  — NEXT
 
 Pivot here after Phase 1. Talks to the same JSON:API; Bootstrap theme + Wt
-`resources/` deploy already wired.
+`resources/` deploy already wired. Design: [`DISPATCHER_DESKTOP.md`](DISPATCHER_DESKTOP.md).
 
-- [ ] Dispatcher shell: navigation, layout, auth-aware (auth later)
-- [ ] Weekly board (Mon→Mon): drivers × days grid of loads
+- [ ] **Shell**: app bar (week selector, health, user), nav, content outlet,
+      command bar; wire the JSON:API client + app-wide state
+- [ ] **Board** with a **Today | Week** toggle (today's runs vs Mon→Mon grid)
 - [ ] Load intake form (new load) + driver/equipment assignment
+- [ ] **HUD** surface (`/hud`) + `HudControlBus` (Wt server push): controls on the
+      console publish commands (`SetMode`, …); HUD auto-switches Today/Week
+- [ ] Extend the command bus to more commands (`FocusDriver`, `HighlightLoad`)
 - [ ] Dispatcher messaging view (mirrors mobile Feature 1)
-- [ ] **HUD**: fleet **truck locations** on a map + at-a-glance fleet data
-      (active loads, status). Truck-location data depends on Feature 2 telemetry
-      + the geospatial endpoint; until then, HUD can render loads/board data.
+- [ ] **HUD map**: fleet **truck locations** — depends on Feature 2 telemetry +
+      the geospatial endpoint; until then the HUD renders board/load/status data
+- [ ] (Optional, distributed HUD) persist commands as a `hud_command` JSON:API
+      resource for audit/replay
 
 ## Feature 2 — Truck Location & Dispatcher HUD
 
