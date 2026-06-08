@@ -77,8 +77,17 @@ it (override with `-DWT_RESOURCES_DIR=...`).
 cd portals/dispatcher-desktop
 cmake -S . -B build
 cmake --build build
+
+# Start it (sensible defaults; override via env or pass-through flags):
+./run.sh                       # console at :8080/ , HUD at :8080/hud
+HTTP_PORT=9000 FLEET_API_BASE_URL=http://api.lan:5656/api ./run.sh
+# (or run the binary directly:)
 ./build/fleet_dispatcher_desktop --docroot build --http-address 0.0.0.0 --http-port 8080
 ```
+
+[`run.sh`](run.sh) points `--docroot` at the build dir (where CMake deployed the
+Wt `resources/` tree) and forwards any extra args to the Wt binary. Env knobs:
+`HTTP_ADDRESS`, `HTTP_PORT`, `DOCROOT`, `BIN`, `FLEET_API_BASE_URL`.
 
 Then open http://localhost:8080 (control console). The **HUD display** is served
 at **`/hud`** (e.g. http://localhost:8080/hud) on the same server; the console's
