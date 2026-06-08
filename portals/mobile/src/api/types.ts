@@ -57,6 +57,8 @@ export interface Load {
   loaded_miles: number;
   rate: number; // post-broker
   currency: string;
+  pickup_date?: string; // YYYY-MM-DD, within the dispatch week
+  delivery_date?: string;
 }
 
 export interface Settlement {
@@ -118,6 +120,44 @@ export interface MessageDocument {
   id: string;
   message_id: string;
   document_id: string;
+}
+
+// --- Telemetry (truck locations) ---
+export interface PositionReport {
+  id: string;
+  equipment_id?: string;
+  driver_id?: string;
+  location_source_id: number; // -> LocationSource (airtag|google_device|phone_push)
+  lat: number;
+  lng: number;
+  heading_deg?: number;
+  speed_mph?: number;
+  accuracy_m?: number;
+  recorded_at: string;
+}
+
+// --- Navigation (trips & waypoints) ---
+export interface Trip {
+  id: string;
+  driver_id?: string;
+  equipment_id?: string;
+  load_id?: string;
+  trip_status_id: number; // 1 planned · 2 active · 3 completed · 4 cancelled
+  name?: string;
+  started_at?: string;
+  ended_at?: string;
+}
+
+export interface Waypoint {
+  id: string;
+  trip_id: string;
+  seq: number;
+  stop_type_id: number; // 1 origin · 2 destination · 3 waypoint · 4 fuel · 5 rest · 6 truck_stop
+  label?: string;
+  lat: number;
+  lng: number;
+  planned_arrival?: string;
+  arrived_at?: string;
 }
 
 // JSON:API envelope (subset).

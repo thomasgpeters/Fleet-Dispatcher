@@ -15,6 +15,9 @@ Working plan, sequenced. Check items off as they ship and add a dated entry to
 - Mobile is published to `Fleet-Dispatcher-Mobile` via `make publish-mobile`.
 - Validate schema/seed against PostgreSQL 16; build the mobile app (`tsc` +
   Vite) before every push.
+- **Desktop C++/Wt is not compiled in the dev sandbox (no Wt); it is built and
+  run on the Linux box.** Standing decision — version-sensitive lines are flagged
+  inline; no per-change "not compiled" disclaimer.
 
 ## Foundation  ✅
 
@@ -56,44 +59,69 @@ Carried over (blocked / owned elsewhere):
 ## Dispatcher Desktop Portal (C++/Wt)  — NEXT
 
 Pivot here after Phase 1. Talks to the same JSON:API; Bootstrap theme + Wt
-`resources/` deploy already wired.
+`resources/` deploy already wired. Design: [`DISPATCHER_DESKTOP.md`](DISPATCHER_DESKTOP.md).
 
-- [ ] Dispatcher shell: navigation, layout, auth-aware (auth later)
-- [ ] Weekly board (Mon→Mon): drivers × days grid of loads
-- [ ] Load intake form (new load) + driver/equipment assignment
+- [x] Schema: `load.pickup_date` / `delivery_date` (drives Today vs Week)
+- [x] **Shell**: app bar (API/health), nav (Board/Loads/Drivers/Messages),
+      command bar, content outlet; owns the JSON:API client + mode state
+      (not compiled in-sandbox — no Wt; see note below)
+- [x] **Board** with a **Today | Week** toggle (today's runs vs Mon→Mon grid),
+      fed by an async `ApiClient` (Wt::Http::Client + Wt::Json)
+- [ ] Add app-bar week selector + user/role/health (with auth)
+- [x] Load intake form (new load) + driver/equipment assignment (POST /Load)
+- [x] **HUD** surface (`/hud`) + `HudControlBus` (Wt server push): the console's
+      Today/Week toggle publishes `SetMode`; HUD sessions auto-switch
+- [x] **Distributed HUD:** schema `hud_command` (+ POST from the console) so a
+      remote HUD can be driven; `command_type`/`arg` event log
+- [ ] Remote HUD: subscribe to `hud_command` (poll/stream) when run off-server
+- [ ] Extend the command bus to more commands (`FocusDriver`, `HighlightLoad`)
+      (enum + HUD handlers stubbed)
 - [ ] Dispatcher messaging view (mirrors mobile Feature 1)
-- [ ] **HUD**: fleet **truck locations** on a map + at-a-glance fleet data
-      (active loads, status). Truck-location data depends on Feature 2 telemetry
-      + the geospatial endpoint; until then, HUD can render loads/board data.
+- [x] **HUD truck-locations panel**: latest position per rig (15s poll), fed by
+      `position_report` (Feature 2)
+- [ ] **HUD map tiles** (Leaflet/HERE) layered over the positions data
+
+> Wt isn't installable in the dev sandbox, so the C++ above is **not compiled
+> here**. Version-sensitive spots are flagged in `ApiClient.cpp` (Http `done()`
+> error_code type; `Json::Type::Null` enum) and `main.cpp`/theme (`WBootstrap5Theme`
+> needs Wt ≥ 4.5).
 
 ## Feature 2 — Truck Location & Dispatcher HUD
 
 Powers the HUD's map. See "Planned" in `domain-model.md`.
 **Decided (2026-06-02):** PostGIS spatial data is separated from the ALS APIs
 (see [`SPATIAL_GIS_DATA_CONSIDERATIONS.md`](SPATIAL_GIS_DATA_CONSIDERATIONS.md)).
-**Decided (2026-06-02):** PostGIS spatial data is separated from the ALS APIs
-(see [`SPATIAL_GIS_DATA_CONSIDERATIONS.md`](SPATIAL_GIS_DATA_CONSIDERATIONS.md)).
 
-- [ ] Schema: `location_source` lookup (`airtag`, `google_device`,
-      `phone_push`), `position_report` time series — **lat/lng numeric on ALS
-      tables** (no geometry); geometry lives in a `gis` schema. See
-      [`SPATIAL_GIS_DATA_CONSIDERATIONS.md`](SPATIAL_GIS_DATA_CONSIDERATIONS.md).
-- [ ] Install PostGIS into its own `gis` schema; exclude it (and
-      `spatial_ref_sys`) from ALS reflection.
-- [ ] Stand up the separate geospatial endpoint (PostGIS `ST_*`, not ALS);
-      decide view vs. trigger-maintained geometry mirror.
-- [ ] Ingestion endpoints/adapters for AirTag / Google / phone-push sources
-- [ ] HERE routing/maps integration (trips, waypoints, truck-legal routes,
-      bridge heights, truck stops)
-- [ ] Mobile: trip start/stop, add-to-trip, navigate, waypoints, POIs
-- [ ] Desktop: Dispatcher HUD — fleet truck locations on a map + fleet data
+- [x] Schema: `location_source` lookup (`airtag`, `google_device`,
+      `phone_push`) + `position_report` time series — **lat/lng numeric on ALS
+      tables** (no geometry). Verified on PostgreSQL 16.
+- [x] Mobile: driver phone-push location (Locate tab → POST `/PositionReport`)
+- [x] Desktop HUD: truck-locations panel (latest per rig, 15s poll)
+- [x] Schema: navigation — `trip`, `waypoint`, `point_of_interest`, `route` +
+      lookups (`trip_status`, `stop_type`, `poi_category`), lat/lng. Verified.
+- [~] Mobile Trips: list, start trip, add waypoint (done); trip start/stop
+      lifecycle, navigate, and POIs pending
+- [x] `gis` bootstrap SQL (`database/gis_bootstrap.sql`): PostGIS into `gis` +
+      derived geography views; **verified** `public` stays clean (ALS-safe).
+      Full standup in [`DEPLOYMENT.md`](DEPLOYMENT.md).
+- [x] Separate geospatial endpoint (FastAPI, `geospatial/`): /health,
+      /truck-stops/nearest, /trucks/near, /positions/latest — **verified** live
+      against PG16+PostGIS as `fleet_gis`. (view vs. mirror: using views for now)
+- [ ] Ingestion adapters for AirTag / Google sources (phone-push done)
+- [ ] HERE routing/maps integration (truck-legal routes, bridge heights, truck
+      stops); persist as `route.polyline`
+- [x] Desktop HUD **map** (`Wt::WLeafletMap`, OSM tiles) with a marker per rig's
+      latest position (15s refresh)
+- [ ] HUD map: overlay routes (`route.polyline`) and driver-focus/load-highlight
+      commands
 
 ## Cross-cutting
 
-- [ ] **Decide DB schema separation** (ALS multi-schema): peel `cms` (content)
-      out from `app` (ops); `telemetry` later. Cross-schema FKs are fine. Apply
-      when configuring the DB — see `MIDDLEWARE_SETUP.md` → "Database schema
-      layout".
+- [x] **DB schema separation (DECIDED + done):** shared instance with
+      Smitty/Student-Onboarding → all Fleet app tables in the **`fleet`** schema
+      (owned by `fleet`, ALS reflects it); PostGIS in shared **`gis`**
+      (Fleet's `fleet_*` views owned by `fleet_gis`). See `MIDDLEWARE_SETUP.md`
+      + `DEPLOYMENT.md`. Verified: 37 tables in `fleet`, 0 in `public`.
 - [ ] AuthN/AuthZ (roles: dispatcher, driver, updater) — gates current-user,
       messaging, and HUD
 - [ ] LogicBank rules in generated middleware (weekly cap, settlement math)

@@ -5,6 +5,117 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-06-02
 
+### Shared-instance schema move + geospatial endpoint + one-shot (verified)
+- Shared PostgreSQL instance (with Smitty / Student-Onboarding): moved all Fleet
+  app objects out of `public` into a dedicated **`fleet`** schema (owned by
+  `fleet`; ALS reflects it via `search_path = fleet, public`). `schema.sql` /
+  `seed_data.sql` set the search_path; resource names unchanged (table-derived).
+- PostGIS in a **shared `gis`** schema: Fleet owns only its `fleet_*` geography
+  views via the new **`fleet_gis`** role (granted CREATE on gis, SELECT on the
+  fleet lat/lng tables); extension objects stay superuser-owned (by design).
+- `scripts/db-setup.sh` — one-shot for steps 1–4 (role+db, schema, seed, gis via
+  admin since CREATE EXTENSION needs superuser).
+- `geospatial/` — FastAPI endpoint (/health, /truck-stops/nearest, /trucks/near,
+  /positions/latest) connecting as `fleet_gis`; Dockerfile + README.
+- **Verified on PG16 + PostGIS 3.4:** one-shot creates `fleet` (37 tables) with
+  `public` empty; `fleet_*` views owned by `fleet_gis`; the FastAPI endpoint
+  served all four routes live (nearest truck stop, latest positions, trucks-near).
+- Synced docs: DEPLOYMENT, MIDDLEWARE_SETUP (schema layout = DECIDED),
+  SPATIAL_GIS_DATA_CONSIDERATIONS, TODO.
+
+### Deployment runbook + PostGIS bootstrap (verified)
+- `docs/DEPLOYMENT.md`: end-to-end standup — PostgreSQL, schema/seed, PostGIS
+  (without breaking ALS), ALS create/run, geospatial-endpoint role, portals,
+  verification + troubleshooting.
+- `database/gis_bootstrap.sql`: installs PostGIS into a dedicated `gis` schema
+  (+ `position_geog`/`poi_geog` geography views).
+- Verified on PostgreSQL 16 + PostGIS 3.4: `public` ends with **0** PostGIS
+  objects (so ALS reflection stays clean), `spatial_ref_sys` lives in `gis`, and
+  spatial queries (nearest-POI KNN, geography distance) work with
+  `search_path = gis, public`. docker-compose notes the `postgis/postgis` image.
+
+### HUD: Leaflet map of truck positions
+- HUD now renders a `Wt::WLeafletMap` (OSM tiles, no key) with a marker per
+  rig's latest position, rebuilt on the 15s poll (markers tracked + removed/
+  re-added); the detail table remains below. Leaflet JS/CSS via CDN (note for
+  offline/self-contained deploy). Needs Wt ≥ 4.5.
+
+### Feature 2: navigation schema + mobile Trips
+- Schema: `trip`, `waypoint` (ordered, unique seq), `point_of_interest`
+  (incl. truck stops via category), `route` (HERE polyline as text) + lookups
+  `trip_status`/`stop_type`/`poi_category` — ALS-facing lat/lng, no PostGIS.
+  Seed: a Lubbock→Denver trip with 3 waypoints, a truck-stop POI, a route.
+  Verified on PostgreSQL 16 (ordered waypoints + unique-seq guard).
+- Mobile: **Trips** tab — list driver trips, start a (planned) trip, trip
+  detail with ordered waypoints and "add current location" (geolocation →
+  addWaypoint). Client: tripsForDriver/getTrip/createTrip/waypointsForTrip/
+  addWaypoint. `npm run build` passes.
+- Pending: trip start/stop lifecycle, HERE routing/navigation, POIs browsing,
+  HUD map tiles.
+
+### Feature 2: truck-location backbone (telemetry)
+- Schema: `location_source` lookup + `position_report` (lat/lng numeric,
+  heading/speed/accuracy, recorded_at; equipment/driver FKs) per the geospatial
+  decision — ALS-facing, no PostGIS. Seed: 3 sources + a short track. Verified on
+  PostgreSQL 16 (latest-per-rig query + lat range CHECK).
+- Mobile: **Locate** tab — `navigator.geolocation` → `api.postPosition` (POST
+  `/PositionReport`, phone_push). Placeholder driver/equipment ids in
+  `currentUser.ts` pending auth. `npm run build` passes.
+- Desktop HUD: `ApiClient::fetchPositions` + a **truck-locations panel** (latest
+  position per rig, refreshed every 15s via `WTimer`).
+- PostGIS `gis` schema, the geospatial endpoint, HERE routing, and HUD map tiles
+  remain queued.
+
+### Dispatcher desktop: /hud surface + HudControlBus
+- Schema: `hud_command` append-only command channel (free-text `command_type` +
+  `arg`) for distributed/remote HUDs. Verified on PostgreSQL 16.
+- C++/Wt: `HudControlBus` (server-push singleton: subscribe/unsubscribe/publish
+  via `WServer::post`), `HudView` (read-only board at `/hud` that reacts to
+  `SetMode`), and a second WServer entry point (`/hud`) alongside the console.
+- The console's Today/Week toggle now publishes `SetMode` to the bus (instant,
+  in-process) and records it via `ApiClient::postHudCommand` (POST /HudCommand)
+  for remote HUDs. `FocusDriver`/`HighlightLoad` enum + handlers stubbed.
+- README: HUD served at `/hud`.
+
+### Dispatcher desktop: load intake form + assignment
+- `LoadForm` (Wt): combos for dispatch week, shipper, receiver, commodity,
+  pickup/drop-off locations, run type, status, plus optional driver + equipment
+  (assignment); rate/miles spin boxes; pickup/delivery date edits. Validates
+  required fields and distinct pickup/drop-off, then POSTs.
+- `ApiClient`: `Option`/`LoadDraft`, `fetchOptions` (generic reference combos),
+  and `createLoad` (POST /Load, hand-built JSON:API body via `postJson`).
+- Shell: "New Load" nav → form; on success returns to the board (which reloads).
+  CMake builds `LoadForm.cpp`.
+
+### Dispatcher desktop: shell + Today/Week board (build start)
+- Schema: added `load.pickup_date` / `delivery_date` (+ `delivery_after_pickup`
+  CHECK, pickup-date index) to drive the board; seed updated. Verified on
+  PostgreSQL 16. Synced the mobile `Load` type.
+- C++/Wt: `Shell` (app bar, nav, Today|Week command bar, content outlet),
+  `BoardView` (Today list vs Mon→Mon grid), and an async `ApiClient`
+  (Wt::Http::Client + Wt::Json) reading `Driver`/`Load`. `main.cpp` enables
+  server push; CMake builds the new sources.
+- Decision: HUD will be **distributed-capable** — commands also persisted as a
+  `hud_command` JSON:API resource (built with the bus, later).
+- NOT compiled here (no Wt in the sandbox); version-sensitive lines flagged in
+  `ApiClient.cpp` and the Bootstrap-5 theme.
+
+### Dispatcher Desktop & HUD design
+- Added `docs/DISPATCHER_DESKTOP.md`: the app **shell**, the **Today | Week**
+  board modes, and the **control → command → HUD** mechanism — a Wt server-push
+  `HudControlBus` where the control console publishes commands and HUD sessions
+  auto-react (generalizable to `FocusDriver`, `HighlightLoad`, …). Notes the
+  same-server (in-process bus) vs distributed (`hud_command` JSON:API) options.
+- TODO desktop section refined accordingly.
+
+### Desktop build/run procedure + systemd
+- Expanded the dispatcher-desktop README with Linux dependency install
+  (Debian/Ubuntu `libwt-dev`/`libwthttp-dev`, Fedora `wt-devel`), a Wt ≥ 4.5
+  note for the Bootstrap 5 theme, configure/build/run, install-prefix run, and a
+  systemd service procedure.
+- Added `deploy/fleet-dispatcher-desktop.service` (hardened unit, runs with the
+  install-prefix docroot so Wt `resources/` resolve) and `deploy/desktop.env.example`.
+
 ### Messaging Phase 1 CLOSED
 - Finished the unblocked Phase-1 items: **unread counts + mark-as-read**
   (`channel_member.last_read_at`, `IonBadge`), **pull-to-refresh**
