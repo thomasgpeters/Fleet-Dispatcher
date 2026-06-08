@@ -5,6 +5,16 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-06-02
 
+### Dispatcher desktop: load intake form + assignment
+- `LoadForm` (Wt): combos for dispatch week, shipper, receiver, commodity,
+  pickup/drop-off locations, run type, status, plus optional driver + equipment
+  (assignment); rate/miles spin boxes; pickup/delivery date edits. Validates
+  required fields and distinct pickup/drop-off, then POSTs.
+- `ApiClient`: `Option`/`LoadDraft`, `fetchOptions` (generic reference combos),
+  and `createLoad` (POST /Load, hand-built JSON:API body via `postJson`).
+- Shell: "New Load" nav → form; on success returns to the board (which reloads).
+  CMake builds `LoadForm.cpp`.
+
 ### Dispatcher desktop: shell + Today/Week board (build start)
 - Schema: added `load.pickup_date` / `delivery_date` (+ `delivery_after_pickup`
   CHECK, pickup-date index) to drive the board; seed updated. Verified on

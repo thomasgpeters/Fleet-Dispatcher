@@ -1,9 +1,12 @@
 #include "ApiClient.h"
 
 #include <chrono>
+#include <cstdio>
 #include <cstdlib>
 #include <memory>
+#include <sstream>
 #include <string>
+#include <vector>
 
 #include <Wt/WApplication.h>
 #include <Wt/Http/Client.h>
@@ -110,6 +113,56 @@ fd::Load parseLoad(const Wt::Json::Object& res) {
     return l;
 }
 
+std::string jsonEscape(const std::string& s) {
+    std::string out;
+    out.reserve(s.size() + 8);
+    for (char c : s) {
+        switch (c) {
+            case '"': out += "\\\""; break;
+            case '\\': out += "\\\\"; break;
+            case '\n': out += "\\n"; break;
+            case '\r': out += "\\r"; break;
+            case '\t': out += "\\t"; break;
+            default: out += c;
+        }
+    }
+    return out;
+}
+
+// POST a JSON:API body and deliver the parsed "data" object to `onObj`.
+void postJson(const std::string& url, const std::string& body,
+              std::function<void(const Wt::Json::Object&)> onObj,
+              ApiClient::ErrorCallback onErr) {
+    auto client = std::make_shared<Wt::Http::Client>();
+    client->setTimeout(std::chrono::seconds(15));
+    client->done().connect(
+        [client, onObj, onErr](Wt::AsioWrapper::error_code err,
+                               const Wt::Http::Message& response) {
+            if (err) {
+                onErr(err.message());
+            } else if (response.status() != 200 && response.status() != 201) {
+                onErr("HTTP " + std::to_string(response.status()) + ": " +
+                      response.body());
+            } else {
+                try {
+                    Wt::Json::Object root;
+                    Wt::Json::parse(response.body(), root);
+                    const Wt::Json::Object& data = root.get("data");
+                    onObj(data);
+                } catch (const std::exception& e) {
+                    onErr(std::string("parse error: ") + e.what());
+                }
+            }
+            if (auto* app = Wt::WApplication::instance()) app->triggerUpdate();
+        });
+
+    Wt::Http::Message msg;
+    msg.addHeader("Content-Type", "application/vnd.api+json");
+    msg.addHeader("Accept", "application/vnd.api+json");
+    msg.addBodyText(body);
+    if (!client->post(url, msg)) onErr("could not start POST to " + url);
+}
+
 }  // namespace
 
 ApiClient::ApiClient(std::string baseUrl) : baseUrl_(std::move(baseUrl)) {}
@@ -138,6 +191,69 @@ void ApiClient::fetchLoads(LoadsCallback onOk, ErrorCallback onErr) {
             for (const Wt::Json::Value& v : data) out.push_back(parseLoad(v));
             onOk(std::move(out));
         },
+        std::move(onErr));
+}
+
+void ApiClient::fetchOptions(const std::string& resource,
+                             const std::string& labelAttr, OptionsCallback onOk,
+                             ErrorCallback onErr) {
+    getCollection(
+        baseUrl_ + "/" + resource,
+        [onOk, labelAttr](const Wt::Json::Array& data) {
+            std::vector<Option> out;
+            for (const Wt::Json::Value& v : data) {
+                const Wt::Json::Object& res = v;
+                const Wt::Json::Object& a = res.get("attributes");
+                out.push_back({jstr(res, "id"), jstr(a, labelAttr.c_str())});
+            }
+            onOk(std::move(out));
+        },
+        std::move(onErr));
+}
+
+void ApiClient::createLoad(const LoadDraft& d, LoadCallback onOk,
+                           ErrorCallback onErr) {
+    std::vector<std::string> f;
+    auto addStr = [&](const char* k, const std::string& v) {
+        if (!v.empty())
+            f.push_back("\"" + std::string(k) + "\":\"" + jsonEscape(v) + "\"");
+    };
+    auto addInt = [&](const char* k, int v) {
+        f.push_back("\"" + std::string(k) + "\":" + std::to_string(v));
+    };
+    auto addFixed = [&](const char* k, double v, const char* fmt) {
+        char b[32];
+        std::snprintf(b, sizeof(b), fmt, v);
+        f.push_back("\"" + std::string(k) + "\":" + b);
+    };
+
+    addStr("dispatch_week_id", d.dispatch_week_id);
+    addStr("shipper_id", d.shipper_id);
+    addStr("receiver_id", d.receiver_id);
+    addStr("commodity_id", d.commodity_id);
+    addStr("pickup_id", d.pickup_id);
+    addStr("dropoff_id", d.dropoff_id);
+    addStr("driver_id", d.driver_id);
+    addStr("equipment_id", d.equipment_id);
+    addInt("run_type_id", d.run_type_id);
+    addInt("load_status_id", d.load_status_id);
+    addFixed("rate", d.rate, "%.2f");
+    addFixed("deadhead_miles", d.deadhead_miles, "%.1f");
+    addFixed("loaded_miles", d.loaded_miles, "%.1f");
+    addStr("pickup_date", d.pickup_date);
+    addStr("delivery_date", d.delivery_date);
+
+    std::ostringstream attrs;
+    for (size_t i = 0; i < f.size(); ++i) {
+        if (i) attrs << ",";
+        attrs << f[i];
+    }
+    const std::string body =
+        "{\"data\":{\"type\":\"Load\",\"attributes\":{" + attrs.str() + "}}}";
+
+    postJson(
+        baseUrl_ + "/Load", body,
+        [onOk](const Wt::Json::Object& obj) { onOk(parseLoad(obj)); },
         std::move(onErr));
 }
 

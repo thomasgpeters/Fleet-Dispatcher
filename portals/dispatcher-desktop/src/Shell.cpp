@@ -30,7 +30,7 @@ Shell::Shell() : api_(std::make_unique<ApiClient>(ApiClient::baseUrlFromEnv())) 
         return b;
     };
     addNav("Board", [this] { showBoard(); });
-    addNav("Loads", [this] { showPlaceholder("Loads"); });
+    addNav("New Load", [this] { showLoadForm(); });
     addNav("Drivers", [this] { showPlaceholder("Drivers"); });
     addNav("Messages", [this] { showPlaceholder("Messages"); });
 
@@ -66,6 +66,14 @@ void Shell::showBoard() {
     refreshModeButtons();
     content_->clear();
     board_ = content_->addNew<BoardView>(api_.get(), mode_);
+}
+
+void Shell::showLoadForm() {
+    board_ = nullptr;
+    commandBar_->hide();
+    content_->clear();
+    // On success, return to the board (which reloads from the API).
+    content_->addNew<LoadForm>(api_.get(), [this] { showBoard(); });
 }
 
 void Shell::showPlaceholder(const std::string& title) {

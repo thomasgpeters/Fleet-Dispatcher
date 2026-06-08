@@ -9,6 +9,7 @@
 
 #include "ApiClient.h"
 #include "BoardView.h"
+#include "LoadForm.h"
 
 namespace fd {
 
@@ -27,6 +28,7 @@ private:
     BoardView* board_ = nullptr;
 
     void showBoard();
+    void showLoadForm();
     void showPlaceholder(const std::string& title);
     void setMode(BoardMode mode);
     void refreshModeButtons();

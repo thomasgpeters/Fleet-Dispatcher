@@ -68,7 +68,7 @@ Pivot here after Phase 1. Talks to the same JSON:API; Bootstrap theme + Wt
 - [x] **Board** with a **Today | Week** toggle (today's runs vs Mon→Mon grid),
       fed by an async `ApiClient` (Wt::Http::Client + Wt::Json)
 - [ ] Add app-bar week selector + user/role/health (with auth)
-- [ ] Load intake form (new load) + driver/equipment assignment
+- [x] Load intake form (new load) + driver/equipment assignment (POST /Load)
 - [ ] **HUD** surface (`/hud`) + `HudControlBus` (Wt server push): controls on the
       console publish commands (`SetMode`, …); HUD auto-switches Today/Week
 - [ ] **Distributed HUD (decided):** also persist commands as a `hud_command`

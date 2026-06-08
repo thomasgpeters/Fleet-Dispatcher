@@ -15,10 +15,37 @@
 
 namespace fd {
 
+// A selectable reference option (id + display label) for form combos.
+struct Option {
+    std::string id;     // JSON:API id (string, even for integer-keyed lookups)
+    std::string label;
+};
+
+// Field values for creating a load. FK ids are strings; lookups are ints.
+struct LoadDraft {
+    std::string dispatch_week_id;
+    std::string shipper_id;
+    std::string receiver_id;
+    std::string commodity_id;
+    std::string pickup_id;
+    std::string dropoff_id;
+    std::string driver_id;     // optional (assignment)
+    std::string equipment_id;  // optional (assignment)
+    int run_type_id = 0;
+    int load_status_id = 0;
+    double rate = 0.0;
+    double deadhead_miles = 0.0;
+    double loaded_miles = 0.0;
+    std::string pickup_date;    // "YYYY-MM-DD" or empty
+    std::string delivery_date;  // "YYYY-MM-DD" or empty
+};
+
 class ApiClient {
 public:
     using DriversCallback = std::function<void(std::vector<Driver>)>;
     using LoadsCallback = std::function<void(std::vector<Load>)>;
+    using OptionsCallback = std::function<void(std::vector<Option>)>;
+    using LoadCallback = std::function<void(Load)>;
     using ErrorCallback = std::function<void(std::string)>;
 
     // baseUrl e.g. "http://localhost:5656/api" (no trailing slash).
@@ -26,6 +53,13 @@ public:
 
     void fetchDrivers(DriversCallback onOk, ErrorCallback onErr);
     void fetchLoads(LoadsCallback onOk, ErrorCallback onErr);
+
+    // Generic option fetch for form combos: GET /resource, label from labelAttr.
+    void fetchOptions(const std::string& resource, const std::string& labelAttr,
+                      OptionsCallback onOk, ErrorCallback onErr);
+
+    // Create a load (POST /Load) and return the created resource.
+    void createLoad(const LoadDraft& draft, LoadCallback onOk, ErrorCallback onErr);
 
     const std::string& baseUrl() const { return baseUrl_; }
 
