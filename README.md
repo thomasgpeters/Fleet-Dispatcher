@@ -18,7 +18,7 @@ schema, the API, and both portals to keep design and discussion aligned:
                └────────────────┬───────────────────┘
                                 │
                   ┌─────────────▼─────────────┐
-                  │   ApiLogicServer          │   middleware  (port 5656)
+                  │   ApiLogicServer          │   middleware  (port 5659)
                   │   JSON:API / SAFRS        │
                   │   LogicBank business rules│
                   └─────────────┬─────────────┘
@@ -73,7 +73,7 @@ Fleet-Dispatcher/                  ← this monorepo (source of truth)
 | -------------------- | ------------------------------- | ------------------------------------------------ | --------------------- | ----------- |
 | **Mobile** (TS)      | `portals/mobile` → published to the `Fleet-Dispatcher-Mobile` repo | `npm ci && npm run build` | static SPA (`dist/`)  | **VCP**     |
 | **Dispatcher desktop** (C++) | `portals/dispatcher-desktop`            | `cmake -S . -B build && cmake --build build`      | Wt HTTP server binary | **VCP**     |
-| ALS middleware       | generated from `database/schema.sql`     | `ApiLogicServer create` / `run`                   | JSON:API on `:5656`   | separately (not VCP) |
+| ALS middleware       | generated from `database/schema.sql`     | `ApiLogicServer create` / `run`                   | JSON:API on `:5659`   | separately (not VCP) |
 | Geospatial endpoint  | `geospatial/`                            | `pip install -r requirements.txt`                 | FastAPI on `:5701`    | own Dockerfile / systemd |
 | PostgreSQL           | `database/*.sql`                         | `scripts/db-setup.sh`                             | `fleet` + `gis` schemas | DBA / psql |
 

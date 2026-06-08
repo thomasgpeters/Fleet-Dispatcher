@@ -49,7 +49,7 @@ public:
     using LoadCallback = std::function<void(Load)>;
     using ErrorCallback = std::function<void(std::string)>;
 
-    // baseUrl e.g. "http://localhost:5656/api" (no trailing slash).
+    // baseUrl e.g. "http://localhost:5659/api" (no trailing slash).
     explicit ApiClient(std::string baseUrl);
 
     void fetchDrivers(DriversCallback onOk, ErrorCallback onErr);
@@ -70,7 +70,7 @@ public:
 
     const std::string& baseUrl() const { return baseUrl_; }
 
-    // Reads FLEET_API_BASE_URL, default http://localhost:5656/api.
+    // Reads FLEET_API_BASE_URL, default http://localhost:5659/api.
     static std::string baseUrlFromEnv();
 
 private:

@@ -1,8 +1,8 @@
 # Fleet Dispatcher — Dispatcher Desktop (Wt) systemd unit.
 #
 # One service serves BOTH faces on the same port:
-#   console : http://<host>:8090/
-#   HUD     : http://<host>:8090/hud
+#   console : http://<host>:8089/
+#   HUD     : http://<host>:8089/hud
 #
 # Install procedure (see portals/dispatcher-desktop/README.md):
 #   sudo cmake --install build --prefix /opt/fleet-dispatcher
@@ -36,7 +36,7 @@ EnvironmentFile=-/etc/fleet-dispatcher/desktop.env
 ExecStart=/opt/fleet-dispatcher/bin/fleet_dispatcher_desktop \
     --docroot /opt/fleet-dispatcher/bin \
     --http-address 0.0.0.0 \
-    --http-port 8090
+    --http-port 8089
 
 Restart=on-failure
 RestartSec=2

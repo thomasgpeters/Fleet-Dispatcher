@@ -7,14 +7,14 @@
 # into the build directory by CMake, so we point --docroot at it.
 #
 # Override any of these via environment, e.g.:
-#   HTTP_PORT=9000 FLEET_API_BASE_URL=http://api.lan:5656/api ./run.sh
+#   HTTP_PORT=9000 FLEET_API_BASE_URL=http://api.lan:5659/api ./run.sh
 #
 #   BUILD_DIR           build output dir          (default: ./build)
 #   BIN                 executable path           (default: $BUILD_DIR/fleet_dispatcher_desktop)
 #   DOCROOT             Wt docroot (has resources/) (default: $BUILD_DIR)
 #   HTTP_ADDRESS        listen address            (default: 0.0.0.0)
-#   HTTP_PORT           listen port               (default: 8090)
-#   FLEET_API_BASE_URL  JSON:API base             (default: http://localhost:5656/api)
+#   HTTP_PORT           listen port               (default: 8089)
+#   FLEET_API_BASE_URL  JSON:API base             (default: http://localhost:5659/api)
 #
 # Any extra arguments are passed straight through to the Wt binary, e.g.:
 #   ./run.sh --http-port 9090 --accesslog access.log
@@ -26,8 +26,8 @@ BUILD_DIR="${BUILD_DIR:-$HERE/build}"
 BIN="${BIN:-$BUILD_DIR/fleet_dispatcher_desktop}"
 DOCROOT="${DOCROOT:-$BUILD_DIR}"
 HTTP_ADDRESS="${HTTP_ADDRESS:-0.0.0.0}"
-HTTP_PORT="${HTTP_PORT:-8090}"
-export FLEET_API_BASE_URL="${FLEET_API_BASE_URL:-http://localhost:5656/api}"
+HTTP_PORT="${HTTP_PORT:-8089}"
+export FLEET_API_BASE_URL="${FLEET_API_BASE_URL:-http://localhost:5659/api}"
 
 if [ ! -x "$BIN" ]; then
     echo "error: binary not found: $BIN" >&2

@@ -6,7 +6,7 @@
 //                             in-process HudControlBus (server push).
 //
 // Talks to the shared ApiLogicServer JSON:API (FLEET_API_BASE_URL, default
-// http://localhost:5656/api); never touches PostgreSQL directly.
+// http://localhost:5659/api); never touches PostgreSQL directly.
 // See docs/DISPATCHER_DESKTOP.md.
 
 #include <iostream>

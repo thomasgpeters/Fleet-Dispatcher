@@ -1,6 +1,6 @@
 // Thin JSON:API client for the Fleet Dispatcher middleware (ApiLogicServer).
 //
-// Base URL comes from Vite env (VITE_API_BASE_URL, default :5656/api). All
+// Base URL comes from Vite env (VITE_API_BASE_URL, default :5659/api). All
 // portals share this one API; this client speaks JSON:API conventions
 // (resource collections, filter[...] query params).
 
@@ -19,7 +19,7 @@ import type {
 } from "./types";
 
 export const API_BASE_URL: string =
-  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5656/api";
+  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5659/api";
 
 async function getCollection<T>(
   resource: string,

@@ -183,7 +183,7 @@ ApiClient::ApiClient(std::string baseUrl) : baseUrl_(std::move(baseUrl)) {}
 
 std::string ApiClient::baseUrlFromEnv() {
     if (const char* env = std::getenv("FLEET_API_BASE_URL")) return env;
-    return "http://localhost:5656/api";
+    return "http://localhost:5659/api";
 }
 
 void ApiClient::fetchDrivers(DriversCallback onOk, ErrorCallback onErr) {

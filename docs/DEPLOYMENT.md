@@ -18,7 +18,7 @@ PostGIS strategy and rationale).
 3. Apply database/seed_data.sql     (reference + demo data)
 4. Apply database/gis_bootstrap.sql (PostGIS into shared `gis` — isolated from ALS)
 5. ApiLogicServer create + run      (reflects `fleet`, never `gis`/`public`)
-6. Geospatial endpoint role         (search_path = gis, public)  [Feature 2]
+6. Geospatial endpoint role         (search_path = gis, fleet, public)  [Feature 2]
 7. Portals: desktop (Wt) + mobile (VCP)
 ```
 
@@ -46,8 +46,8 @@ ports:
 | ------------------------------------ | ------ | ---------------------------------- |
 | Student-Onboarding (sibling)         | `8080` | in use — do not reuse              |
 | Smitty-Services (sibling)            | `8085` | in use — do not reuse              |
-| **Fleet — Dispatcher desktop (Wt)**  | `8090` | console `/` + HUD `/hud`           |
-| **Fleet — ApiLogicServer (JSON:API)**| `5656` | `API_PORT`                         |
+| **Fleet — Dispatcher desktop (Wt)**  | `8089` | console `/` + HUD `/hud`           |
+| **Fleet — ApiLogicServer (JSON:API)**| `5659` | `API_PORT`                         |
 | **Fleet — Geospatial endpoint**      | `5701` | `GIS_PORT`                         |
 | PostgreSQL (shared)                  | `5432` | one instance, schema-separated     |
 
@@ -175,7 +175,7 @@ ApiLogicServer create --project_name=fleet-dispatcher-api \
     --db_url="$DATABASE_URL" --from_git ""   # see note on --schema below
 
 cd fleet-dispatcher-api
-ApiLogicServer run --port "${API_PORT:-5656}"
+ApiLogicServer run --port "${API_PORT:-5659}"
 ```
 
 > ALS reflects the schema(s) on the connection's `search_path`; because the
@@ -183,7 +183,7 @@ ApiLogicServer run --port "${API_PORT:-5656}"
 > your ALS version exposes an explicit schema flag, point it at `fleet`. Resource
 > names come from table names, so the portals are unaffected.
 
-- JSON:API + Swagger serve on `:5656`. See [`MIDDLEWARE_SETUP.md`](MIDDLEWARE_SETUP.md).
+- JSON:API + Swagger serve on `:5659`. See [`MIDDLEWARE_SETUP.md`](MIDDLEWARE_SETUP.md).
 - If anything spatial ever *does* get reflected (e.g. you installed PostGIS into
   `public` by mistake), the fix is to reinstall it into `gis` — or, as a
   fallback, remove the unwanted classes from the generated `database/models.py`
@@ -227,7 +227,7 @@ LIMIT 5;
 
 ```bash
 # API up?
-curl -s "http://localhost:${API_PORT:-5656}/api/Driver" | head -c 200
+curl -s "http://localhost:${API_PORT:-5659}/api/Driver" | head -c 200
 
 # app tables live in fleet (not public)?  (fleet > 0, public app tables = 0)
 psql "$DATABASE_URL" -tAc "SELECT count(*) FROM information_schema.tables WHERE table_schema='fleet';"
