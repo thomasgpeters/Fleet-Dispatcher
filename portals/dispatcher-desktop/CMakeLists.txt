@@ -12,6 +12,8 @@ add_executable(fleet_dispatcher_desktop
     src/Shell.cpp
     src/BoardView.cpp
     src/LoadForm.cpp
+    src/HudView.cpp
+    src/HudControlBus.cpp
     src/ApiClient.cpp
 )
 

@@ -69,11 +69,13 @@ Pivot here after Phase 1. Talks to the same JSON:API; Bootstrap theme + Wt
       fed by an async `ApiClient` (Wt::Http::Client + Wt::Json)
 - [ ] Add app-bar week selector + user/role/health (with auth)
 - [x] Load intake form (new load) + driver/equipment assignment (POST /Load)
-- [ ] **HUD** surface (`/hud`) + `HudControlBus` (Wt server push): controls on the
-      console publish commands (`SetMode`, …); HUD auto-switches Today/Week
-- [ ] **Distributed HUD (decided):** also persist commands as a `hud_command`
-      JSON:API resource so a remote HUD can subscribe (audit/replay)
+- [x] **HUD** surface (`/hud`) + `HudControlBus` (Wt server push): the console's
+      Today/Week toggle publishes `SetMode`; HUD sessions auto-switch
+- [x] **Distributed HUD:** schema `hud_command` (+ POST from the console) so a
+      remote HUD can be driven; `command_type`/`arg` event log
+- [ ] Remote HUD: subscribe to `hud_command` (poll/stream) when run off-server
 - [ ] Extend the command bus to more commands (`FocusDriver`, `HighlightLoad`)
+      (enum + HUD handlers stubbed)
 - [ ] Dispatcher messaging view (mirrors mobile Feature 1)
 - [ ] **HUD map**: fleet **truck locations** — depends on Feature 2 telemetry +
       the geospatial endpoint; until then the HUD renders board/load/status data

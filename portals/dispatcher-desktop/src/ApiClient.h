@@ -61,6 +61,11 @@ public:
     // Create a load (POST /Load) and return the created resource.
     void createLoad(const LoadDraft& draft, LoadCallback onOk, ErrorCallback onErr);
 
+    // Persist a HUD command (POST /HudCommand) for remote/distributed HUDs.
+    // Best-effort; errors go to onErr (ignore for fire-and-forget).
+    void postHudCommand(const std::string& commandType, const std::string& arg,
+                        ErrorCallback onErr);
+
     const std::string& baseUrl() const { return baseUrl_; }
 
     // Reads FLEET_API_BASE_URL, default http://localhost:5656/api.

@@ -303,6 +303,24 @@ CREATE TABLE load_document (
 CREATE INDEX idx_message_document_message ON message_document (message_id);
 CREATE INDEX idx_load_document_load ON load_document (load_id);
 
+-- ===========================================================================
+-- Dispatcher HUD command channel
+--
+-- An append-only command/event stream so a remote HUD (separate process /
+-- machine) can subscribe to control commands issued from the dispatcher
+-- console (the same-server case uses an in-process Wt server-push bus instead).
+-- command_type is free text (an event log, not reference data): e.g. set_mode,
+-- focus_driver, highlight_load; arg carries the payload (e.g. "week").
+-- ===========================================================================
+CREATE TABLE hud_command (
+    id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    command_type TEXT NOT NULL,
+    arg          TEXT,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_hud_command_created ON hud_command (created_at);
+
 COMMIT;
 
 -- Invariants for the middleware (LogicBank), enforced at the transaction boundary:

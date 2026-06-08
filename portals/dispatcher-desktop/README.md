@@ -80,7 +80,9 @@ cmake --build build
 ./build/fleet_dispatcher_desktop --docroot build --http-address 0.0.0.0 --http-port 8080
 ```
 
-Then open http://localhost:8080.
+Then open http://localhost:8080 (control console). The **HUD display** is served
+at **`/hud`** (e.g. http://localhost:8080/hud) on the same server; the console's
+Today/Week toggle drives it live via the in-process command bus.
 
 CMake auto-detects the Wt `resources/` folder in the common install locations
 (`/usr/share/Wt/resources`, `/usr/local/share/Wt/resources`, …). If Wt lives in

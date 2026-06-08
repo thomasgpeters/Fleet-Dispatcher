@@ -257,4 +257,14 @@ void ApiClient::createLoad(const LoadDraft& d, LoadCallback onOk,
         std::move(onErr));
 }
 
+void ApiClient::postHudCommand(const std::string& commandType,
+                               const std::string& arg, ErrorCallback onErr) {
+    const std::string body =
+        "{\"data\":{\"type\":\"HudCommand\",\"attributes\":{\"command_type\":\"" +
+        jsonEscape(commandType) + "\",\"arg\":\"" + jsonEscape(arg) + "\"}}}";
+    postJson(
+        baseUrl_ + "/HudCommand", body,
+        [](const Wt::Json::Object&) { /* fire-and-forget */ }, std::move(onErr));
+}
+
 }  // namespace fd

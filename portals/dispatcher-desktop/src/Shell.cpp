@@ -5,6 +5,8 @@
 #include <Wt/WString.h>
 #include <Wt/WText.h>
 
+#include "HudControlBus.h"
+
 namespace fd {
 
 Shell::Shell() : api_(std::make_unique<ApiClient>(ApiClient::baseUrlFromEnv())) {
@@ -52,6 +54,12 @@ void Shell::setMode(BoardMode mode) {
     mode_ = mode;
     refreshModeButtons();
     if (board_) board_->setMode(mode_);
+
+    // Drive the HUD: the same console control pushes a command to every HUD
+    // session (in-process, instant) and records it for remote/distributed HUDs.
+    const std::string arg = (mode_ == BoardMode::Today) ? "today" : "week";
+    HudControlBus::instance().publish({HudCommand::SetMode, arg});
+    api_->postHudCommand("set_mode", arg, [](std::string) { /* best-effort */ });
 }
 
 void Shell::refreshModeButtons() {

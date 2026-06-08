@@ -5,6 +5,17 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-06-02
 
+### Dispatcher desktop: /hud surface + HudControlBus
+- Schema: `hud_command` append-only command channel (free-text `command_type` +
+  `arg`) for distributed/remote HUDs. Verified on PostgreSQL 16.
+- C++/Wt: `HudControlBus` (server-push singleton: subscribe/unsubscribe/publish
+  via `WServer::post`), `HudView` (read-only board at `/hud` that reacts to
+  `SetMode`), and a second WServer entry point (`/hud`) alongside the console.
+- The console's Today/Week toggle now publishes `SetMode` to the bus (instant,
+  in-process) and records it via `ApiClient::postHudCommand` (POST /HudCommand)
+  for remote HUDs. `FocusDriver`/`HighlightLoad` enum + handlers stubbed.
+- README: HUD served at `/hud`.
+
 ### Dispatcher desktop: load intake form + assignment
 - `LoadForm` (Wt): combos for dispatch week, shipper, receiver, commodity,
   pickup/drop-off locations, run type, status, plus optional driver + equipment
