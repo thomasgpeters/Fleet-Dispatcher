@@ -79,18 +79,18 @@ cmake -S . -B build
 cmake --build build
 
 # Start it (sensible defaults; override via env or pass-through flags):
-./run.sh                       # console at :8080/ , HUD at :8080/hud
+./run.sh                       # console at :8090/ , HUD at :8090/hud
 HTTP_PORT=9000 FLEET_API_BASE_URL=http://api.lan:5656/api ./run.sh
 # (or run the binary directly:)
-./build/fleet_dispatcher_desktop --docroot build --http-address 0.0.0.0 --http-port 8080
+./build/fleet_dispatcher_desktop --docroot build --http-address 0.0.0.0 --http-port 8090
 ```
 
 [`run.sh`](run.sh) points `--docroot` at the build dir (where CMake deployed the
 Wt `resources/` tree) and forwards any extra args to the Wt binary. Env knobs:
 `HTTP_ADDRESS`, `HTTP_PORT`, `DOCROOT`, `BIN`, `FLEET_API_BASE_URL`.
 
-Then open http://localhost:8080 (control console). The **HUD display** is served
-at **`/hud`** (e.g. http://localhost:8080/hud) on the same server; the console's
+Then open http://localhost:8090 (control console). The **HUD display** is served
+at **`/hud`** (e.g. http://localhost:8090/hud) on the same server; the console's
 Today/Week toggle drives it live via the in-process command bus.
 
 The HUD shows a **Leaflet map** (`Wt::WLeafletMap`, needs **Wt ≥ 4.5**) of the
@@ -124,7 +124,7 @@ Run the installed build (docroot is the install `bin/` so `resources/` resolves)
 ```bash
 FLEET_API_BASE_URL=http://localhost:5656/api \
   /opt/fleet-dispatcher/bin/fleet_dispatcher_desktop \
-  --docroot /opt/fleet-dispatcher/bin --http-address 0.0.0.0 --http-port 8080
+  --docroot /opt/fleet-dispatcher/bin --http-address 0.0.0.0 --http-port 8090
 ```
 
 ### Run as a systemd service

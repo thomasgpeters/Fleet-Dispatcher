@@ -1,5 +1,9 @@
 # Fleet Dispatcher — Dispatcher Desktop (Wt) systemd unit.
 #
+# One service serves BOTH faces on the same port:
+#   console : http://<host>:8090/
+#   HUD     : http://<host>:8090/hud
+#
 # Install procedure (see portals/dispatcher-desktop/README.md):
 #   sudo cmake --install build --prefix /opt/fleet-dispatcher
 #   sudo useradd --system --no-create-home --shell /usr/sbin/nologin fleet   # once
@@ -8,6 +12,10 @@
 #   sudo cp deploy/fleet-dispatcher-desktop.service /etc/systemd/system/
 #   sudo systemctl daemon-reload
 #   sudo systemctl enable --now fleet-dispatcher-desktop
+#
+# Change the port: edit --http-port below, or add a drop-in:
+#   sudo systemctl edit fleet-dispatcher-desktop   (override ExecStart)
+# desktop.env supplies FLEET_API_BASE_URL (the JSON:API the app calls).
 #
 # Logs:   journalctl -u fleet-dispatcher-desktop -f
 
@@ -28,7 +36,7 @@ EnvironmentFile=-/etc/fleet-dispatcher/desktop.env
 ExecStart=/opt/fleet-dispatcher/bin/fleet_dispatcher_desktop \
     --docroot /opt/fleet-dispatcher/bin \
     --http-address 0.0.0.0 \
-    --http-port 8080
+    --http-port 8090
 
 Restart=on-failure
 RestartSec=2

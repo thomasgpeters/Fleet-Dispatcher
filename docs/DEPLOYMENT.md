@@ -37,6 +37,23 @@ FLEET_ADMIN_PSQL='sudo -u postgres psql' scripts/db-setup.sh
 
 ---
 
+## Ports on the shared host
+
+This host also runs sibling apps, so Fleet Dispatcher's listeners avoid their
+ports:
+
+| Service                              | Port   | Notes                              |
+| ------------------------------------ | ------ | ---------------------------------- |
+| Student-Onboarding (sibling)         | `8080` | in use — do not reuse              |
+| Smitty-Services (sibling)            | `8085` | in use — do not reuse              |
+| **Fleet — Dispatcher desktop (Wt)**  | `8090` | console `/` + HUD `/hud`           |
+| **Fleet — ApiLogicServer (JSON:API)**| `5656` | `API_PORT`                         |
+| **Fleet — Geospatial endpoint**      | `5701` | `GIS_PORT`                         |
+| PostgreSQL (shared)                  | `5432` | one instance, schema-separated     |
+
+Change the desktop port with `HTTP_PORT=… ./run.sh` (dev) or the unit's
+`--http-port` (prod).
+
 ## 0. Prerequisites
 
 ```bash
