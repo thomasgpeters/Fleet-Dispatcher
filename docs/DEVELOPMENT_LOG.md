@@ -5,6 +5,19 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-06-02
 
+### Feature 2: truck-location backbone (telemetry)
+- Schema: `location_source` lookup + `position_report` (lat/lng numeric,
+  heading/speed/accuracy, recorded_at; equipment/driver FKs) per the geospatial
+  decision — ALS-facing, no PostGIS. Seed: 3 sources + a short track. Verified on
+  PostgreSQL 16 (latest-per-rig query + lat range CHECK).
+- Mobile: **Locate** tab — `navigator.geolocation` → `api.postPosition` (POST
+  `/PositionReport`, phone_push). Placeholder driver/equipment ids in
+  `currentUser.ts` pending auth. `npm run build` passes.
+- Desktop HUD: `ApiClient::fetchPositions` + a **truck-locations panel** (latest
+  position per rig, refreshed every 15s via `WTimer`).
+- PostGIS `gis` schema, the geospatial endpoint, HERE routing, and HUD map tiles
+  remain queued.
+
 ### Dispatcher desktop: /hud surface + HudControlBus
 - Schema: `hud_command` append-only command channel (free-text `command_type` +
   `arg`) for distributed/remote HUDs. Verified on PostgreSQL 16.

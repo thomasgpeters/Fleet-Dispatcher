@@ -113,6 +113,20 @@ fd::Load parseLoad(const Wt::Json::Object& res) {
     return l;
 }
 
+fd::Position parsePosition(const Wt::Json::Object& res) {
+    const Wt::Json::Object& a = res.get("attributes");
+    Position p;
+    p.id = jstr(res, "id");
+    p.equipment_id = jstr(a, "equipment_id");
+    p.driver_id = jstr(a, "driver_id");
+    p.recorded_at = jstr(a, "recorded_at");
+    p.location_source_id = jint(a, "location_source_id");
+    p.lat = jnum(a, "lat");
+    p.lng = jnum(a, "lng");
+    p.speed_mph = jnum(a, "speed_mph");
+    return p;
+}
+
 std::string jsonEscape(const std::string& s) {
     std::string out;
     out.reserve(s.size() + 8);
@@ -189,6 +203,17 @@ void ApiClient::fetchLoads(LoadsCallback onOk, ErrorCallback onErr) {
         [onOk](const Wt::Json::Array& data) {
             std::vector<Load> out;
             for (const Wt::Json::Value& v : data) out.push_back(parseLoad(v));
+            onOk(std::move(out));
+        },
+        std::move(onErr));
+}
+
+void ApiClient::fetchPositions(PositionsCallback onOk, ErrorCallback onErr) {
+    getCollection(
+        baseUrl_ + "/PositionReport",
+        [onOk](const Wt::Json::Array& data) {
+            std::vector<Position> out;
+            for (const Wt::Json::Value& v : data) out.push_back(parsePosition(v));
             onOk(std::move(out));
         },
         std::move(onErr));

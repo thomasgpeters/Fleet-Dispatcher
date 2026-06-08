@@ -77,8 +77,9 @@ Pivot here after Phase 1. Talks to the same JSON:API; Bootstrap theme + Wt
 - [ ] Extend the command bus to more commands (`FocusDriver`, `HighlightLoad`)
       (enum + HUD handlers stubbed)
 - [ ] Dispatcher messaging view (mirrors mobile Feature 1)
-- [ ] **HUD map**: fleet **truck locations** — depends on Feature 2 telemetry +
-      the geospatial endpoint; until then the HUD renders board/load/status data
+- [x] **HUD truck-locations panel**: latest position per rig (15s poll), fed by
+      `position_report` (Feature 2)
+- [ ] **HUD map tiles** (Leaflet/HERE) layered over the positions data
 
 > Wt isn't installable in the dev sandbox, so the C++ above is **not compiled
 > here**. Version-sensitive spots are flagged in `ApiClient.cpp` (Http `done()`
@@ -90,22 +91,21 @@ Pivot here after Phase 1. Talks to the same JSON:API; Bootstrap theme + Wt
 Powers the HUD's map. See "Planned" in `domain-model.md`.
 **Decided (2026-06-02):** PostGIS spatial data is separated from the ALS APIs
 (see [`SPATIAL_GIS_DATA_CONSIDERATIONS.md`](SPATIAL_GIS_DATA_CONSIDERATIONS.md)).
-**Decided (2026-06-02):** PostGIS spatial data is separated from the ALS APIs
-(see [`SPATIAL_GIS_DATA_CONSIDERATIONS.md`](SPATIAL_GIS_DATA_CONSIDERATIONS.md)).
 
-- [ ] Schema: `location_source` lookup (`airtag`, `google_device`,
-      `phone_push`), `position_report` time series — **lat/lng numeric on ALS
-      tables** (no geometry); geometry lives in a `gis` schema. See
-      [`SPATIAL_GIS_DATA_CONSIDERATIONS.md`](SPATIAL_GIS_DATA_CONSIDERATIONS.md).
+- [x] Schema: `location_source` lookup (`airtag`, `google_device`,
+      `phone_push`) + `position_report` time series — **lat/lng numeric on ALS
+      tables** (no geometry). Verified on PostgreSQL 16.
+- [x] Mobile: driver phone-push location (Locate tab → POST `/PositionReport`)
+- [x] Desktop HUD: truck-locations panel (latest per rig, 15s poll)
 - [ ] Install PostGIS into its own `gis` schema; exclude it (and
       `spatial_ref_sys`) from ALS reflection.
 - [ ] Stand up the separate geospatial endpoint (PostGIS `ST_*`, not ALS);
       decide view vs. trigger-maintained geometry mirror.
-- [ ] Ingestion endpoints/adapters for AirTag / Google / phone-push sources
+- [ ] Ingestion adapters for AirTag / Google sources (phone-push done)
 - [ ] HERE routing/maps integration (trips, waypoints, truck-legal routes,
       bridge heights, truck stops)
 - [ ] Mobile: trip start/stop, add-to-trip, navigate, waypoints, POIs
-- [ ] Desktop: Dispatcher HUD — fleet truck locations on a map + fleet data
+- [ ] Desktop HUD **map tiles** (Leaflet/HERE) over the positions data
 
 ## Cross-cutting
 

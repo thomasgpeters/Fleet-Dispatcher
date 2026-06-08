@@ -13,6 +13,7 @@ import type {
   Load,
   Message,
   MessageDocument,
+  PositionReport,
 } from "./types";
 
 export const API_BASE_URL: string =
@@ -223,5 +224,21 @@ export const api = {
       message_id: messageId,
       document_id: documentId,
     });
+  },
+
+  // --- Telemetry ---
+
+  /** Push a position report (truck location). */
+  postPosition(attrs: {
+    location_source_id: number;
+    lat: number;
+    lng: number;
+    equipment_id?: string;
+    driver_id?: string;
+    heading_deg?: number;
+    speed_mph?: number;
+    accuracy_m?: number;
+  }): Promise<PositionReport> {
+    return createResource<PositionReport>("PositionReport", attrs);
   },
 };

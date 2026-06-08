@@ -122,6 +122,20 @@ export interface MessageDocument {
   document_id: string;
 }
 
+// --- Telemetry (truck locations) ---
+export interface PositionReport {
+  id: string;
+  equipment_id?: string;
+  driver_id?: string;
+  location_source_id: number; // -> LocationSource (airtag|google_device|phone_push)
+  lat: number;
+  lng: number;
+  heading_deg?: number;
+  speed_mph?: number;
+  accuracy_m?: number;
+  recorded_at: string;
+}
+
 // JSON:API envelope (subset).
 export interface JsonApiResource<T> {
   id: string;

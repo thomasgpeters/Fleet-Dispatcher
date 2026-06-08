@@ -178,4 +178,22 @@ INSERT INTO message_document (id, message_id, document_id) VALUES
 INSERT INTO load_document (id, load_id, document_id) VALUES
   ('222d0c00-0000-0000-0000-000000000001', '88888888-0000-0000-0000-000000000001', 'd0c00000-0000-0000-0000-000000000001');
 
+-- ===========================================================================
+-- Telemetry — truck locations
+-- ===========================================================================
+INSERT INTO location_source (id, code, name) VALUES
+  (1, 'airtag',        'Apple AirTag'),
+  (2, 'google_device', 'Google device'),
+  (3, 'phone_push',    'Driver phone (push)');
+
+SELECT setval(pg_get_serial_sequence('location_source', 'id'), (SELECT max(id) FROM location_source));
+
+-- A short track for Pat's RGN low-boy (T-102), Lubbock area heading north.
+INSERT INTO position_report
+  (equipment_id, driver_id, location_source_id, lat, lng, heading_deg, speed_mph, accuracy_m, recorded_at) VALUES
+  ('bbbbbbbb-0000-0000-0000-000000000002', 'aaaaaaaa-0000-0000-0000-000000000001', 3, 33.5779, -101.8552,   5.0, 62.0,  8.0, now() - interval '20 minutes'),
+  ('bbbbbbbb-0000-0000-0000-000000000002', 'aaaaaaaa-0000-0000-0000-000000000001', 3, 34.1850, -101.7060,   8.0, 64.0,  6.0, now() - interval '5 minutes'),
+  -- Sam's RAM car carrier (R-201), Denver area.
+  ('bbbbbbbb-0000-0000-0000-000000000004', 'aaaaaaaa-0000-0000-0000-000000000002', 1, 39.7392, -104.9903, 180.0,  0.0, 12.0, now() - interval '2 minutes');
+
 COMMIT;

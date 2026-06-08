@@ -44,6 +44,7 @@ class ApiClient {
 public:
     using DriversCallback = std::function<void(std::vector<Driver>)>;
     using LoadsCallback = std::function<void(std::vector<Load>)>;
+    using PositionsCallback = std::function<void(std::vector<Position>)>;
     using OptionsCallback = std::function<void(std::vector<Option>)>;
     using LoadCallback = std::function<void(Load)>;
     using ErrorCallback = std::function<void(std::string)>;
@@ -53,6 +54,7 @@ public:
 
     void fetchDrivers(DriversCallback onOk, ErrorCallback onErr);
     void fetchLoads(LoadsCallback onOk, ErrorCallback onErr);
+    void fetchPositions(PositionsCallback onOk, ErrorCallback onErr);
 
     // Generic option fetch for form combos: GET /resource, label from labelAttr.
     void fetchOptions(const std::string& resource, const std::string& labelAttr,
