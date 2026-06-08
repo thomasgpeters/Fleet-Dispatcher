@@ -37,7 +37,9 @@ schema, the API, and both portals to keep design and discussion aligned:
 | Path                          | Tier       | Description                                                            |
 | ----------------------------- | ---------- | ---------------------------------------------------------------------- |
 | `docs/MIDDLEWARE_SETUP.md`    | middleware | How to generate/run the ApiLogicServer middleware (managed outside this repo) on `:5656`. |
-| `database/`                   | backend    | PostgreSQL schema (`schema.sql`) and seed data (`seed_data.sql`).      |
+| `database/`                   | backend    | PostgreSQL `schema.sql` (in the `fleet` schema), `seed_data.sql`, `gis_bootstrap.sql`. |
+| `geospatial/`                 | middleware | FastAPI endpoint for PostGIS spatial queries (off the ALS path).      |
+| `scripts/db-setup.sh`         | —          | One-shot DB standup (role+db, schema, seed, PostGIS).                 |
 | `portals/dispatcher-desktop/` | client     | Desktop dispatcher portal — C++ / Wt.                                  |
 | `portals/mobile/`             | client     | Driver & Updater mobile app — React / Ionic / Capacitor.              |
 | `docs/`                       | —          | Architecture, domain model, and DDD pattern notes.                     |

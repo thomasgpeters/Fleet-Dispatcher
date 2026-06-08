@@ -5,6 +5,24 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-06-02
 
+### Shared-instance schema move + geospatial endpoint + one-shot (verified)
+- Shared PostgreSQL instance (with Smitty / Student-Onboarding): moved all Fleet
+  app objects out of `public` into a dedicated **`fleet`** schema (owned by
+  `fleet`; ALS reflects it via `search_path = fleet, public`). `schema.sql` /
+  `seed_data.sql` set the search_path; resource names unchanged (table-derived).
+- PostGIS in a **shared `gis`** schema: Fleet owns only its `fleet_*` geography
+  views via the new **`fleet_gis`** role (granted CREATE on gis, SELECT on the
+  fleet lat/lng tables); extension objects stay superuser-owned (by design).
+- `scripts/db-setup.sh` — one-shot for steps 1–4 (role+db, schema, seed, gis via
+  admin since CREATE EXTENSION needs superuser).
+- `geospatial/` — FastAPI endpoint (/health, /truck-stops/nearest, /trucks/near,
+  /positions/latest) connecting as `fleet_gis`; Dockerfile + README.
+- **Verified on PG16 + PostGIS 3.4:** one-shot creates `fleet` (37 tables) with
+  `public` empty; `fleet_*` views owned by `fleet_gis`; the FastAPI endpoint
+  served all four routes live (nearest truck stop, latest positions, trucks-near).
+- Synced docs: DEPLOYMENT, MIDDLEWARE_SETUP (schema layout = DECIDED),
+  SPATIAL_GIS_DATA_CONSIDERATIONS, TODO.
+
 ### Deployment runbook + PostGIS bootstrap (verified)
 - `docs/DEPLOYMENT.md`: end-to-end standup — PostgreSQL, schema/seed, PostGIS
   (without breaking ALS), ALS create/run, geospatial-endpoint role, portals,

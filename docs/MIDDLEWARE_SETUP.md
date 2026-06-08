@@ -63,31 +63,26 @@ Port and database come from the environment (see [`../.env.example`](../.env.exa
 [`../docker-compose.yml`](../docker-compose.yml) brings up PostgreSQL with the
 schema + seed applied for local development.
 
-## Database schema layout (single vs. multiple Postgres schemas)
+## Database schema layout (DECIDED)
 
-ApiLogicServer can reflect **multiple Postgres schemas**, so we can logically
-separate concerns at the database level. Today everything is in `public`.
+This PostgreSQL instance is **shared** with the Smitty-Services and
+Student-Onboarding apps, so Fleet Dispatcher is **logically separated into its
+own schema** rather than living in `public`:
 
-Candidate split (decision pending — see `TODO.md`), to apply when the database
-is configured:
+| Postgres schema | Owner       | Contents                                                       | ALS |
+| --------------- | ----------- | ------------------------------------------------------------- | --- |
+| `fleet`         | `fleet`     | **all** Fleet app tables + lookups (fleet/dispatch/settlement/messaging/CMS/telemetry/navigation) | ✅ reflected |
+| `gis` (shared)  | (shared)    | PostGIS + Fleet's `fleet_*` geography views (owned by `fleet_gis`) | ❌ never |
+| `public`        | —           | left to the shared instance; Fleet puts nothing here          | ❌ |
 
-| Postgres schema   | Contents                                                              |
-| ----------------- | -------------------------------------------------------------------- |
-| `cms`             | `document`, `document_type` — the reusable content store.            |
-| `app` / `public`  | fleet, dispatch, settlement, messaging tables + their lookups.       |
-| `telemetry` (later) | `position_report`, `location_source` (truck locations).           |
-| `identity` (opt.) | `app_user`, `app_role` if shared access control is wanted.          |
-
-Notes:
-- **Cross-schema FKs are fully supported** in Postgres — e.g.
-  `messaging.message_document` → `cms.document`, `app.load_document` →
-  `cms.document`. Referential integrity (and thus ALS-generated relationships)
-  still holds across schemas.
-- The cost is schema-qualified DDL and setting the connection `search_path`;
-  point ALS at the schemas to include when generating the project.
-- Rationale for separating `cms` first: `document` is an app-wide reusable
-  resource, so an independent schema gives it its own access control / backup
-  boundary and signals "shared service."
+- ALS reflects the **`fleet`** schema: the `fleet` role's `search_path` is pinned
+  to `fleet, public`, so `ApiLogicServer create` sees exactly Fleet's tables.
+- Resource/endpoint names come from **table names**, so a named schema does not
+  change the JSON:API surface — the portals are unaffected.
+- All Fleet objects sit in one schema (no intra-app cross-schema FKs needed);
+  the only cross-schema reference is the `gis` views reading `fleet.*` (one-way,
+  read-only). See [`DEPLOYMENT.md`](DEPLOYMENT.md) and
+  [`SPATIAL_GIS_DATA_CONSIDERATIONS.md`](SPATIAL_GIS_DATA_CONSIDERATIONS.md).
 
 ## Dependencies
 

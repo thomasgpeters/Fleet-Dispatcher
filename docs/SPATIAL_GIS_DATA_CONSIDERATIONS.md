@@ -25,7 +25,7 @@ spatial data from the ApiLogicServer (ALS) APIs. Pairs with
                   │  ApiLogicServer    │              │  Geospatial endpoint      │
                   │  (JSON:API/SAFRS)  │              │  (PostGIS ST_* — NOT ALS) │
                   └─────────┬──────────┘              └─────────────┬────────────┘
-                            │ app/cms/telemetry schemas             │ gis schema
+                            │ fleet schema                         │ gis schema
                             ▼                                       ▼
                   ┌─────────────────────────── PostgreSQL ──────────────────────────┐
                   │ lat/lng numeric columns on ALS tables   │  PostGIS geometry +    │
@@ -79,20 +79,20 @@ behind a purpose-built endpoint.
   CREATE SCHEMA IF NOT EXISTS gis;
   CREATE EXTENSION IF NOT EXISTS postgis SCHEMA gis;
   ```
-- **ALS reflects `app` / `cms` / `telemetry` only — never `gis`.** (Pass the
+- **ALS reflects `fleet` only — never `gis`.** (Pass the
   schema list to `ApiLogicServer create`; keep `gis` and `spatial_ref_sys` out.)
 
 ### What goes where
 
 | Resource                         | Schema      | Via ALS? | Geometry?                         |
 | -------------------------------- | ----------- | -------- | --------------------------------- |
-| `trip`, `trip_stop` / waypoint   | telemetry   | ✅ yes   | lat/lng numeric                   |
-| `point_of_interest`, `truck_stop`| telemetry   | ✅ yes   | lat/lng numeric                   |
-| `route` (metadata, HERE polyline)| telemetry   | ✅ yes   | encoded polyline as text          |
-| `position_report`                | telemetry   | ✅ yes   | lat/lng numeric                   |
-| `location_source` (lookup)       | telemetry   | ✅ yes   | —                                 |
-| spatial mirrors / views, indexes | `gis`       | ❌ no    | PostGIS geometry/geography + GiST |
-| PostGIS extension + metadata     | `gis`       | ❌ no    | (engine internals)                |
+| `trip`, `waypoint`               | `fleet`     | ✅ yes   | lat/lng numeric                   |
+| `point_of_interest` (truck stops)| `fleet`     | ✅ yes   | lat/lng numeric                   |
+| `route` (metadata, HERE polyline)| `fleet`     | ✅ yes   | encoded polyline as text          |
+| `position_report`                | `fleet`     | ✅ yes   | lat/lng numeric                   |
+| `location_source` (lookup)       | `fleet`     | ✅ yes   | —                                 |
+| `fleet_*` geography views, indexes| `gis` (shared) | ❌ no | PostGIS geometry/geography + GiST |
+| PostGIS extension + metadata     | `gis` (shared) | ❌ no | (engine internals)                |
 | Truck-legal routing              | external    | —        | HERE API                          |
 
 ---
@@ -126,9 +126,9 @@ Geometry is **derived from the ALS lat/lng — never hand-duplicated**:
 | **materialized view**            | on refresh  | yes       | periodic refresh acceptable                |
 | **mirror table + trigger**       | live        | yes (GiST)| indexed nearest-neighbor at fleet scale    |
 
-- Example view: `gis.position_geog AS SELECT id, equipment_id, recorded_at,
+- Example view: `gis.fleet_position_geog AS SELECT id, equipment_id, recorded_at,
   ST_SetSRID(ST_MakePoint(lng, lat), 4326)::geography AS geog FROM
-  telemetry.position_report;` — zero storage, always in sync, cannot be indexed.
+  fleet.position_report;` — zero storage, always in sync, cannot be indexed.
 - `ST_MakePoint` / `ST_SetSRID` are immutable, so a `STORED` generated geometry
   column is possible — but only on a `gis`-schema table, never an ALS one.
 - Index geometry with **GiST** (or SP-GiST); use the `<->` KNN operator for
@@ -140,10 +140,11 @@ Geometry is **derived from the ALS lat/lng — never hand-duplicated**:
 
 - **Responsibility:** all PostGIS `ST_*` queries (nearest, within, route
   geometry, geofence). The only component that imports GeoAlchemy2 / raw PostGIS.
-- **Host (leaning):** a small **FastAPI** service over the `gis` schema;
-  alternatives: PostgREST, or a thin module beside ALS.
+- **Host:** a small **FastAPI** service over the `gis` schema — implemented in
+  [`../geospatial/`](../geospatial) (connects as `fleet_gis`). Returns plain
+  JSON/REST (not JSON:API — that's ALS's job).
 - **DB access:** its **own read-mostly DB role**, granted on `gis` (+ read on the
-  `telemetry` lat/lng tables it derives from). ALS keeps its own role with **no**
+  `fleet` lat/lng tables it derives from). ALS keeps its own role with **no**
   rights on `gis`. Least privilege both ways.
 - **Contract:** returns plain JSON (GeoJSON where useful) so clients don't need a
   spatial client library for simple cases.
@@ -210,9 +211,9 @@ Geometry is **derived from the ALS lat/lng — never hand-duplicated**:
 ```sql
 CREATE SCHEMA IF NOT EXISTS gis;
 CREATE EXTENSION IF NOT EXISTS postgis SCHEMA gis;
--- telemetry tables (lat/lng) created via the normal schema.sql (ALS-facing)
+-- fleet tables (lat/lng) created via the normal schema.sql (ALS-facing)
 -- gis views / mirror tables + GiST indexes created here (NOT reflected by ALS)
--- ALS: generate with the app/cms/telemetry schemas only, excluding gis
+-- ALS: reflect the fleet schema (search_path = fleet, public), excluding gis
 ```
 A compose/VCP entry for the geospatial endpoint and the `gis` bootstrap SQL will
 be added when Feature 2 is built, so a fresh environment comes up repeatably.

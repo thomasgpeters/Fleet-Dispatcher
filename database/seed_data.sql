@@ -6,6 +6,9 @@
 
 BEGIN;
 
+-- Fleet Dispatcher lives in its own schema (shared instance).
+SET search_path TO fleet, public;
+
 -- ===========================================================================
 -- Lookup tables (explicit sequential ids so domain FKs are stable)
 -- ===========================================================================

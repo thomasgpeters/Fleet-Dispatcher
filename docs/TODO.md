@@ -104,8 +104,9 @@ Powers the HUD's map. See "Planned" in `domain-model.md`.
 - [x] `gis` bootstrap SQL (`database/gis_bootstrap.sql`): PostGIS into `gis` +
       derived geography views; **verified** `public` stays clean (ALS-safe).
       Full standup in [`DEPLOYMENT.md`](DEPLOYMENT.md).
-- [ ] Stand up the separate geospatial endpoint (PostGIS `ST_*`, not ALS);
-      decide view vs. trigger-maintained geometry mirror.
+- [x] Separate geospatial endpoint (FastAPI, `geospatial/`): /health,
+      /truck-stops/nearest, /trucks/near, /positions/latest — **verified** live
+      against PG16+PostGIS as `fleet_gis`. (view vs. mirror: using views for now)
 - [ ] Ingestion adapters for AirTag / Google sources (phone-push done)
 - [ ] HERE routing/maps integration (truck-legal routes, bridge heights, truck
       stops); persist as `route.polyline`
@@ -116,10 +117,11 @@ Powers the HUD's map. See "Planned" in `domain-model.md`.
 
 ## Cross-cutting
 
-- [ ] **Decide DB schema separation** (ALS multi-schema): peel `cms` (content)
-      out from `app` (ops); `telemetry` later. Cross-schema FKs are fine. Apply
-      when configuring the DB — see `MIDDLEWARE_SETUP.md` → "Database schema
-      layout".
+- [x] **DB schema separation (DECIDED + done):** shared instance with
+      Smitty/Student-Onboarding → all Fleet app tables in the **`fleet`** schema
+      (owned by `fleet`, ALS reflects it); PostGIS in shared **`gis`**
+      (Fleet's `fleet_*` views owned by `fleet_gis`). See `MIDDLEWARE_SETUP.md`
+      + `DEPLOYMENT.md`. Verified: 37 tables in `fleet`, 0 in `public`.
 - [ ] AuthN/AuthZ (roles: dispatcher, driver, updater) — gates current-user,
       messaging, and HUD
 - [ ] LogicBank rules in generated middleware (weekly cap, settlement math)

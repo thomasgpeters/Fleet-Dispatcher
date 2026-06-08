@@ -11,12 +11,22 @@
 --   * Domain objects use auto-generated GUID (UUID) primary keys.
 --   * Relationships between domain objects are enforced with FK constraints.
 --
+-- This PostgreSQL instance is shared with the Smitty-Services and
+-- Student-Onboarding apps, so Fleet Dispatcher lives in its OWN schema (`fleet`)
+-- rather than `public`. ALS reflects the `fleet` schema (its connection's
+-- search_path includes it). Resource names are unchanged (they come from the
+-- table names), so the portals/clients are unaffected.
+--
 -- Apply with:  psql "$DATABASE_URL" -f database/schema.sql
+--   (run as the `fleet` role; see scripts/db-setup.sh / docs/DEPLOYMENT.md)
 
 BEGIN;
 
--- gen_random_uuid() is built into PostgreSQL 13+. (Enable pgcrypto on older.)
--- CREATE EXTENSION IF NOT EXISTS pgcrypto;
+-- All objects below land in the `fleet` schema.
+CREATE SCHEMA IF NOT EXISTS fleet;
+SET search_path TO fleet, public;
+
+-- gen_random_uuid() is built into PostgreSQL 13+ (lives in pg_catalog).
 
 -- ===========================================================================
 -- Lookup tables  (sequential integer keys; reference data)
