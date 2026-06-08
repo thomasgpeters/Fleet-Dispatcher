@@ -5,6 +5,17 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-06-02
 
+### Deployment runbook + PostGIS bootstrap (verified)
+- `docs/DEPLOYMENT.md`: end-to-end standup — PostgreSQL, schema/seed, PostGIS
+  (without breaking ALS), ALS create/run, geospatial-endpoint role, portals,
+  verification + troubleshooting.
+- `database/gis_bootstrap.sql`: installs PostGIS into a dedicated `gis` schema
+  (+ `position_geog`/`poi_geog` geography views).
+- Verified on PostgreSQL 16 + PostGIS 3.4: `public` ends with **0** PostGIS
+  objects (so ALS reflection stays clean), `spatial_ref_sys` lives in `gis`, and
+  spatial queries (nearest-POI KNN, geography distance) work with
+  `search_path = gis, public`. docker-compose notes the `postgis/postgis` image.
+
 ### HUD: Leaflet map of truck positions
 - HUD now renders a `Wt::WLeafletMap` (OSM tiles, no key) with a marker per
   rig's latest position, rebuilt on the 15s poll (markers tracked + removed/

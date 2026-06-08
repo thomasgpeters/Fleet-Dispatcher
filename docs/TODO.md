@@ -101,8 +101,9 @@ Powers the HUD's map. See "Planned" in `domain-model.md`.
       lookups (`trip_status`, `stop_type`, `poi_category`), lat/lng. Verified.
 - [~] Mobile Trips: list, start trip, add waypoint (done); trip start/stop
       lifecycle, navigate, and POIs pending
-- [ ] Install PostGIS into its own `gis` schema; exclude it (and
-      `spatial_ref_sys`) from ALS reflection.
+- [x] `gis` bootstrap SQL (`database/gis_bootstrap.sql`): PostGIS into `gis` +
+      derived geography views; **verified** `public` stays clean (ALS-safe).
+      Full standup in [`DEPLOYMENT.md`](DEPLOYMENT.md).
 - [ ] Stand up the separate geospatial endpoint (PostGIS `ST_*`, not ALS);
       decide view vs. trigger-maintained geometry mirror.
 - [ ] Ingestion adapters for AirTag / Google sources (phone-push done)
