@@ -84,6 +84,12 @@ Then open http://localhost:8080 (control console). The **HUD display** is served
 at **`/hud`** (e.g. http://localhost:8080/hud) on the same server; the console's
 Today/Week toggle drives it live via the in-process command bus.
 
+The HUD shows a **Leaflet map** (`Wt::WLeafletMap`, needs **Wt ≥ 4.5**) of the
+latest truck position per rig, refreshed every 15s. Leaflet's JS/CSS are loaded
+from a CDN in `HudView.cpp`; for an offline/self-contained deploy, host them
+locally (or set the leaflet URLs in `wt_config.xml`) and remove those two lines.
+Map tiles use OpenStreetMap (no API key).
+
 CMake auto-detects the Wt `resources/` folder in the common install locations
 (`/usr/share/Wt/resources`, `/usr/local/share/Wt/resources`, …). If Wt lives in
 a non-standard prefix, point at it explicitly:

@@ -108,7 +108,10 @@ Powers the HUD's map. See "Planned" in `domain-model.md`.
 - [ ] Ingestion adapters for AirTag / Google sources (phone-push done)
 - [ ] HERE routing/maps integration (truck-legal routes, bridge heights, truck
       stops); persist as `route.polyline`
-- [ ] Desktop HUD **map tiles** (Leaflet/HERE) over the positions/route data
+- [x] Desktop HUD **map** (`Wt::WLeafletMap`, OSM tiles) with a marker per rig's
+      latest position (15s refresh)
+- [ ] HUD map: overlay routes (`route.polyline`) and driver-focus/load-highlight
+      commands
 
 ## Cross-cutting
 

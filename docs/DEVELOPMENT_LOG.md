@@ -5,6 +5,12 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-06-02
 
+### HUD: Leaflet map of truck positions
+- HUD now renders a `Wt::WLeafletMap` (OSM tiles, no key) with a marker per
+  rig's latest position, rebuilt on the 15s poll (markers tracked + removed/
+  re-added); the detail table remains below. Leaflet JS/CSS via CDN (note for
+  offline/self-contained deploy). Needs Wt ≥ 4.5.
+
 ### Feature 2: navigation schema + mobile Trips
 - Schema: `trip`, `waypoint` (ordered, unique seq), `point_of_interest`
   (incl. truck stops via category), `route` (HERE polyline as text) + lookups

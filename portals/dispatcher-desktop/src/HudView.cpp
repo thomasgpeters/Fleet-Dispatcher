@@ -1,15 +1,18 @@
 #include "HudView.h"
 
-#include <algorithm>
 #include <chrono>
 #include <cstdio>
+#include <map>
+#include <memory>
 
 #include <Wt/WApplication.h>
+#include <Wt/WLink.h>
 #include <Wt/WString.h>
 #include <Wt/WTable.h>
 #include <Wt/WTableCell.h>
 #include <Wt/WText.h>
 #include <Wt/WTimer.h>
+#include <Wt/Json/Object.h>
 
 namespace fd {
 
@@ -31,13 +34,31 @@ HudView::HudView(ApiClient* api) : api_(api) {
     modeLabel_->addStyleClass("badge bg-primary");
     modeLabel_->setText("WEEK");
 
-    board_ = addNew<BoardView>(api_, mode_);
+    // --- Truck-locations map -------------------------------------------------
+    // WLeafletMap (Wt >= 4.5) renders Leaflet. Leaflet's JS/CSS are loaded from
+    // a CDN here; for an offline/self-contained deploy, host them locally or set
+    // the leaflet URLs in wt_config.xml and drop these two lines.
+    auto* app = Wt::WApplication::instance();
+    app->useStyleSheet(Wt::WLink("https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"));
+    app->require("https://unpkg.com/leaflet@1.9.4/dist/leaflet.js");
 
-    addNew<Wt::WText>("<h2 class=\"h5 mt-4\">Truck locations</h2>");
+    addNew<Wt::WText>("<h2 class=\"h5\">Truck locations</h2>");
+    auto map = std::make_unique<Wt::WLeafletMap>();
+    map->setHeight(420);
+    Wt::Json::Object tileOptions;
+    tileOptions["maxZoom"] = 19;
+    tileOptions["attribution"] = "&copy; OpenStreetMap contributors";
+    map->addTileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", tileOptions);
+    map->panTo(Wt::WLeafletMap::Coordinate(39.5, -98.35));  // continental US
+    map_ = addWidget(std::move(map));
+
     positionsBody_ = addNew<Wt::WContainerWidget>();
 
+    // --- Board (read-only, mirrors console mode) -----------------------------
+    addNew<Wt::WText>("<h2 class=\"h5 mt-4\">Board</h2>");
+    board_ = addNew<BoardView>(api_, mode_);
+
     // React to console commands via server push.
-    auto* app = Wt::WApplication::instance();
     token_ = HudControlBus::instance().subscribe(
         app->sessionId(), [this](const HudCommand& cmd) {
             apply(cmd);
@@ -67,13 +88,12 @@ void HudView::apply(const HudCommand& command) {
         }
         case HudCommand::FocusDriver:
         case HudCommand::HighlightLoad:
-            // TODO: wire when the board/map gains driver focus & load highlight.
+            // TODO: pan/zoom the map to a driver, or highlight a load.
             break;
     }
 }
 
 void HudView::loadPositions() {
-    // Names first (so the table can show unit numbers), then positions.
     api_->fetchOptions(
         "Equipment", "unit_number",
         [this](std::vector<Option> opts) {
@@ -85,17 +105,46 @@ void HudView::loadPositions() {
     api_->fetchPositions(
         [this](std::vector<Position> ps) {
             positions_ = std::move(ps);
+            updateMap();
             renderPositions();
         },
         [](std::string) {});
+}
+
+void HudView::updateMap() {
+    if (!map_) return;
+
+    // Latest position per rig (ISO-8601 recorded_at sorts lexically).
+    std::map<std::string, Position> latest;
+    for (const auto& p : positions_) {
+        if (p.equipment_id.empty()) continue;
+        auto it = latest.find(p.equipment_id);
+        if (it == latest.end() || p.recorded_at > it->second.recorded_at)
+            latest[p.equipment_id] = p;
+    }
+
+    // Rebuild markers.
+    for (auto* m : markers_) map_->removeMarker(m);
+    markers_.clear();
+
+    bool first = true;
+    for (const auto& kv : latest) {
+        const Position& p = kv.second;
+        Wt::WLeafletMap::Coordinate pos(p.lat, p.lng);
+        auto marker = std::make_unique<Wt::WLeafletMap::LeafletMarker>(pos);
+        markers_.push_back(marker.get());
+        map_->addMarker(std::move(marker));
+        if (first) {
+            map_->panTo(pos);  // center on the first rig we have
+            first = false;
+        }
+    }
 }
 
 void HudView::renderPositions() {
     if (!positionsBody_) return;
     positionsBody_->clear();
 
-    // Latest position per equipment (positions arrive newest-last is not
-    // guaranteed, so compare recorded_at strings — ISO-8601 sorts lexically).
     std::map<std::string, Position> latest;
     for (const auto& p : positions_) {
         if (p.equipment_id.empty()) continue;
@@ -105,7 +154,7 @@ void HudView::renderPositions() {
     }
 
     auto* table = positionsBody_->addNew<Wt::WTable>();
-    table->addStyleClass("table table-sm table-striped");
+    table->addStyleClass("table table-sm table-striped mt-2");
     table->setHeaderCount(1);
     table->elementAt(0, 0)->addNew<Wt::WText>("Rig");
     table->elementAt(0, 1)->addNew<Wt::WText>("Lat");
