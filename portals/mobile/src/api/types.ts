@@ -136,6 +136,30 @@ export interface PositionReport {
   recorded_at: string;
 }
 
+// --- Navigation (trips & waypoints) ---
+export interface Trip {
+  id: string;
+  driver_id?: string;
+  equipment_id?: string;
+  load_id?: string;
+  trip_status_id: number; // 1 planned · 2 active · 3 completed · 4 cancelled
+  name?: string;
+  started_at?: string;
+  ended_at?: string;
+}
+
+export interface Waypoint {
+  id: string;
+  trip_id: string;
+  seq: number;
+  stop_type_id: number; // 1 origin · 2 destination · 3 waypoint · 4 fuel · 5 rest · 6 truck_stop
+  label?: string;
+  lat: number;
+  lng: number;
+  planned_arrival?: string;
+  arrived_at?: string;
+}
+
 // JSON:API envelope (subset).
 export interface JsonApiResource<T> {
   id: string;

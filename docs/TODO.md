@@ -97,15 +97,18 @@ Powers the HUD's map. See "Planned" in `domain-model.md`.
       tables** (no geometry). Verified on PostgreSQL 16.
 - [x] Mobile: driver phone-push location (Locate tab → POST `/PositionReport`)
 - [x] Desktop HUD: truck-locations panel (latest per rig, 15s poll)
+- [x] Schema: navigation — `trip`, `waypoint`, `point_of_interest`, `route` +
+      lookups (`trip_status`, `stop_type`, `poi_category`), lat/lng. Verified.
+- [~] Mobile Trips: list, start trip, add waypoint (done); trip start/stop
+      lifecycle, navigate, and POIs pending
 - [ ] Install PostGIS into its own `gis` schema; exclude it (and
       `spatial_ref_sys`) from ALS reflection.
 - [ ] Stand up the separate geospatial endpoint (PostGIS `ST_*`, not ALS);
       decide view vs. trigger-maintained geometry mirror.
 - [ ] Ingestion adapters for AirTag / Google sources (phone-push done)
-- [ ] HERE routing/maps integration (trips, waypoints, truck-legal routes,
-      bridge heights, truck stops)
-- [ ] Mobile: trip start/stop, add-to-trip, navigate, waypoints, POIs
-- [ ] Desktop HUD **map tiles** (Leaflet/HERE) over the positions data
+- [ ] HERE routing/maps integration (truck-legal routes, bridge heights, truck
+      stops); persist as `route.polyline`
+- [ ] Desktop HUD **map tiles** (Leaflet/HERE) over the positions/route data
 
 ## Cross-cutting
 

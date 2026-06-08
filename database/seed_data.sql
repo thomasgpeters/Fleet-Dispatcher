@@ -196,4 +196,44 @@ INSERT INTO position_report
   -- Sam's RAM car carrier (R-201), Denver area.
   ('bbbbbbbb-0000-0000-0000-000000000004', 'aaaaaaaa-0000-0000-0000-000000000002', 1, 39.7392, -104.9903, 180.0,  0.0, 12.0, now() - interval '2 minutes');
 
+-- ===========================================================================
+-- Navigation (trip for Pat's load, waypoints, a truck-stop POI, a route)
+-- ===========================================================================
+INSERT INTO trip_status (id, code, name) VALUES
+  (1, 'planned', 'Planned'), (2, 'active', 'Active'),
+  (3, 'completed', 'Completed'), (4, 'cancelled', 'Cancelled');
+
+INSERT INTO stop_type (id, code, name) VALUES
+  (1, 'origin', 'Origin'), (2, 'destination', 'Destination'),
+  (3, 'waypoint', 'Waypoint'), (4, 'fuel', 'Fuel'),
+  (5, 'rest', 'Rest'), (6, 'truck_stop', 'Truck stop');
+
+INSERT INTO poi_category (id, code, name) VALUES
+  (1, 'fuel', 'Fuel'), (2, 'rest_area', 'Rest area'),
+  (3, 'weigh_station', 'Weigh station'), (4, 'truck_stop', 'Truck stop'),
+  (5, 'customer', 'Customer');
+
+SELECT setval(pg_get_serial_sequence('trip_status', 'id'),  (SELECT max(id) FROM trip_status));
+SELECT setval(pg_get_serial_sequence('stop_type', 'id'),    (SELECT max(id) FROM stop_type));
+SELECT setval(pg_get_serial_sequence('poi_category', 'id'), (SELECT max(id) FROM poi_category));
+
+INSERT INTO trip (id, driver_id, equipment_id, load_id, trip_status_id, name, started_at) VALUES
+  ('72190000-0000-0000-0000-000000000001',
+   'aaaaaaaa-0000-0000-0000-000000000001',  -- Pat
+   'bbbbbbbb-0000-0000-0000-000000000002',  -- RGN low-boy
+   '88888888-0000-0000-0000-000000000001',  -- the Lubbock→Denver load
+   2, 'Lubbock → Denver', now() - interval '20 minutes');
+
+INSERT INTO waypoint (id, trip_id, seq, stop_type_id, label, lat, lng) VALUES
+  ('7a900000-0000-0000-0000-000000000001', '72190000-0000-0000-0000-000000000001', 1, 1, 'Lubbock yard',   33.5779, -101.8552),
+  ('7a900000-0000-0000-0000-000000000002', '72190000-0000-0000-0000-000000000001', 2, 4, 'Fuel — Amarillo', 35.2220, -101.8313),
+  ('7a900000-0000-0000-0000-000000000003', '72190000-0000-0000-0000-000000000001', 3, 2, 'Denver dock',     39.7392, -104.9903);
+
+INSERT INTO point_of_interest (id, name, poi_category_id, lat, lng, amenities) VALUES
+  ('90100000-0000-0000-0000-000000000001', 'Big Rig Travel Center', 4, 35.1990, -101.8450, 'diesel,DEF,parking,showers');
+
+INSERT INTO route (id, trip_id, origin_lat, origin_lng, dest_lat, dest_lng, distance_mi, drive_minutes, provider) VALUES
+  ('209e0000-0000-0000-0000-000000000001', '72190000-0000-0000-0000-000000000001',
+   33.5779, -101.8552, 39.7392, -104.9903, 780.0, 690, 'here');
+
 COMMIT;

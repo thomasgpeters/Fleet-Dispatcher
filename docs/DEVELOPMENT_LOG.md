@@ -5,6 +5,19 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-06-02
 
+### Feature 2: navigation schema + mobile Trips
+- Schema: `trip`, `waypoint` (ordered, unique seq), `point_of_interest`
+  (incl. truck stops via category), `route` (HERE polyline as text) + lookups
+  `trip_status`/`stop_type`/`poi_category` — ALS-facing lat/lng, no PostGIS.
+  Seed: a Lubbock→Denver trip with 3 waypoints, a truck-stop POI, a route.
+  Verified on PostgreSQL 16 (ordered waypoints + unique-seq guard).
+- Mobile: **Trips** tab — list driver trips, start a (planned) trip, trip
+  detail with ordered waypoints and "add current location" (geolocation →
+  addWaypoint). Client: tripsForDriver/getTrip/createTrip/waypointsForTrip/
+  addWaypoint. `npm run build` passes.
+- Pending: trip start/stop lifecycle, HERE routing/navigation, POIs browsing,
+  HUD map tiles.
+
 ### Feature 2: truck-location backbone (telemetry)
 - Schema: `location_source` lookup + `position_report` (lat/lng numeric,
   heading/speed/accuracy, recorded_at; equipment/driver FKs) per the geospatial

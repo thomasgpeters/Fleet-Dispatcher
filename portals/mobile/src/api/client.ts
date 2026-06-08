@@ -14,6 +14,8 @@ import type {
   Message,
   MessageDocument,
   PositionReport,
+  Trip,
+  Waypoint,
 } from "./types";
 
 export const API_BASE_URL: string =
@@ -240,5 +242,41 @@ export const api = {
     accuracy_m?: number;
   }): Promise<PositionReport> {
     return createResource<PositionReport>("PositionReport", attrs);
+  },
+
+  // --- Navigation ---
+
+  /** Trips for a driver (the driver's trip list). */
+  tripsForDriver(driverId: string): Promise<Trip[]> {
+    return getCollection<Trip>("Trip", { driver_id: driverId });
+  },
+
+  getTrip(tripId: string): Promise<Trip> {
+    return getOne<Trip>("Trip", tripId);
+  },
+
+  createTrip(attrs: {
+    driver_id: string;
+    equipment_id?: string;
+    load_id?: string;
+    trip_status_id: number;
+    name?: string;
+  }): Promise<Trip> {
+    return createResource<Trip>("Trip", attrs);
+  },
+
+  waypointsForTrip(tripId: string): Promise<Waypoint[]> {
+    return getCollection<Waypoint>("Waypoint", { trip_id: tripId });
+  },
+
+  addWaypoint(attrs: {
+    trip_id: string;
+    seq: number;
+    stop_type_id: number;
+    lat: number;
+    lng: number;
+    label?: string;
+  }): Promise<Waypoint> {
+    return createResource<Waypoint>("Waypoint", attrs);
   },
 };
