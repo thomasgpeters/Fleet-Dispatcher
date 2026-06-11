@@ -150,9 +150,15 @@ INSERT INTO document_type (id, code, name) VALUES
   (6, 'license',          'License / permit'),
   (7, 'other',            'Other');
 
+INSERT INTO pin_scope (id, code, name) VALUES
+  (1, 'self',     'Only me'),
+  (2, 'channel',  'Everyone in the channel'),
+  (3, 'everyone', 'Everyone');
+
 SELECT setval(pg_get_serial_sequence('channel_type', 'id'),        (SELECT max(id) FROM channel_type));
 SELECT setval(pg_get_serial_sequence('channel_member_role', 'id'), (SELECT max(id) FROM channel_member_role));
 SELECT setval(pg_get_serial_sequence('document_type', 'id'),       (SELECT max(id) FROM document_type));
+SELECT setval(pg_get_serial_sequence('pin_scope', 'id'),           (SELECT max(id) FROM pin_scope));
 
 -- A group channel for the week's dispatch chatter.
 INSERT INTO channel (id, name, channel_type_id, created_by) VALUES
@@ -180,6 +186,16 @@ INSERT INTO message_document (id, message_id, document_id) VALUES
 
 INSERT INTO load_document (id, load_id, document_id) VALUES
   ('222d0c00-0000-0000-0000-000000000001', '88888888-0000-0000-0000-000000000001', 'd0c00000-0000-0000-0000-000000000001');
+
+-- Dana pins the dispatch message for the whole channel (scope = channel).
+INSERT INTO message_pin (id, message_id, channel_id, pinned_by, pin_scope_id) VALUES
+  ('9171ed00-0000-0000-0000-000000000001', '5e55a6e0-0000-0000-0000-000000000001',
+   'c4a11e10-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111', 2);
+
+-- Pat saves the BOL message to their personal archive with a note.
+INSERT INTO saved_message (id, user_id, message_id, note) VALUES
+  ('5a7ed000-0000-0000-0000-000000000001', '22222222-2222-2222-2222-222222222222',
+   '5e55a6e0-0000-0000-0000-000000000001', 'BOL for the Denver run');
 
 -- ===========================================================================
 -- Telemetry — truck locations

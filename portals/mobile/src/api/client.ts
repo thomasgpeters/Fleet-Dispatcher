@@ -13,13 +13,18 @@ import type {
   Load,
   Message,
   MessageDocument,
+  MessagePin,
   PositionReport,
+  SavedMessage,
   Trip,
   Waypoint,
 } from "./types";
 
 export const API_BASE_URL: string =
   import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5659/api";
+
+/** pin_scope ids (match database/seed_data.sql). */
+export const PIN_SCOPE = { self: 1, channel: 2, everyone: 3 } as const;
 
 async function getCollection<T>(
   resource: string,
@@ -106,6 +111,17 @@ async function updateResource<T>(
   return { id: r.id, ...r.attributes } as T;
 }
 
+/** Delete a resource via JSON:API (DELETE /Resource/{id}). */
+async function deleteResource(resource: string, id: string): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/${resource}/${id}`, {
+    method: "DELETE",
+    headers: { Accept: "application/vnd.api+json" },
+  });
+  if (!res.ok) {
+    throw new Error(`JSON:API delete ${resource}/${id} failed: ${res.status}`);
+  }
+}
+
 export const api = {
   /** All loads (the dispatch board). */
   listLoads(): Promise<Load[]> {
@@ -144,6 +160,11 @@ export const api = {
     return getCollection<Message>("Message", { channel_id: channelId });
   },
 
+  /** A single message by id (used by the saved/archive view). */
+  getMessage(messageId: string): Promise<Message> {
+    return getOne<Message>("Message", messageId);
+  },
+
   /** Post a new text message to a channel. */
   createMessage(
     channelId: string,
@@ -176,6 +197,99 @@ export const api = {
     await updateResource<ChannelMember>("ChannelMember", membership.id, {
       last_read_at: new Date().toISOString(),
     });
+  },
+
+  // --- Pins ---
+
+  /** All pins on a channel (any scope); filter for visibility client-side. */
+  pinsForChannel(channelId: string): Promise<MessagePin[]> {
+    return getCollection<MessagePin>("MessagePin", { channel_id: channelId });
+  },
+
+  /**
+   * Pins in a channel that `userId` should see: their own `self` pins, plus all
+   * `channel`- and `everyone`-scoped pins. (A production rule would enforce this
+   * server-side; we filter here while auth/LogicBank are pending.)
+   */
+  async visiblePinsForChannel(
+    channelId: string,
+    userId: string,
+  ): Promise<MessagePin[]> {
+    const pins = await this.pinsForChannel(channelId);
+    return pins.filter(
+      (p) =>
+        p.pin_scope_id !== PIN_SCOPE.self || p.pinned_by === userId,
+    );
+  },
+
+  /** The current user's own pin on a message, if any. */
+  async myPin(messageId: string, userId: string): Promise<MessagePin | null> {
+    const rows = await getCollection<MessagePin>("MessagePin", {
+      message_id: messageId,
+      pinned_by: userId,
+    });
+    return rows[0] ?? null;
+  },
+
+  /** Pin a message at a chosen visibility scope. */
+  pinMessage(
+    messageId: string,
+    channelId: string,
+    userId: string,
+    pinScopeId: number,
+  ): Promise<MessagePin> {
+    return createResource<MessagePin>("MessagePin", {
+      message_id: messageId,
+      channel_id: channelId,
+      pinned_by: userId,
+      pin_scope_id: pinScopeId,
+    });
+  },
+
+  /** Change the scope of an existing pin. */
+  repinMessage(pinId: string, pinScopeId: number): Promise<MessagePin> {
+    return updateResource<MessagePin>("MessagePin", pinId, {
+      pin_scope_id: pinScopeId,
+    });
+  },
+
+  unpinMessage(pinId: string): Promise<void> {
+    return deleteResource("MessagePin", pinId);
+  },
+
+  // --- Saved messages (personal archive) ---
+
+  /** The current user's saved/archived messages (newest first by saved_at). */
+  async savedForUser(userId: string): Promise<SavedMessage[]> {
+    const rows = await getCollection<SavedMessage>("SavedMessage", {
+      user_id: userId,
+    });
+    return rows.sort((a, b) => b.saved_at.localeCompare(a.saved_at));
+  },
+
+  /** The current user's saved entry for a message, if any. */
+  async mySaved(messageId: string, userId: string): Promise<SavedMessage | null> {
+    const rows = await getCollection<SavedMessage>("SavedMessage", {
+      message_id: messageId,
+      user_id: userId,
+    });
+    return rows[0] ?? null;
+  },
+
+  saveMessage(
+    userId: string,
+    messageId: string,
+    note?: string,
+  ): Promise<SavedMessage> {
+    return createResource<SavedMessage>("SavedMessage", {
+      user_id: userId,
+      message_id: messageId,
+      ...(note ? { note } : {}),
+    });
+  },
+
+  unsaveMessage(savedId: string): Promise<void> {
+    return deleteResource("SavedMessage", savedId);
   },
 
   // --- Content (CMS) ---

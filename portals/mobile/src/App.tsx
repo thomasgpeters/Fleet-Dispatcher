@@ -21,6 +21,7 @@ import { LoadsPage } from "./pages/LoadsPage";
 import { LoadDetailPage } from "./pages/LoadDetailPage";
 import { ChannelsPage } from "./pages/ChannelsPage";
 import { ChannelPage } from "./pages/ChannelPage";
+import { SavedPage } from "./pages/SavedPage";
 import { LocatePage } from "./pages/LocatePage";
 import { TripsPage } from "./pages/TripsPage";
 import { TripDetailPage } from "./pages/TripDetailPage";
@@ -45,6 +46,7 @@ export default function App() {
             <Route exact path="/trips" component={TripsPage} />
             <Route exact path="/trips/:tripId" component={TripDetailPage} />
             <Route exact path="/messages" component={ChannelsPage} />
+            <Route exact path="/saved" component={SavedPage} />
             <Route exact path="/messages/:channelId" component={ChannelPage} />
             <Route exact path="/locate" component={LocatePage} />
             <Route exact path="/assistant" component={AssistantPage} />

@@ -122,6 +122,33 @@ export interface MessageDocument {
   document_id: string;
 }
 
+// Visibility a user picks when pinning a message.
+export interface PinScope {
+  id: number;
+  code: "self" | "channel" | "everyone";
+  name: string;
+}
+
+// A pinned message. `pin_scope_id` controls who sees it: self (just the pinner),
+// channel (channel members), everyone (org-wide).
+export interface MessagePin {
+  id: string;
+  message_id: string;
+  channel_id: string;
+  pinned_by: string;
+  pin_scope_id: number; // -> PinScope
+  pinned_at: string;
+}
+
+// A user's personal saved/archive entry for a message (cross-channel).
+export interface SavedMessage {
+  id: string;
+  user_id: string;
+  message_id: string;
+  note?: string | null;
+  saved_at: string;
+}
+
 // --- Telemetry (truck locations) ---
 export interface PositionReport {
   id: string;

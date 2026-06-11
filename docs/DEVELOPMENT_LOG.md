@@ -5,6 +5,22 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-06-11
 
+### Feature 1 (Phase 2) — pinned messages + personal saved archive
+- Schema: `pin_scope` lookup (`self`/`channel`/`everyone`) + `message_pin`
+  (user-selectable visibility per pin; `channel_id` carried for direct filtering;
+  one pin per (message, user)) + `saved_message` (per-user cross-channel archive
+  with an optional note). +3 tables → **40** in `fleet`. Seeded a channel-scope
+  pin and a saved message; **verified** schema+seed on PostgreSQL 16.
+- Mobile: pin a message via a scope picker (Only me / Channel / Everyone), a
+  "Pinned" strip atop the channel showing visible pins + scope, swipe actions to
+  pin-unpin / save-unsave, and inline pin/saved markers. New personal **Saved**
+  view (cross-channel archive) reached from the Message Board header.
+- API client: `MessagePin`/`SavedMessage` types, `PIN_SCOPE` ids, pin/unpin/
+  repin, visible-pins filter (self pins only for the pinner), save/unsave,
+  single-message getter; added a JSON:API DELETE helper.
+- Note: pin-visibility is filtered **client-side** for now — a server-side rule
+  (auth/LogicBank) is the production approach. Mobile `npm run build` clean.
+
 ### Feature 3 — "Hey Dispatch" driver voice assistant (pluggable AI provider)
 - New `assistant/` FastAPI service (port `5710`): `POST /assist` takes an
   on-device STT transcript + the driver's trusted context and returns a spoken

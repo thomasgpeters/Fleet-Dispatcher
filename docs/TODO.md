@@ -45,6 +45,18 @@ Done:
 - [x] Unread counts via `channel_member.last_read_at` + mark-as-read (Badge)
 - [x] Pull-to-refresh (`IonRefresher`) on channel list + detail
 
+Phase 2 — pins & personal archive (2026-06-11):
+- [x] Schema: `pin_scope` lookup + `message_pin` (user-selectable scope:
+      self/channel/everyone) + `saved_message` (per-user archive, optional note).
+      Verified on PostgreSQL 16 (40 tables in `fleet`).
+- [x] Mobile: pin a message with a scope picker; visible-pins strip atop the
+      channel; swipe to pin/unpin or save/unsave; inline pin/saved markers
+- [x] Mobile: personal **Saved** archive view (cross-channel), reached from the
+      Message Board header; remove items
+- [ ] Server-side pin-visibility enforcement (currently filtered client-side) →
+      auth / LogicBank
+- [ ] Desktop (dispatcher) pins & saved views → desktop portal work
+
 Carried over (blocked / owned elsewhere):
 - [ ] Direct (1:1) channel creation + membership management — needs a user
       directory (→ auth)
@@ -144,7 +156,7 @@ AI provider is admin-selectable (Anthropic default / OpenAI / Ollama).
       Smitty/Student-Onboarding → all Fleet app tables in the **`fleet`** schema
       (owned by `fleet`, ALS reflects it); PostGIS in shared **`gis`**
       (Fleet's `fleet_*` views owned by `fleet_gis`). See `MIDDLEWARE_SETUP.md`
-      + `DEPLOYMENT.md`. Verified: 37 tables in `fleet`, 0 in `public`.
+      + `DEPLOYMENT.md`. Verified: 40 tables in `fleet`, 0 in `public`.
 - [ ] AuthN/AuthZ (roles: dispatcher, driver, updater) — gates current-user,
       messaging, and HUD
 - [ ] LogicBank rules in generated middleware (weekly cap, settlement math)

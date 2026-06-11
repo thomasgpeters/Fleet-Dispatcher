@@ -162,6 +162,7 @@ resources). Codes shown below match the `code` column in
   `generators`, `lifts`.
 - `channel_type`: `direct`, `group`, `broadcast`.
 - `channel_member_role`: `owner`, `member`.
+- `pin_scope`: `self`, `channel`, `everyone` (visibility chosen when pinning).
 - `document_type`: `document`, `image`, `bill_of_lading`, `invoice`,
   `inspection_photo`, `license`, `other`.
 
@@ -193,6 +194,12 @@ drivers, dispatchers, and updaters all converse through one model.
   (`owner`/`member`) and `last_read_at` (drives per-user unread counts).
 - **Message** — text posted to a channel by an author; `reply_to` supports
   threaded replies; may be empty when it only carries documents.
+- **MessagePin** — a message a user pinned, with a `pin_scope` controlling who
+  sees it: `self` (only the pinner), `channel` (channel members), or `everyone`
+  (org-wide). One pin per (message, user); re-scoping updates the row.
+- **SavedMessage** — a user's personal archive entry for a message (from any
+  channel), with an optional note. Distinct from channels (organization) and
+  pins (shared importance) — this collection is per-user.
 
 A message references **Documents** (below) through the `message_document` link,
 so attachments are shared content rather than message-private blobs.

@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
 import {
   IonBadge,
+  IonButton,
+  IonButtons,
   IonContent,
   IonHeader,
+  IonIcon,
   IonItem,
   IonLabel,
   IonList,
@@ -15,6 +18,7 @@ import {
   IonToolbar,
 } from "@ionic/react";
 import type { RefresherCustomEvent } from "@ionic/react";
+import { bookmarkOutline } from "ionicons/icons";
 
 import { api } from "../api/client";
 import type { Channel } from "../api/types";
@@ -73,6 +77,11 @@ export function ChannelsPage() {
       <IonHeader>
         <IonToolbar>
           <IonTitle>Message Board</IonTitle>
+          <IonButtons slot="end">
+            <IonButton routerLink="/saved" aria-label="Saved messages">
+              <IonIcon slot="icon-only" icon={bookmarkOutline} />
+            </IonButton>
+          </IonButtons>
         </IonToolbar>
       </IonHeader>
       <IonContent>
