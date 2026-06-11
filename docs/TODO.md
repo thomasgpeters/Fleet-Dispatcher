@@ -86,7 +86,8 @@ Pivot here after Phase 1. Talks to the same JSON:API; Bootstrap theme + Wt
       (not compiled in-sandbox — no Wt; see note below)
 - [x] **Board** with a **Today | Week** toggle (today's runs vs Mon→Mon grid),
       fed by an async `ApiClient` (Wt::Http::Client + Wt::Json)
-- [ ] Add app-bar week selector + user/role/health (with auth)
+- [x] App-bar **user + role + Sign out** (auth); console gated by a Wt login
+- [ ] Add app-bar week selector + health indicator
 - [x] Load intake form (new load) + driver/equipment assignment (POST /Load)
 - [x] **HUD** surface (`/hud`) + `HudControlBus` (Wt server push): the console's
       Today/Week toggle publishes `SetMode`; HUD sessions auto-switch
@@ -167,8 +168,10 @@ AI provider is admin-selectable (Anthropic default / OpenAI / Ollama).
 - [~] **AuthN/AuthZ** (roles: dispatcher, driver, updater). DONE: ALS built-in
       JWT auth against `app_user` (password_hash + profile fields + avatar FK);
       mobile login/profile/logout, bearer header on all calls, 401 auto-logout,
-      `currentUser.ts` placeholder replaced by `useAuth()`. See
-      [`AUTHENTICATION.md`](AUTHENTICATION.md). REMAINING: role-based grants
-      (LogicBank/ALS security), desktop (Wt) login, native secure token storage
+      `currentUser.ts` placeholder replaced by `useAuth()`; **desktop (Wt) console
+      login + profile** (LoginView/ProfileView, token on all ApiClient calls,
+      sign out). See [`AUTHENTICATION.md`](AUTHENTICATION.md). REMAINING:
+      role-based grants (LogicBank/ALS security), desktop **avatar upload** + HUD
+      service token, native secure token storage
 - [ ] LogicBank rules in generated middleware (weekly cap, settlement math)
 - [ ] Seed data growth for demos

@@ -5,6 +5,22 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-06-11
 
+### Desktop (Wt) console login + profile (same ALS JWT credentials)
+- ApiClient: holds the bearer token (`setAuthToken`/`clearAuthToken`/`hasAuthToken`)
+  and adds `Authorization: Bearer` to every GET/POST/PATCH; new `login()`
+  (POST /api/auth/login via a plain-JSON helper), `fetchUserByUsername()`
+  (GET /AppUser?filter[username]=), and `updateUser()` (PATCH /AppUser/{id} via a
+  new patch helper). Added `parseUser`, `urlEncode`, `AppUser` model.
+- New `LoginView` gates the console (DispatcherApp shows login → Shell on success;
+  Shell's Sign out returns to login). New `ProfileView` (view/edit profile,
+  PATCH). Shell now takes `(ApiClient*, AppUser, onLogout)`, shows name·role +
+  Sign out in the app bar, and a Profile nav item. CMake gains the two sources.
+- Token lives **server-side** in the Wt session (not in the browser). HUD entry
+  point stays unauthenticated for now (wall display) — noted for a service token.
+- **Not compiled in the sandbox** (no Wt). Version-sensitive spots flagged:
+  `Http::Method::Patch` (older Wt may lack PATCH → PUT fallback) alongside the
+  existing `done()` error_code / `Json::Type::Null` notes. Avatar upload deferred.
+
 ### Authentication + user profile (ALS built-in JWT, mobile-first)
 - Schema: `app_user` gains `password_hash` (werkzeug pbkdf2:sha256) + profile
   fields (`phone`, `title`, `timezone`, `avatar_document_id` → CMS `document`,

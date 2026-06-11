@@ -20,7 +20,9 @@
 
 #include "ApiClient.h"
 #include "HudView.h"
+#include "LoginView.h"
 #include "Shell.h"
+#include "models.h"
 
 namespace {
 
@@ -32,15 +34,37 @@ void applyChrome(Wt::WApplication* app) {
 
 }  // namespace
 
+// The dispatcher console. The session owns one ApiClient; we gate on auth —
+// show the login screen first, then the shell once a token + user are in hand.
 class DispatcherApp : public Wt::WApplication {
 public:
     explicit DispatcherApp(const Wt::WEnvironment& env) : Wt::WApplication(env) {
         setTitle("Fleet Dispatcher — Dispatcher Console");
         applyChrome(this);
-        root()->addNew<fd::Shell>();
+        api_ = std::make_unique<fd::ApiClient>(fd::ApiClient::baseUrlFromEnv());
+        showLogin();
+    }
+
+private:
+    std::unique_ptr<fd::ApiClient> api_;
+
+    void showLogin() {
+        root()->clear();
+        root()->addNew<fd::LoginView>(
+            api_.get(), [this](fd::AppUser user) { showShell(std::move(user)); });
+    }
+
+    void showShell(fd::AppUser user) {
+        root()->clear();
+        root()->addNew<fd::Shell>(api_.get(), std::move(user),
+                                  [this] { showLogin(); });
     }
 };
 
+// The HUD display (often a wall screen with no operator to log in). It stays
+// unauthenticated for now. When ALS auth is enforced on reads, give this a
+// service token (e.g. ASSISTANT-style API key / a dedicated HUD login) via
+// api_->setAuthToken(...) — tracked in docs/AUTHENTICATION.md / TODO.
 class HudApp : public Wt::WApplication {
 public:
     explicit HudApp(const Wt::WEnvironment& env) : Wt::WApplication(env) {

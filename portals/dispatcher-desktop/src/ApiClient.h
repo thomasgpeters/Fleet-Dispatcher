@@ -40,6 +40,15 @@ struct LoadDraft {
     std::string delivery_date;  // "YYYY-MM-DD" or empty
 };
 
+// Editable profile fields (PATCH /AppUser/{id}).
+struct ProfileEdit {
+    std::string full_name;
+    std::string email;
+    std::string phone;
+    std::string title;
+    std::string timezone;
+};
+
 class ApiClient {
 public:
     using DriversCallback = std::function<void(std::vector<Driver>)>;
@@ -47,10 +56,30 @@ public:
     using PositionsCallback = std::function<void(std::vector<Position>)>;
     using OptionsCallback = std::function<void(std::vector<Option>)>;
     using LoadCallback = std::function<void(Load)>;
+    using TokenCallback = std::function<void(std::string)>;
+    using UserCallback = std::function<void(AppUser)>;
     using ErrorCallback = std::function<void(std::string)>;
 
     // baseUrl e.g. "http://localhost:5659/api" (no trailing slash).
     explicit ApiClient(std::string baseUrl);
+
+    // --- Authentication (ALS built-in JWT) -------------------------------
+    // The bearer token (set after login) is sent on every subsequent request.
+    void setAuthToken(std::string token) { authToken_ = std::move(token); }
+    void clearAuthToken() { authToken_.clear(); }
+    bool hasAuthToken() const { return !authToken_.empty(); }
+
+    // POST /api/auth/login {username,password} -> access token.
+    void login(const std::string& username, const std::string& password,
+               TokenCallback onOk, ErrorCallback onErr);
+
+    // Load the signed-in user's profile (GET /AppUser?filter[username]=).
+    void fetchUserByUsername(const std::string& username, UserCallback onOk,
+                             ErrorCallback onErr);
+
+    // Update editable profile fields (PATCH /AppUser/{id}).
+    void updateUser(const std::string& id, const ProfileEdit& edit,
+                    UserCallback onOk, ErrorCallback onErr);
 
     void fetchDrivers(DriversCallback onOk, ErrorCallback onErr);
     void fetchLoads(LoadsCallback onOk, ErrorCallback onErr);
@@ -75,6 +104,7 @@ public:
 
 private:
     std::string baseUrl_;
+    std::string authToken_;   // bearer token after login (empty = unauthenticated)
 };
 
 }  // namespace fd

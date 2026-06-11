@@ -16,18 +16,30 @@ The desktop portal serves two surfaces from the same Wt application:
 The control console issues **commands**; HUD sessions **react** to them in real
 time via Wt server push.
 
+## Sign-in
+
+The console is gated by a Wt login (`LoginView`) using the shared **ALS JWT
+auth** — the same credentials as the mobile app. `DispatcherApp` shows the login
+first, then the `Shell` once a token + user are loaded. The bearer token lives
+**server-side** in the Wt session (never sent to the browser) and rides on every
+`ApiClient` call. **Sign out** clears it and returns to the login. See
+[`AUTHENTICATION.md`](AUTHENTICATION.md). (The `/hud` display stays
+unauthenticated for now.)
+
 ## The shell
 
 The shell is the frame + app-wide state every view plugs into:
 
-- **Top app bar** — brand, current **dispatch week** selector, API/health
-  indicator, user/role.
-- **Navigation** — Board · Loads · Drivers · Equipment · Messages · HUD.
+- **Top app bar** — brand, API indicator, and the **signed-in user · role** with
+  a **Sign out** button (dispatch-week selector + health indicator still to come).
+- **Navigation** — Board · New Load · Drivers · Messages · **Profile**.
+- **Profile** — `ProfileView`: view/edit profile fields (`PATCH /AppUser/{id}`);
+  avatar upload is a follow-up.
 - **Content outlet** — hosts the active view.
 - **Command bar** — mode toggle (**Today | Week**) + action buttons that emit
   HUD commands.
-- **Owned state** — JSON:API client, current week, current board mode, handle to
-  the command bus.
+- **Owned state** — the signed-in `AppUser`; the JSON:API client (with the bearer
+  token) is owned by the application and shared with the shell.
 
 ## Board modes
 

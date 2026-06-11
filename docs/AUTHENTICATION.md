@@ -100,9 +100,24 @@ any real deployment.** Never store plaintext; the column is `password_hash`.
 the Capacitor WebView). For a hardened native build, switch to Capacitor Secure
 Storage / Preferences — tracked in [`TODO.md`](TODO.md).
 
-**Desktop (Wt):** not yet wired (mobile-first). When added, the dispatcher
-console/HUD will log in the same way and send the bearer token on its
-`ApiClient` calls.
+**Desktop (Wt)** — implemented for the dispatcher console:
+
+- `src/LoginView.*` gates the console: it calls `ApiClient::login()`
+  (`POST /api/auth/login`), then loads the profile via
+  `fetchUserByUsername()`. `src/main.cpp` (`DispatcherApp`) shows the login
+  first, then the `Shell` once a token + user are in hand.
+- `ApiClient` holds the bearer token (`setAuthToken`/`clearAuthToken`) and adds
+  `Authorization: Bearer` to every GET/POST/PATCH. The token lives **server-side**
+  in the Wt session (never sent to the browser) — stronger than the mobile
+  WebView's `localStorage`.
+- `src/ProfileView.*` shows the signed-in user and edits profile fields
+  (`PATCH /AppUser/{id}`); the app bar shows name · role with a **Sign out**
+  button. (Avatar upload is a follow-up — the mobile app already has it.)
+- **Not compiled in the dev sandbox** (no Wt). Two Wt-version-sensitive spots are
+  flagged in `ApiClient.cpp`: the `done()` `error_code` type and
+  `Http::Method::Patch` (older Wt may lack PATCH — fall back to PUT).
+- **HUD** (`/hud`): stays unauthenticated for now (wall-screen display). When auth
+  is enforced on reads, give it a service token via `ApiClient::setAuthToken()`.
 
 ## CORS
 
