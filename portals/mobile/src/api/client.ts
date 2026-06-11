@@ -5,10 +5,12 @@
 // (resource collections, filter[...] query params).
 
 import type {
+  AppUser,
   Channel,
   ChannelMember,
   Document,
   Driver,
+  DriverEquipment,
   JsonApiDocument,
   Load,
   Message,
@@ -26,6 +28,35 @@ export const API_BASE_URL: string =
 /** pin_scope ids (match database/seed_data.sql). */
 export const PIN_SCOPE = { self: 1, channel: 2, everyone: 3 } as const;
 
+// --- Auth token (set by the auth context after login) ------------------------
+
+let authToken: string | null = null;
+let onUnauthorized: (() => void) | null = null;
+
+/** Set/clear the bearer token sent on every request. */
+export function setAuthToken(token: string | null): void {
+  authToken = token;
+}
+
+/** Register a callback invoked on a 401/403 (e.g. force logout). */
+export function setUnauthorizedHandler(fn: (() => void) | null): void {
+  onUnauthorized = fn;
+}
+
+/** Request headers with Accept (+ optional extras) and Authorization if set. */
+function authHeaders(extra: Record<string, string> = {}): Record<string, string> {
+  const base: Record<string, string> = {
+    Accept: "application/vnd.api+json",
+    ...extra,
+  };
+  return authToken ? { ...base, Authorization: `Bearer ${authToken}` } : base;
+}
+
+/** Trip the unauthorized handler on a 401/403 before throwing. */
+function guard(res: Response): void {
+  if (res.status === 401 || res.status === 403) onUnauthorized?.();
+}
+
 async function getCollection<T>(
   resource: string,
   filters: Record<string, string> = {},
@@ -36,9 +67,10 @@ async function getCollection<T>(
   }
   const qs = params.toString();
   const res = await fetch(`${API_BASE_URL}/${resource}${qs ? `?${qs}` : ""}`, {
-    headers: { Accept: "application/vnd.api+json" },
+    headers: authHeaders(),
   });
   if (!res.ok) {
+    guard(res);
     throw new Error(`JSON:API ${resource} request failed: ${res.status}`);
   }
   const doc = (await res.json()) as JsonApiDocument<T>;
@@ -57,13 +89,11 @@ async function createResource<T>(
 ): Promise<T> {
   const res = await fetch(`${API_BASE_URL}/${resource}`, {
     method: "POST",
-    headers: {
-      Accept: "application/vnd.api+json",
-      "Content-Type": "application/vnd.api+json",
-    },
+    headers: authHeaders({ "Content-Type": "application/vnd.api+json" }),
     body: JSON.stringify({ data: { type: resource, attributes } }),
   });
   if (!res.ok) {
+    guard(res);
     throw new Error(`JSON:API create ${resource} failed: ${res.status}`);
   }
   const doc = (await res.json()) as JsonApiDocument<T>;
@@ -79,9 +109,10 @@ async function getOne<T>(
 ): Promise<T> {
   const qs = fields ? `?${new URLSearchParams({ [`fields[${resource}]`]: fields.join(",") })}` : "";
   const res = await fetch(`${API_BASE_URL}/${resource}/${id}${qs}`, {
-    headers: { Accept: "application/vnd.api+json" },
+    headers: authHeaders(),
   });
   if (!res.ok) {
+    guard(res);
     throw new Error(`JSON:API ${resource}/${id} failed: ${res.status}`);
   }
   const doc = (await res.json()) as JsonApiDocument<T>;
@@ -97,13 +128,11 @@ async function updateResource<T>(
 ): Promise<T> {
   const res = await fetch(`${API_BASE_URL}/${resource}/${id}`, {
     method: "PATCH",
-    headers: {
-      Accept: "application/vnd.api+json",
-      "Content-Type": "application/vnd.api+json",
-    },
+    headers: authHeaders({ "Content-Type": "application/vnd.api+json" }),
     body: JSON.stringify({ data: { type: resource, id, attributes } }),
   });
   if (!res.ok) {
+    guard(res);
     throw new Error(`JSON:API update ${resource}/${id} failed: ${res.status}`);
   }
   const doc = (await res.json()) as JsonApiDocument<T>;
@@ -115,14 +144,54 @@ async function updateResource<T>(
 async function deleteResource(resource: string, id: string): Promise<void> {
   const res = await fetch(`${API_BASE_URL}/${resource}/${id}`, {
     method: "DELETE",
-    headers: { Accept: "application/vnd.api+json" },
+    headers: authHeaders(),
   });
   if (!res.ok) {
+    guard(res);
     throw new Error(`JSON:API delete ${resource}/${id} failed: ${res.status}`);
   }
 }
 
 export const api = {
+  // --- Identity & profile ---
+
+  /** Look up a user by login username (used after auth to load the profile). */
+  async getUserByUsername(username: string): Promise<AppUser | null> {
+    const rows = await getCollection<AppUser>("AppUser", { username });
+    return rows[0] ?? null;
+  },
+
+  getUser(userId: string): Promise<AppUser> {
+    return getOne<AppUser>("AppUser", userId);
+  },
+
+  /** Update editable profile fields (PATCH AppUser). */
+  updateUser(
+    userId: string,
+    attrs: Partial<
+      Pick<
+        AppUser,
+        "full_name" | "email" | "phone" | "title" | "timezone" | "avatar_document_id"
+      >
+    >,
+  ): Promise<AppUser> {
+    return updateResource<AppUser>("AppUser", userId, attrs);
+  },
+
+  /** The Driver row linked to a user (for driver-role context), if any. */
+  async driverForUser(userId: string): Promise<Driver | null> {
+    const rows = await getCollection<Driver>("Driver", { user_id: userId });
+    return rows[0] ?? null;
+  },
+
+  /** A driver's first assigned equipment id (drives the locate/telemetry tab). */
+  async equipmentForDriver(driverId: string): Promise<string | null> {
+    const rows = await getCollection<DriverEquipment>("DriverEquipment", {
+      driver_id: driverId,
+    });
+    return rows[0]?.equipment_id ?? null;
+  },
+
   /** All loads (the dispatch board). */
   listLoads(): Promise<Load[]> {
     return getCollection<Load>("Load");

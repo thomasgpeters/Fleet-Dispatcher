@@ -30,6 +30,35 @@ export interface LoadStatus {
   name: string;
 }
 
+// --- Identity & access ---
+export interface AppRole {
+  id: number;
+  code: "dispatcher" | "driver" | "updater";
+  name: string;
+}
+
+export interface AppUser {
+  id: string;
+  username: string;
+  full_name: string;
+  email?: string;
+  app_role_id: number; // -> AppRole
+  active: boolean;
+  // Profile (editable); password_hash is never exposed to the client.
+  phone?: string;
+  title?: string;
+  timezone?: string;
+  avatar_document_id?: string | null; // -> Document (profile photo via CMS)
+  last_login_at?: string | null;
+}
+
+// Join: which equipment a driver is assigned (drives equipment context).
+export interface DriverEquipment {
+  id: string;
+  driver_id: string;
+  equipment_id: string;
+}
+
 // --- Domain resources (UUID ids, lookup FKs) ---
 export interface Driver {
   id: string;

@@ -18,10 +18,7 @@ import { micOutline, stopCircleOutline } from "ionicons/icons";
 
 import { api } from "../api/client";
 import { assist, type AssistAction } from "../api/assistant";
-import {
-  CURRENT_DRIVER_ID,
-  CURRENT_USER_ID,
-} from "../currentUser";
+import { useAuth } from "../auth/AuthContext";
 
 type Phase = "idle" | "listening" | "thinking" | "speaking";
 
@@ -44,6 +41,7 @@ function getFix(): Promise<{ lat: number; lng: number } | null> {
  * and acts (message dispatch, ETA, route checks) and returns a spoken reply.
  */
 export function AssistantPage() {
+  const { user, driverId } = useAuth();
   const [phase, setPhase] = useState<Phase>("idle");
   const [transcript, setTranscript] = useState("");
   const [reply, setReply] = useState("");
@@ -71,20 +69,22 @@ export function AssistantPage() {
       })
       .catch(() => undefined);
 
-    api
-      .tripsForDriver(CURRENT_DRIVER_ID)
-      .then(async (trips) => {
-        const trip = trips.find((t) => t.trip_status_id === 2) ?? trips[0];
-        if (!trip) return;
-        const wps = await api.waypointsForTrip(trip.id);
-        const dest =
-          wps.find((w) => w.stop_type_id === 2) ?? wps[wps.length - 1];
-        if (dest) {
-          destRef.current = { lat: dest.lat, lng: dest.lng, label: dest.label };
-        }
-      })
-      .catch(() => undefined);
-  }, []);
+    if (driverId) {
+      api
+        .tripsForDriver(driverId)
+        .then(async (trips) => {
+          const trip = trips.find((t) => t.trip_status_id === 2) ?? trips[0];
+          if (!trip) return;
+          const wps = await api.waypointsForTrip(trip.id);
+          const dest =
+            wps.find((w) => w.stop_type_id === 2) ?? wps[wps.length - 1];
+          if (dest) {
+            destRef.current = { lat: dest.lat, lng: dest.lng, label: dest.label };
+          }
+        })
+        .catch(() => undefined);
+    }
+  }, [driverId]);
 
   const speak = useCallback((text: string) => {
     if (!("speechSynthesis" in window)) return;
@@ -111,8 +111,8 @@ export function AssistantPage() {
         const fix = await getFix();
         const res = await assist({
           transcript: said,
-          driver_id: CURRENT_DRIVER_ID,
-          author_user_id: CURRENT_USER_ID,
+          driver_id: driverId ?? undefined,
+          author_user_id: user?.id,
           dispatcher_channel_id: channelRef.current ?? undefined,
           lat: fix?.lat,
           lng: fix?.lng,
@@ -129,7 +129,7 @@ export function AssistantPage() {
         setPhase("idle");
       }
     },
-    [speak],
+    [speak, driverId, user],
   );
 
   const startListening = useCallback(() => {

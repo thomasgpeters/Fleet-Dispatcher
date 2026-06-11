@@ -61,8 +61,12 @@ first, then propagate. Consistent terms keep design unambiguous and reviews fast
    and places involved. Owns load lifecycle and scheduling invariants.
 3. **Settlement** — turns a completed/dispatched load's rate into driver pay
    using the contract percentage from Fleet.
-4. **Identity & Access** — users and the three roles (Dispatcher, Driver,
-   Updater).
+4. **Identity & Access** — `app_user`s and the three roles (Dispatcher, Driver,
+   Updater). Each user carries auth (`username` + `password_hash`) and an editable
+   **profile** (`full_name`, `email`, `phone`, `title`, `timezone`, plus an avatar
+   stored as a CMS `document`). Authentication is ApiLogicServer's built-in JWT,
+   verified against `app_user` — see [`AUTHENTICATION.md`](AUTHENTICATION.md). A
+   `driver` may link to a login via `driver.user_id`.
 
 The **Driver** is shared by Fleet, Dispatch, and Settlement; Fleet is its
 *owning* context. Other contexts reference it by identity (`driver_id`).

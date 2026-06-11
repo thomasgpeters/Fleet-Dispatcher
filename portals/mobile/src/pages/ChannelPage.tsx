@@ -44,6 +44,7 @@ import {
 
 import { EmojiPicker } from "../components/EmojiPicker";
 import { api, PIN_SCOPE } from "../api/client";
+import { useAuth } from "../auth/AuthContext";
 import type {
   Channel,
   Document,
@@ -51,7 +52,6 @@ import type {
   MessagePin,
   SavedMessage,
 } from "../api/types";
-import { CURRENT_USER_ID } from "../currentUser";
 
 /** Human label for a pin scope (pin_scope.code). */
 const SCOPE_LABEL: Record<number, string> = {
@@ -84,6 +84,8 @@ function fileToBase64(file: File): Promise<string> {
  */
 export function ChannelPage() {
   const { channelId } = useParams<{ channelId: string }>();
+  const { user } = useAuth();
+  const userId = user?.id ?? "";
   const [channel, setChannel] = useState<Channel | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [docsByMessage, setDocsByMessage] = useState<Record<string, Document[]>>({});
@@ -124,21 +126,21 @@ export function ChannelPage() {
       setDocsByMessage(map);
 
       // Pins visible to me + my own pins (for toggle state); my saved messages.
-      const visible = await api.visiblePinsForChannel(channelId, CURRENT_USER_ID);
+      const visible = await api.visiblePinsForChannel(channelId, userId);
       setPins(visible);
       const mine: Record<string, MessagePin> = {};
       for (const p of visible) {
-        if (p.pinned_by === CURRENT_USER_ID) mine[p.message_id] = p;
+        if (p.pinned_by === userId) mine[p.message_id] = p;
       }
       setMyPins(mine);
 
-      const savedRows = await api.savedForUser(CURRENT_USER_ID);
+      const savedRows = await api.savedForUser(userId);
       const sMap: Record<string, SavedMessage> = {};
       for (const s of savedRows) sMap[s.message_id] = s;
       setSaved(sMap);
 
       // Entering a channel marks it read for the current user.
-      void api.markChannelRead(channelId, CURRENT_USER_ID).catch(() => {});
+      void api.markChannelRead(channelId, userId).catch(() => {});
     } catch (e) {
       fail(e);
     }
@@ -159,7 +161,7 @@ export function ChannelPage() {
     try {
       const msg = await api.createMessage(
         channelId,
-        CURRENT_USER_ID,
+        userId,
         draft.trim(),
         replyTo?.id,
       );
@@ -178,7 +180,7 @@ export function ChannelPage() {
       const existing = myPins[messageId];
       const saved_ = existing
         ? await api.repinMessage(existing.id, scopeId)
-        : await api.pinMessage(messageId, channelId, CURRENT_USER_ID, scopeId);
+        : await api.pinMessage(messageId, channelId, userId, scopeId);
       setMyPins((prev) => ({ ...prev, [messageId]: saved_ }));
       setPins((prev) => [
         ...prev.filter((p) => p.id !== saved_.id),
@@ -214,7 +216,7 @@ export function ChannelPage() {
           return next;
         });
       } else {
-        const s = await api.saveMessage(CURRENT_USER_ID, m.id);
+        const s = await api.saveMessage(userId, m.id);
         setSaved((prev) => ({ ...prev, [m.id]: s }));
       }
     } catch (e) {
@@ -230,7 +232,7 @@ export function ChannelPage() {
       const base64 = await fileToBase64(file);
       const msg = await api.createMessage(
         channelId,
-        CURRENT_USER_ID,
+        userId,
         `📎 ${file.name}`,
       );
       const doc = await api.createDocument({
@@ -240,7 +242,7 @@ export function ChannelPage() {
         content_type: file.type || "application/octet-stream",
         byte_size: file.size,
         data: base64,
-        uploaded_by: CURRENT_USER_ID,
+        uploaded_by: userId,
       });
       await api.linkMessageDocument(msg.id, doc.id);
       setMessages((prev) => [...prev, msg]);

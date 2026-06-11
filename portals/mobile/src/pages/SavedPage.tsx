@@ -22,7 +22,7 @@ import { bookmark, trashOutline } from "ionicons/icons";
 
 import { api } from "../api/client";
 import type { Message, SavedMessage } from "../api/types";
-import { CURRENT_USER_ID } from "../currentUser";
+import { useAuth } from "../auth/AuthContext";
 
 type SavedRow = { saved: SavedMessage; message: Message | null };
 
@@ -33,12 +33,14 @@ type SavedRow = { saved: SavedMessage; message: Message | null };
  * header; swipe/tap to remove an item.
  */
 export function SavedPage() {
+  const { user } = useAuth();
   const [rows, setRows] = useState<SavedRow[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const load = async () => {
+    if (!user) return;
     try {
-      const saved = await api.savedForUser(CURRENT_USER_ID);
+      const saved = await api.savedForUser(user.id);
       // Resolve each saved entry's message body (best-effort; a deleted message
       // leaves the entry with a null body rather than failing the whole list).
       const resolved = await Promise.all(
@@ -55,7 +57,8 @@ export function SavedPage() {
 
   useEffect(() => {
     void load();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   const refresh = async (e: RefresherCustomEvent) => {
     await load();

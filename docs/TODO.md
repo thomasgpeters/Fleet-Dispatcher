@@ -66,7 +66,8 @@ Phase 2 — pins & personal archive (2026-06-11):
 Carried over (blocked / owned elsewhere):
 - [ ] Direct (1:1) channel creation + membership management — needs a user
       directory (→ auth)
-- [ ] Current-user identity (replace `src/currentUser.ts` placeholder) → auth
+- [x] Current-user identity — replaced `src/currentUser.ts` placeholder with the
+      authenticated user via `useAuth()` (Feature: Authentication)
 - [ ] Clickable message **toasts** (`IonToast`, 2–3s, deep-link) → realtime
 - [ ] Realtime delivery (websockets/push) — currently polling/pull-to-refresh
 - [ ] Desktop (dispatcher) messaging view → desktop portal work
@@ -163,7 +164,11 @@ AI provider is admin-selectable (Anthropic default / OpenAI / Ollama).
       (owned by `fleet`, ALS reflects it); PostGIS in shared **`gis`**
       (Fleet's `fleet_*` views owned by `fleet_gis`). See `MIDDLEWARE_SETUP.md`
       + `DEPLOYMENT.md`. Verified: 40 tables in `fleet`, 0 in `public`.
-- [ ] AuthN/AuthZ (roles: dispatcher, driver, updater) — gates current-user,
-      messaging, and HUD
+- [~] **AuthN/AuthZ** (roles: dispatcher, driver, updater). DONE: ALS built-in
+      JWT auth against `app_user` (password_hash + profile fields + avatar FK);
+      mobile login/profile/logout, bearer header on all calls, 401 auto-logout,
+      `currentUser.ts` placeholder replaced by `useAuth()`. See
+      [`AUTHENTICATION.md`](AUTHENTICATION.md). REMAINING: role-based grants
+      (LogicBank/ALS security), desktop (Wt) login, native secure token storage
 - [ ] LogicBank rules in generated middleware (weekly cap, settlement math)
 - [ ] Seed data growth for demos

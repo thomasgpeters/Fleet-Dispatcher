@@ -5,6 +5,25 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-06-11
 
+### Authentication + user profile (ALS built-in JWT, mobile-first)
+- Schema: `app_user` gains `password_hash` (werkzeug pbkdf2:sha256) + profile
+  fields (`phone`, `title`, `timezone`, `avatar_document_id` → CMS `document`,
+  `last_login_at`). Avatar FK added after `document` (ordering). Seeded the three
+  demo users with password `fleet123` (hashes verified) + titles/phones.
+  **Verified** schema+seed on PostgreSQL 16; avatar FK present.
+- Mobile: ALS JWT auth. New `auth/AuthContext` (`useAuth()` → user, driverId,
+  equipmentId, token, login/logout), `api/auth.ts` login (POST /api/auth/login),
+  bearer header on every client call + 401/403 auto-logout, `LoginPage` gate
+  (shown until authed), `ProfilePage` (view/edit + avatar upload via CMS + sign
+  out), profile button in the Loads header. Replaced the `currentUser.ts`
+  identity placeholder with `useAuth()` across Channels/Channel/Saved/Locate/
+  Trips/Assistant (only the `PHONE_PUSH_SOURCE_ID` lookup constant remains).
+- Docs: new `AUTHENTICATION.md` (ALS add-auth + auth_provider sketch verifying
+  the werkzeug hash, login endpoint, JWT secret, roles, token storage); TODO,
+  domain-model. Token in localStorage for now (Capacitor Secure Storage = TODO).
+- **Needs ALS regeneration** so `AppUser` exposes the new columns + the
+  AppUser↔Document avatar relationship. Mobile `npm run build` clean.
+
 ### Feature 1 — reply-to-message (threaded quotes)
 - Mobile: swipe a message → **Reply**; the composer shows a "Replying to …"
   banner with a one-line snippet of the original + cancel, and the sent message

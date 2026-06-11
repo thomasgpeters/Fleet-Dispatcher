@@ -88,6 +88,16 @@ CREATE TABLE app_user (
     email         TEXT,
     app_role_id   INTEGER NOT NULL REFERENCES app_role(id),
     active        BOOLEAN NOT NULL DEFAULT TRUE,
+    -- Authentication: ApiLogicServer's built-in JWT auth verifies against this
+    -- hash (format must match the ALS auth provider's hasher — see
+    -- docs/AUTHENTICATION.md). Never store plaintext.
+    password_hash TEXT,
+    -- Profile fields (editable from the client profile screen).
+    phone             TEXT,
+    title             TEXT,                 -- job title, e.g. "Lead Dispatcher"
+    timezone          TEXT,                 -- IANA tz, e.g. "America/Chicago"
+    avatar_document_id UUID,                -- profile photo via the CMS document table (FK added below)
+    last_login_at     TIMESTAMPTZ,
     created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -332,6 +342,12 @@ CREATE TABLE document (
     uploaded_by      UUID NOT NULL REFERENCES app_user(id),
     created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- A user's profile photo is a CMS document (defined here, after `document`).
+-- ALS reads this FK to relate AppUser -> Document for the avatar.
+ALTER TABLE app_user
+    ADD CONSTRAINT app_user_avatar_document_fk
+    FOREIGN KEY (avatar_document_id) REFERENCES document(id);
 
 -- Link tables (one per related resource): keep FK integrity and let ApiLogicServer
 -- generate the relationships. Add load_document, driver_document, etc. as needed.
