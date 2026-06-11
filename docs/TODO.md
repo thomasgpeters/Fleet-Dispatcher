@@ -53,6 +53,10 @@ Phase 2 — pins & personal archive (2026-06-11):
       channel; swipe to pin/unpin or save/unsave; inline pin/saved markers
 - [x] Mobile: personal **Saved** archive view (cross-channel), reached from the
       Message Board header; remove items
+- [x] **Emoji** in the composer: dependency-free picker (trucking-relevant set);
+      storage/transport already UTF-8 (verified round-trip), so no schema change
+- [ ] Emoji in the desktop messaging view (Wt WText/WLineEdit are UTF-8 native) →
+      lands with that view
 - [ ] Server-side pin-visibility enforcement (currently filtered client-side) →
       auth / LogicBank
 - [ ] Desktop (dispatcher) pins & saved views → desktop portal work

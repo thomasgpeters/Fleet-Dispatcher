@@ -20,6 +20,7 @@ import {
   IonListHeader,
   IonNote,
   IonPage,
+  IonPopover,
   IonRefresher,
   IonRefresherContent,
   IonText,
@@ -32,11 +33,13 @@ import {
   bookmark,
   bookmarkOutline,
   documentOutline,
+  happyOutline,
   pin,
   pinOutline,
   send,
 } from "ionicons/icons";
 
+import { EmojiPicker } from "../components/EmojiPicker";
 import { api, PIN_SCOPE } from "../api/client";
 import type {
   Channel,
@@ -80,6 +83,7 @@ export function ChannelPage() {
   const [saved, setSaved] = useState<Record<string, SavedMessage>>({});
   const [scopeFor, setScopeFor] = useState<string | null>(null); // message awaiting a scope pick
   const [draft, setDraft] = useState("");
+  const [emojiOpen, setEmojiOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -375,6 +379,9 @@ export function ChannelPage() {
             <IonButton onClick={() => fileInput.current?.click()}>
               <IonIcon slot="icon-only" icon={attachOutline} />
             </IonButton>
+            <IonButton id="emoji-trigger" onClick={() => setEmojiOpen(true)}>
+              <IonIcon slot="icon-only" icon={happyOutline} />
+            </IonButton>
           </IonButtons>
           <IonInput
             value={draft}
@@ -391,6 +398,17 @@ export function ChannelPage() {
           </IonButtons>
         </IonToolbar>
       </IonFooter>
+
+      {/* Emoji picker for the composer (appends to the draft). */}
+      <IonPopover
+        trigger="emoji-trigger"
+        isOpen={emojiOpen}
+        onDidDismiss={() => setEmojiOpen(false)}
+        side="top"
+        alignment="start"
+      >
+        <EmojiPicker onSelect={(e) => setDraft((prev) => prev + e)} />
+      </IonPopover>
 
       {/* Hidden native file picker driven by the attach button. */}
       <input

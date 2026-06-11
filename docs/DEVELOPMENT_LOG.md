@@ -5,6 +5,17 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-06-11
 
+### Feature 1 — emoji support in the messaging composer
+- Mobile: a dependency-free `EmojiPicker` (curated set incl. trucking symbols:
+  🚛 ⛽ 📍 🛣️ …) opened from a composer button (IonPopover); tapping appends to
+  the draft. No emoji library — keeps the bundle lean; emojis are plain UTF-8
+  text so display/storage need nothing special.
+- Verified the storage/transport path round-trips a 4-byte emoji through
+  `message.body` (TEXT) on a UTF8 PostgreSQL 16 cluster (24 chars / 32 bytes
+  preserved); JSON:API passes UTF-8 through unchanged — no schema change.
+- Desktop messaging view (not yet built) will get emoji for free: Wt's
+  WText/WLineEdit are UTF-8 native.
+
 ### Feature 1 (Phase 2) — pinned messages + personal saved archive
 - Schema: `pin_scope` lookup (`self`/`channel`/`everyone`) + `message_pin`
   (user-selectable visibility per pin; `channel_id` carried for direct filtering;
