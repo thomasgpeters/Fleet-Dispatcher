@@ -29,13 +29,16 @@ import {
 } from "@ionic/react";
 import type { RefresherCustomEvent } from "@ionic/react";
 import {
+  arrowUndoOutline,
   attachOutline,
   bookmark,
   bookmarkOutline,
+  close,
   documentOutline,
   happyOutline,
   pin,
   pinOutline,
+  returnDownForwardOutline,
   send,
 } from "ionicons/icons";
 
@@ -56,6 +59,12 @@ const SCOPE_LABEL: Record<number, string> = {
   [PIN_SCOPE.channel]: "channel",
   [PIN_SCOPE.everyone]: "everyone",
 };
+
+/** A short single-line preview of a message body for reply quotes. */
+function snippet(body: string, max = 80): string {
+  const oneLine = body.replace(/\s+/g, " ").trim();
+  return oneLine.length > max ? `${oneLine.slice(0, max - 1)}…` : oneLine;
+}
 
 /** Strip the "data:<mime>;base64," prefix, returning just the base64 payload. */
 function fileToBase64(file: File): Promise<string> {
@@ -82,6 +91,7 @@ export function ChannelPage() {
   const [myPins, setMyPins] = useState<Record<string, MessagePin>>({});
   const [saved, setSaved] = useState<Record<string, SavedMessage>>({});
   const [scopeFor, setScopeFor] = useState<string | null>(null); // message awaiting a scope pick
+  const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [draft, setDraft] = useState("");
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -147,9 +157,15 @@ export function ChannelPage() {
   const send_ = async () => {
     if (!draft.trim()) return;
     try {
-      const msg = await api.createMessage(channelId, CURRENT_USER_ID, draft.trim());
+      const msg = await api.createMessage(
+        channelId,
+        CURRENT_USER_ID,
+        draft.trim(),
+        replyTo?.id,
+      );
       setMessages((prev) => [...prev, msg]);
       setDraft("");
+      setReplyTo(null);
     } catch (e) {
       fail(e);
     }
@@ -249,6 +265,10 @@ export function ChannelPage() {
     .map((p) => ({ pin: p, msg: messages.find((m) => m.id === p.message_id) }))
     .filter((x): x is { pin: MessagePin; msg: Message } => Boolean(x.msg));
 
+  // For rendering reply quotes: resolve a reply_to_id to its message.
+  const messagesById: Record<string, Message> = {};
+  for (const m of messages) messagesById[m.id] = m;
+
   return (
     <IonPage>
       <IonHeader>
@@ -302,6 +322,23 @@ export function ChannelPage() {
             <IonItemSliding key={m.id}>
               <IonItem lines="none">
                 <IonLabel className="ion-text-wrap">
+                  {m.reply_to_id && (
+                    <IonNote
+                      className="ion-text-wrap"
+                      style={{
+                        display: "block",
+                        borderLeft: "3px solid var(--ion-color-medium)",
+                        paddingLeft: 8,
+                        marginBottom: 4,
+                        fontStyle: "italic",
+                      }}
+                    >
+                      <IonIcon icon={returnDownForwardOutline} />{" "}
+                      {messagesById[m.reply_to_id]
+                        ? snippet(messagesById[m.reply_to_id].body)
+                        : "quoted message"}
+                    </IonNote>
+                  )}
                   <p>{m.body}</p>
                   {(docsByMessage[m.id] ?? []).map((doc) => (
                     <IonChip key={doc.id} onClick={() => void openDocument(doc)}>
@@ -324,6 +361,11 @@ export function ChannelPage() {
                   />
                 )}
               </IonItem>
+              <IonItemOptions slot="start">
+                <IonItemOption color="success" onClick={() => setReplyTo(m)}>
+                  <IonIcon slot="icon-only" icon={arrowUndoOutline} />
+                </IonItemOption>
+              </IonItemOptions>
               <IonItemOptions slot="end">
                 <IonItemOption
                   color="primary"
@@ -374,6 +416,26 @@ export function ChannelPage() {
       />
 
       <IonFooter>
+        {replyTo && (
+          <IonToolbar>
+            <IonItem lines="none">
+              <IonIcon slot="start" icon={returnDownForwardOutline} color="medium" />
+              <IonLabel className="ion-text-wrap">
+                <IonNote>Replying to</IonNote>
+                <p>{snippet(replyTo.body)}</p>
+              </IonLabel>
+              <IonButton
+                slot="end"
+                fill="clear"
+                color="medium"
+                onClick={() => setReplyTo(null)}
+                aria-label="Cancel reply"
+              >
+                <IonIcon slot="icon-only" icon={close} />
+              </IonButton>
+            </IonItem>
+          </IonToolbar>
+        )}
         <IonToolbar>
           <IonButtons slot="start">
             <IonButton onClick={() => fileInput.current?.click()}>

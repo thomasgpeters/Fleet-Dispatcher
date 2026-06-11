@@ -165,16 +165,19 @@ export const api = {
     return getOne<Message>("Message", messageId);
   },
 
-  /** Post a new text message to a channel. */
+  /** Post a new text message to a channel; pass `replyToId` to thread it under
+   * another message (renders a quoted snippet in the timeline). */
   createMessage(
     channelId: string,
     authorId: string,
     body: string,
+    replyToId?: string,
   ): Promise<Message> {
     return createResource<Message>("Message", {
       channel_id: channelId,
       author_id: authorId,
       body,
+      ...(replyToId ? { reply_to_id: replyToId } : {}),
     });
   },
 

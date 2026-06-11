@@ -5,6 +5,15 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-06-11
 
+### Feature 1 — reply-to-message (threaded quotes)
+- Mobile: swipe a message → **Reply**; the composer shows a "Replying to …"
+  banner with a one-line snippet of the original + cancel, and the sent message
+  renders a quoted snippet (left-bar) above its body. Uses the existing
+  `message.reply_to_id` self-reference (no schema change); `createMessage` gained
+  an optional `replyToId`. Quotes resolve client-side from the loaded timeline
+  (falls back to "quoted message" if the original isn't loaded).
+- Verified: mobile `npm run build` clean.
+
 ### Feature 1 — emoji support in the messaging composer
 - Mobile: a dependency-free `EmojiPicker` (curated set incl. trucking symbols:
   🚛 ⛽ 📍 🛣️ …) opened from a composer button (IonPopover); tapping appends to

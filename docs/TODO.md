@@ -55,6 +55,8 @@ Phase 2 — pins & personal archive (2026-06-11):
       Message Board header; remove items
 - [x] **Emoji** in the composer: dependency-free picker (trucking-relevant set);
       storage/transport already UTF-8 (verified round-trip), so no schema change
+- [x] **Reply to message**: swipe → Reply, composer quote banner, threaded quote
+      snippet in the timeline (uses existing `message.reply_to_id`; no schema change)
 - [ ] Emoji in the desktop messaging view (Wt WText/WLineEdit are UTF-8 native) →
       lands with that view
 - [ ] Server-side pin-visibility enforcement (currently filtered client-side) →
