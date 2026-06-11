@@ -115,6 +115,29 @@ Powers the HUD's map. See "Planned" in `domain-model.md`.
 - [ ] HUD map: overlay routes (`route.polyline`) and driver-focus/load-highlight
       commands
 
+## Feature 3 — Hey Dispatch driver voice assistant
+
+Hands-free assistant: driver says "Hey Dispatch", push-to-talk, on-device speech.
+A FastAPI service (`assistant/`) calls a **pluggable AI provider** with tool use.
+Design: [`AI_ASSISTANT.md`](AI_ASSISTANT.md).
+**Decided (2026-06-11):** push-to-talk first; STT/TTS on-device (Web Speech API);
+AI provider is admin-selectable (Anthropic default / OpenAI / Ollama).
+
+- [x] Service scaffold (`assistant/`): FastAPI `/assist` + `/health`, config,
+      Dockerfile, README
+- [x] Tool schemas + handlers: `send_message_to_dispatcher` (→ ALS JSON:API),
+      `get_eta`, `validate_route`, `alternate_routes` (→ HERE, with fallbacks),
+      `tech_help` (built-in KB)
+- [x] **Pluggable AI provider** (`app/providers/`): Anthropic (default; adaptive
+      thinking, effort, prompt caching) + OpenAI-compatible adapter (OpenAI /
+      Ollama via base URL); selected by `ASSISTANT_PROVIDER`, lazy SDK imports
+- [x] Mobile: "Dispatch" tab — push-to-talk (Web Speech STT → `/assist` → TTS),
+      pulls dispatcher channel + active-trip destination for context
+- [ ] Wake-word ("Hey Dispatch") hands-free activation (push-to-talk shipped)
+- [ ] Real tech-help knowledge base / retrieval (replace placeholder KB)
+- [ ] Per-driver truck profile (height/weight) feeding route tools — needs auth
+- [ ] Live end-to-end test against a configured provider + HERE key
+
 ## Cross-cutting
 
 - [x] **DB schema separation (DECIDED + done):** shared instance with

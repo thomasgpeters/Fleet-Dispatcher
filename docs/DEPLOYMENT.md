@@ -20,9 +20,10 @@ PostGIS strategy and rationale).
 5. ApiLogicServer create + run      (reflects `fleet`, never `gis`/`public`)
 6. Geospatial endpoint role         (search_path = gis, fleet, public)  [Feature 2]
 7. Portals: desktop (Wt) + mobile (VCP)
+8. Hey Dispatch assistant service   (pluggable AI provider)            [Feature 3]
 ```
 
-Steps 1–3 give a working ALS API. Step 4 adds spatial support safely. Steps 6–7
+Steps 1–3 give a working ALS API. Step 4 adds spatial support safely. Steps 6–8
 come online as those components are built.
 
 **Quick path:** `scripts/db-setup.sh` runs steps 1–4 (creates the role + DB,
@@ -49,6 +50,7 @@ ports:
 | **Fleet — Dispatcher desktop (Wt)**  | `8089` | console `/` + HUD `/hud`           |
 | **Fleet — ApiLogicServer (JSON:API)**| `5659` | `API_PORT`                         |
 | **Fleet — Geospatial endpoint**      | `5701` | `GIS_PORT`                         |
+| **Fleet — Hey Dispatch assistant**   | `5710` | `ASSISTANT_PORT`                   |
 | PostgreSQL (shared)                  | `5432` | one instance, schema-separated     |
 
 Change the desktop port with `HTTP_PORT=… ./run.sh` (dev) or the unit's
@@ -219,7 +221,38 @@ LIMIT 5;
   (`deploy/` has the unit file). Point it at the API with `FLEET_API_BASE_URL`.
 - **Mobile (TS/Ionic):** built/deployed by VCP from the
   `Fleet-Dispatcher-Mobile` repo (`make publish-mobile`); set
-  `VITE_API_BASE_URL`.
+  `VITE_API_BASE_URL` and `VITE_ASSISTANT_BASE_URL`.
+
+## 8. Hey Dispatch assistant  *(Feature 3)*
+
+The driver voice assistant — a small FastAPI service that calls a **pluggable AI
+provider** (Anthropic / OpenAI / Ollama) with tool use. The backend admin picks
+the provider and supplies its key via env; the mobile app does push-to-talk and
+on-device speech (Web Speech API). See [`../assistant/README.md`](../assistant/README.md).
+
+```bash
+cd assistant
+cp .env.example .env            # set ASSISTANT_PROVIDER + its credential
+pip install -r requirements.txt # only the SDK for your provider is loaded (lazy)
+set -a; . ./.env; set +a
+uvicorn app.main:app --host 0.0.0.0 --port "${ASSISTANT_PORT:-5710}"
+```
+
+| `ASSISTANT_PROVIDER` | Credential / endpoint                  | Default model     |
+| -------------------- | -------------------------------------- | ----------------- |
+| `anthropic` (default)| `ANTHROPIC_API_KEY`                    | `claude-opus-4-8` |
+| `openai`             | `OPENAI_API_KEY` (+ `OPENAI_BASE_URL`) | `gpt-4o`          |
+| `ollama`             | `OLLAMA_BASE_URL` (`…:11434/v1`)       | `llama3.1`        |
+
+It calls the ALS JSON:API (`FLEET_API_BASE_URL`) to post dispatcher messages and,
+optionally, HERE (`HERE_API_KEY`) for ETA/route tools — without HERE it falls
+back to straight-line estimates. Point the mobile app at it with
+`VITE_ASSISTANT_BASE_URL`.
+
+```bash
+curl -s localhost:5710/health
+# {"status":"ok","provider":"anthropic","model":"claude-opus-4-8","ai_configured":true,"here_configured":false}
+```
 
 ---
 

@@ -3,6 +3,31 @@
 Newest first. One entry per meaningful change set; pair with the checklist in
 [`TODO.md`](TODO.md).
 
+## 2026-06-11
+
+### Feature 3 — "Hey Dispatch" driver voice assistant (pluggable AI provider)
+- New `assistant/` FastAPI service (port `5710`): `POST /assist` takes an
+  on-device STT transcript + the driver's trusted context and returns a spoken
+  reply + the actions it took; `GET /health` reports provider/model/config.
+- Tool use (5 intents): `send_message_to_dispatcher` (→ ALS JSON:API `Message`),
+  `get_eta`, `validate_route`, `alternate_routes` (→ HERE truck routing, with
+  straight-line / "not configured" fallbacks), `tech_help` (built-in KB). Trusted
+  context (driver, position, destination, truck profile) comes from the request,
+  never the model.
+- **Pluggable AI provider** (`app/providers/`): admin picks via
+  `ASSISTANT_PROVIDER` — `anthropic` (default; adaptive thinking, effort,
+  prompt-cached system+tools prefix), `openai`, or `ollama` (OpenAI-compatible
+  adapter, local base URL). SDK imports are lazy, so only the chosen provider's
+  package is loaded. The brain (`app/assistant.py`) owns the prompt + tool
+  dispatch/action-recording and delegates the model loop to the provider.
+- Mobile: new **Dispatch** tab (`AssistantPage`) — push-to-talk via Web Speech
+  API (STT) → `/assist` → `speechSynthesis` (TTS); pulls the dispatcher channel +
+  active-trip destination for context. New `VITE_ASSISTANT_BASE_URL`, assistant
+  API client, and minimal `SpeechRecognition` typings.
+- Verified: service `py_compile`s and imports without the AI SDKs (lazy);
+  mobile `npm run build` clean. Docs: DEPLOYMENT (port table + step 8), TODO,
+  new `AI_ASSISTANT.md`.
+
 ## 2026-06-02
 
 ### Shared-instance schema move + geospatial endpoint + one-shot (verified)

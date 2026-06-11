@@ -48,6 +48,9 @@ Fleet-Dispatcher/                  ← this monorepo (source of truth)
 ├── geospatial/                    spatial endpoint — Python / FastAPI
 │   ├── app/main.py                /health, /truck-stops/nearest, /trucks/near …
 │   ├── requirements.txt · Dockerfile · README.md
+├── assistant/                     "Hey Dispatch" voice assistant — Python / FastAPI
+│   ├── app/                       FastAPI + tools + pluggable AI providers/
+│   ├── requirements.txt · Dockerfile · README.md
 ├── portals/
 │   ├── dispatcher-desktop/        Dispatcher portal — C++ / Wt      ◀ VCP builds
 │   │   ├── src/                   shell, board, load form, HUD, API client
@@ -75,6 +78,7 @@ Fleet-Dispatcher/                  ← this monorepo (source of truth)
 | **Dispatcher desktop** (C++) | `portals/dispatcher-desktop`            | `cmake -S . -B build && cmake --build build`      | Wt HTTP server binary | **VCP**     |
 | ALS middleware       | generated from `database/schema.sql`     | `ApiLogicServer create` / `run`                   | JSON:API on `:5659`   | separately (not VCP) |
 | Geospatial endpoint  | `geospatial/`                            | `pip install -r requirements.txt`                 | FastAPI on `:5701`    | own Dockerfile / systemd |
+| Voice assistant      | `assistant/`                             | `pip install -r requirements.txt`                 | FastAPI on `:5710`    | own Dockerfile / systemd |
 | PostgreSQL           | `database/*.sql`                         | `scripts/db-setup.sh`                             | `fleet` + `gis` schemas | DBA / psql |
 
 ### Building with VCP
