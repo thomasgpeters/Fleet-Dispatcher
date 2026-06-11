@@ -254,6 +254,12 @@ curl -s localhost:5710/health
 # {"status":"ok","provider":"anthropic","model":"claude-opus-4-8","ai_configured":true,"here_configured":false}
 ```
 
+For a long-running install, use the systemd unit in
+[`../assistant/deploy/`](../assistant/deploy/) (`fleet-dispatcher-assistant.service`
++ `assistant.env.example`) — runs uvicorn from a venv as the `fleet` user, with
+the provider key in a `chmod 600` env file. Install steps are in
+[`../assistant/README.md`](../assistant/README.md#production-systemd).
+
 ---
 
 ## Verification checklist

@@ -84,6 +84,36 @@ curl -s localhost:5710/assist -H 'Content-Type: application/json' -d '{
 }' | jq
 ```
 
+## Production (systemd)
+
+A unit + env template live in [`deploy/`](deploy/). It runs uvicorn from a venv
+under `/opt/fleet-dispatcher/assistant`, as the shared `fleet` system user, with
+the provider key in a `chmod 600` env file:
+
+```bash
+# install code + venv
+sudo mkdir -p /opt/fleet-dispatcher/assistant
+sudo cp -r app requirements.txt /opt/fleet-dispatcher/assistant/
+sudo python3 -m venv /opt/fleet-dispatcher/assistant/venv
+sudo /opt/fleet-dispatcher/assistant/venv/bin/pip install \
+     -r /opt/fleet-dispatcher/assistant/requirements.txt
+
+# config (holds the AI provider key — keep it 0600)
+sudo mkdir -p /etc/fleet-dispatcher
+sudo cp deploy/assistant.env.example /etc/fleet-dispatcher/assistant.env
+sudo chmod 600 /etc/fleet-dispatcher/assistant.env
+sudo $EDITOR /etc/fleet-dispatcher/assistant.env      # ASSISTANT_PROVIDER + its key
+
+# service
+sudo cp deploy/fleet-dispatcher-assistant.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now fleet-dispatcher-assistant
+journalctl -u fleet-dispatcher-assistant -f
+```
+
+Port comes from `ASSISTANT_PORT` in the env file (default `5710`); the unit ships
+a `5710` default so it starts even without the env file.
+
 ## Design notes
 
 - **Provider-agnostic loop:** the brain (`app/assistant.py`) builds the prompt,
