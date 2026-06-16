@@ -20,7 +20,7 @@ JSON:API exposed by ApiLogicServer.
 [**ApiLogicServer**](https://apilogicserver.github.io/Docs/) exposes the domain
 as a **JSON:API** via **SAFRS**, and enforces business rules declaratively with
 **LogicBank**. It maps the PostgreSQL schema to SQLAlchemy models and serves
-them on **port 5656** (configurable via `API_PORT`).
+them on **port 5659** (configurable via `API_PORT`).
 
 - **JSON:API / SAFRS** — resource endpoints, filtering, sorting, pagination,
   relationship navigation, and an OpenAPI/Swagger surface, generated from models.
@@ -48,7 +48,7 @@ All ports and credentials are configurable through environment variables; see
 | `DB_NAME`       | `fleet_dispatcher`       | Database name                    |
 | `DB_USER`       | `fleet`                  | Database user                    |
 | `DB_PASSWORD`   | `fleet`                  | Database password                |
-| `API_PORT`      | `5656`                   | ApiLogicServer JSON:API port     |
+| `API_PORT`      | `5659`                   | ApiLogicServer JSON:API port     |
 | `DATABASE_URL`  | derived from the above   | SQLAlchemy / psql connection URL |
 
 ## Why this shape

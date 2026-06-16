@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
 import {
   IonBadge,
+  IonButton,
+  IonButtons,
   IonContent,
   IonHeader,
+  IonIcon,
   IonItem,
   IonLabel,
   IonList,
@@ -15,10 +18,11 @@ import {
   IonToolbar,
 } from "@ionic/react";
 import type { RefresherCustomEvent } from "@ionic/react";
+import { bookmarkOutline } from "ionicons/icons";
 
 import { api } from "../api/client";
 import type { Channel } from "../api/types";
-import { CURRENT_USER_ID } from "../currentUser";
+import { useAuth } from "../auth/AuthContext";
 
 /**
  * Message board — channel list with unread badges. Tapping a channel pushes its
@@ -29,11 +33,13 @@ import { CURRENT_USER_ID } from "../currentUser";
  * (see docs/TODO.md → middleware rules).
  */
 export function ChannelsPage() {
+  const { user } = useAuth();
   const [channels, setChannels] = useState<Channel[]>([]);
   const [unread, setUnread] = useState<Record<string, number>>({});
   const [error, setError] = useState<string | null>(null);
 
   const load = async () => {
+    if (!user) return;
     try {
       const chs = await api.listChannels();
       setChannels(chs);
@@ -42,13 +48,13 @@ export function ChannelsPage() {
       await Promise.all(
         chs.map(async (ch) => {
           const [membership, messages] = await Promise.all([
-            api.myMembership(ch.id, CURRENT_USER_ID),
+            api.myMembership(ch.id, user.id),
             api.messagesForChannel(ch.id),
           ]);
           const lastRead = membership?.last_read_at ?? null;
           counts[ch.id] = messages.filter(
             (m) =>
-              m.author_id !== CURRENT_USER_ID &&
+              m.author_id !== user.id &&
               (!lastRead || m.posted_at > lastRead),
           ).length;
         }),
@@ -61,7 +67,8 @@ export function ChannelsPage() {
 
   useEffect(() => {
     void load();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   const refresh = async (e: RefresherCustomEvent) => {
     await load();
@@ -73,6 +80,11 @@ export function ChannelsPage() {
       <IonHeader>
         <IonToolbar>
           <IonTitle>Message Board</IonTitle>
+          <IonButtons slot="end">
+            <IonButton routerLink="/saved" aria-label="Saved messages">
+              <IonIcon slot="icon-only" icon={bookmarkOutline} />
+            </IonButton>
+          </IonButtons>
         </IonToolbar>
       </IonHeader>
       <IonContent>

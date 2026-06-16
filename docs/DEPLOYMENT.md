@@ -18,11 +18,12 @@ PostGIS strategy and rationale).
 3. Apply database/seed_data.sql     (reference + demo data)
 4. Apply database/gis_bootstrap.sql (PostGIS into shared `gis` — isolated from ALS)
 5. ApiLogicServer create + run      (reflects `fleet`, never `gis`/`public`)
-6. Geospatial endpoint role         (search_path = gis, public)  [Feature 2]
+6. Geospatial endpoint role         (search_path = gis, fleet, public)  [Feature 2]
 7. Portals: desktop (Wt) + mobile (VCP)
+8. Hey Dispatch assistant service   (pluggable AI provider)            [Feature 3]
 ```
 
-Steps 1–3 give a working ALS API. Step 4 adds spatial support safely. Steps 6–7
+Steps 1–3 give a working ALS API. Step 4 adds spatial support safely. Steps 6–8
 come online as those components are built.
 
 **Quick path:** `scripts/db-setup.sh` runs steps 1–4 (creates the role + DB,
@@ -36,6 +37,24 @@ FLEET_ADMIN_PSQL='sudo -u postgres psql' scripts/db-setup.sh
 ```
 
 ---
+
+## Ports on the shared host
+
+This host also runs sibling apps, so Fleet Dispatcher's listeners avoid their
+ports:
+
+| Service                              | Port   | Notes                              |
+| ------------------------------------ | ------ | ---------------------------------- |
+| Student-Onboarding (sibling)         | `8080` | in use — do not reuse              |
+| Smitty-Services (sibling)            | `8085` | in use — do not reuse              |
+| **Fleet — Dispatcher desktop (Wt)**  | `8089` | console `/` + HUD `/hud`           |
+| **Fleet — ApiLogicServer (JSON:API)**| `5659` | `API_PORT`                         |
+| **Fleet — Geospatial endpoint**      | `5701` | `GIS_PORT`                         |
+| **Fleet — Hey Dispatch assistant**   | `5710` | `ASSISTANT_PORT`                   |
+| PostgreSQL (shared)                  | `5432` | one instance, schema-separated     |
+
+Change the desktop port with `HTTP_PORT=… ./run.sh` (dev) or the unit's
+`--http-port` (prod).
 
 ## 0. Prerequisites
 
@@ -158,7 +177,7 @@ ApiLogicServer create --project_name=fleet-dispatcher-api \
     --db_url="$DATABASE_URL" --from_git ""   # see note on --schema below
 
 cd fleet-dispatcher-api
-ApiLogicServer run --port "${API_PORT:-5656}"
+ApiLogicServer run --port "${API_PORT:-5659}"
 ```
 
 > ALS reflects the schema(s) on the connection's `search_path`; because the
@@ -166,7 +185,7 @@ ApiLogicServer run --port "${API_PORT:-5656}"
 > your ALS version exposes an explicit schema flag, point it at `fleet`. Resource
 > names come from table names, so the portals are unaffected.
 
-- JSON:API + Swagger serve on `:5656`. See [`MIDDLEWARE_SETUP.md`](MIDDLEWARE_SETUP.md).
+- JSON:API + Swagger serve on `:5659`. See [`MIDDLEWARE_SETUP.md`](MIDDLEWARE_SETUP.md).
 - If anything spatial ever *does* get reflected (e.g. you installed PostGIS into
   `public` by mistake), the fix is to reinstall it into `gis` — or, as a
   fallback, remove the unwanted classes from the generated `database/models.py`
@@ -202,7 +221,44 @@ LIMIT 5;
   (`deploy/` has the unit file). Point it at the API with `FLEET_API_BASE_URL`.
 - **Mobile (TS/Ionic):** built/deployed by VCP from the
   `Fleet-Dispatcher-Mobile` repo (`make publish-mobile`); set
-  `VITE_API_BASE_URL`.
+  `VITE_API_BASE_URL` and `VITE_ASSISTANT_BASE_URL`.
+
+## 8. Hey Dispatch assistant  *(Feature 3)*
+
+The driver voice assistant — a small FastAPI service that calls a **pluggable AI
+provider** (Anthropic / OpenAI / Ollama) with tool use. The backend admin picks
+the provider and supplies its key via env; the mobile app does push-to-talk and
+on-device speech (Web Speech API). See [`../assistant/README.md`](../assistant/README.md).
+
+```bash
+cd assistant
+cp .env.example .env            # set ASSISTANT_PROVIDER + its credential
+pip install -r requirements.txt # only the SDK for your provider is loaded (lazy)
+set -a; . ./.env; set +a
+uvicorn app.main:app --host 0.0.0.0 --port "${ASSISTANT_PORT:-5710}"
+```
+
+| `ASSISTANT_PROVIDER` | Credential / endpoint                  | Default model     |
+| -------------------- | -------------------------------------- | ----------------- |
+| `anthropic` (default)| `ANTHROPIC_API_KEY`                    | `claude-opus-4-8` |
+| `openai`             | `OPENAI_API_KEY` (+ `OPENAI_BASE_URL`) | `gpt-4o`          |
+| `ollama`             | `OLLAMA_BASE_URL` (`…:11434/v1`)       | `llama3.1`        |
+
+It calls the ALS JSON:API (`FLEET_API_BASE_URL`) to post dispatcher messages and,
+optionally, HERE (`HERE_API_KEY`) for ETA/route tools — without HERE it falls
+back to straight-line estimates. Point the mobile app at it with
+`VITE_ASSISTANT_BASE_URL`.
+
+```bash
+curl -s localhost:5710/health
+# {"status":"ok","provider":"anthropic","model":"claude-opus-4-8","ai_configured":true,"here_configured":false}
+```
+
+For a long-running install, use the systemd unit in
+[`../assistant/deploy/`](../assistant/deploy/) (`fleet-dispatcher-assistant.service`
++ `assistant.env.example`) — runs uvicorn from a venv as the `fleet` user, with
+the provider key in a `chmod 600` env file. Install steps are in
+[`../assistant/README.md`](../assistant/README.md#production-systemd).
 
 ---
 
@@ -210,7 +266,7 @@ LIMIT 5;
 
 ```bash
 # API up?
-curl -s "http://localhost:${API_PORT:-5656}/api/Driver" | head -c 200
+curl -s "http://localhost:${API_PORT:-5659}/api/Driver" | head -c 200
 
 # app tables live in fleet (not public)?  (fleet > 0, public app tables = 0)
 psql "$DATABASE_URL" -tAc "SELECT count(*) FROM information_schema.tables WHERE table_schema='fleet';"

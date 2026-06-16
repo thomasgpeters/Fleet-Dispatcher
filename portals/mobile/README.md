@@ -10,7 +10,7 @@ the **`Fleet-Dispatcher-Mobile`** repository, from which VCP builds and deploys
 it. Nothing here depends on files outside this folder.
 
 It talks to the shared middleware over **JSON:API** (ApiLogicServer / SAFRS) at
-`VITE_API_BASE_URL` (default `http://localhost:5656/api`) and never touches
+`VITE_API_BASE_URL` (default `http://localhost:5659/api`) and never touches
 PostgreSQL directly.
 
 ## What this portal does

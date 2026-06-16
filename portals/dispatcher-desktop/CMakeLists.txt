@@ -15,6 +15,8 @@ add_executable(fleet_dispatcher_desktop
     src/HudView.cpp
     src/HudControlBus.cpp
     src/ApiClient.cpp
+    src/LoginView.cpp
+    src/ProfileView.cpp
 )
 
 target_link_libraries(fleet_dispatcher_desktop

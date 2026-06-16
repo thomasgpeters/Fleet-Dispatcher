@@ -45,10 +45,29 @@ Done:
 - [x] Unread counts via `channel_member.last_read_at` + mark-as-read (Badge)
 - [x] Pull-to-refresh (`IonRefresher`) on channel list + detail
 
+Phase 2 — pins & personal archive (2026-06-11):
+- [x] Schema: `pin_scope` lookup + `message_pin` (user-selectable scope:
+      self/channel/everyone) + `saved_message` (per-user archive, optional note).
+      Verified on PostgreSQL 16 (40 tables in `fleet`).
+- [x] Mobile: pin a message with a scope picker; visible-pins strip atop the
+      channel; swipe to pin/unpin or save/unsave; inline pin/saved markers
+- [x] Mobile: personal **Saved** archive view (cross-channel), reached from the
+      Message Board header; remove items
+- [x] **Emoji** in the composer: dependency-free picker (trucking-relevant set);
+      storage/transport already UTF-8 (verified round-trip), so no schema change
+- [x] **Reply to message**: swipe → Reply, composer quote banner, threaded quote
+      snippet in the timeline (uses existing `message.reply_to_id`; no schema change)
+- [ ] Emoji in the desktop messaging view (Wt WText/WLineEdit are UTF-8 native) →
+      lands with that view
+- [ ] Server-side pin-visibility enforcement (currently filtered client-side) →
+      auth / LogicBank
+- [ ] Desktop (dispatcher) pins & saved views → desktop portal work
+
 Carried over (blocked / owned elsewhere):
 - [ ] Direct (1:1) channel creation + membership management — needs a user
       directory (→ auth)
-- [ ] Current-user identity (replace `src/currentUser.ts` placeholder) → auth
+- [x] Current-user identity — replaced `src/currentUser.ts` placeholder with the
+      authenticated user via `useAuth()` (Feature: Authentication)
 - [ ] Clickable message **toasts** (`IonToast`, 2–3s, deep-link) → realtime
 - [ ] Realtime delivery (websockets/push) — currently polling/pull-to-refresh
 - [ ] Desktop (dispatcher) messaging view → desktop portal work
@@ -67,7 +86,8 @@ Pivot here after Phase 1. Talks to the same JSON:API; Bootstrap theme + Wt
       (not compiled in-sandbox — no Wt; see note below)
 - [x] **Board** with a **Today | Week** toggle (today's runs vs Mon→Mon grid),
       fed by an async `ApiClient` (Wt::Http::Client + Wt::Json)
-- [ ] Add app-bar week selector + user/role/health (with auth)
+- [x] App-bar **user + role + Sign out** (auth); console gated by a Wt login
+- [ ] Add app-bar week selector + health indicator
 - [x] Load intake form (new load) + driver/equipment assignment (POST /Load)
 - [x] **HUD** surface (`/hud`) + `HudControlBus` (Wt server push): the console's
       Today/Week toggle publishes `SetMode`; HUD sessions auto-switch
@@ -115,14 +135,43 @@ Powers the HUD's map. See "Planned" in `domain-model.md`.
 - [ ] HUD map: overlay routes (`route.polyline`) and driver-focus/load-highlight
       commands
 
+## Feature 3 — Hey Dispatch driver voice assistant
+
+Hands-free assistant: driver says "Hey Dispatch", push-to-talk, on-device speech.
+A FastAPI service (`assistant/`) calls a **pluggable AI provider** with tool use.
+Design: [`AI_ASSISTANT.md`](AI_ASSISTANT.md).
+**Decided (2026-06-11):** push-to-talk first; STT/TTS on-device (Web Speech API);
+AI provider is admin-selectable (Anthropic default / OpenAI / Ollama).
+
+- [x] Service scaffold (`assistant/`): FastAPI `/assist` + `/health`, config,
+      Dockerfile, README
+- [x] Tool schemas + handlers: `send_message_to_dispatcher` (→ ALS JSON:API),
+      `get_eta`, `validate_route`, `alternate_routes` (→ HERE, with fallbacks),
+      `tech_help` (built-in KB)
+- [x] **Pluggable AI provider** (`app/providers/`): Anthropic (default; adaptive
+      thinking, effort, prompt caching) + OpenAI-compatible adapter (OpenAI /
+      Ollama via base URL); selected by `ASSISTANT_PROVIDER`, lazy SDK imports
+- [x] Mobile: "Dispatch" tab — push-to-talk (Web Speech STT → `/assist` → TTS),
+      pulls dispatcher channel + active-trip destination for context
+- [ ] Wake-word ("Hey Dispatch") hands-free activation (push-to-talk shipped)
+- [ ] Real tech-help knowledge base / retrieval (replace placeholder KB)
+- [ ] Per-driver truck profile (height/weight) feeding route tools — needs auth
+- [ ] Live end-to-end test against a configured provider + HERE key
+
 ## Cross-cutting
 
 - [x] **DB schema separation (DECIDED + done):** shared instance with
       Smitty/Student-Onboarding → all Fleet app tables in the **`fleet`** schema
       (owned by `fleet`, ALS reflects it); PostGIS in shared **`gis`**
       (Fleet's `fleet_*` views owned by `fleet_gis`). See `MIDDLEWARE_SETUP.md`
-      + `DEPLOYMENT.md`. Verified: 37 tables in `fleet`, 0 in `public`.
-- [ ] AuthN/AuthZ (roles: dispatcher, driver, updater) — gates current-user,
-      messaging, and HUD
+      + `DEPLOYMENT.md`. Verified: 40 tables in `fleet`, 0 in `public`.
+- [~] **AuthN/AuthZ** (roles: dispatcher, driver, updater). DONE: ALS built-in
+      JWT auth against `app_user` (password_hash + profile fields + avatar FK);
+      mobile login/profile/logout, bearer header on all calls, 401 auto-logout,
+      `currentUser.ts` placeholder replaced by `useAuth()`; **desktop (Wt) console
+      login + profile** (LoginView/ProfileView, token on all ApiClient calls,
+      sign out). See [`AUTHENTICATION.md`](AUTHENTICATION.md). REMAINING:
+      role-based grants (LogicBank/ALS security), desktop **avatar upload** + HUD
+      service token, native secure token storage
 - [ ] LogicBank rules in generated middleware (weekly cap, settlement math)
 - [ ] Seed data growth for demos

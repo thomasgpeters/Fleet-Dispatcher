@@ -66,10 +66,19 @@ SELECT setval(pg_get_serial_sequence('commodity_category', 'id'),  (SELECT max(i
 -- ===========================================================================
 
 -- Users (one per role) ------------------------------------------------------
-INSERT INTO app_user (id, username, full_name, email, app_role_id) VALUES
-  ('11111111-1111-1111-1111-111111111111', 'dispatch1', 'Dana Dispatcher', 'dana@example.com', 1),
-  ('22222222-2222-2222-2222-222222222222', 'driver1',   'Pat Diesel',      'pat@example.com',  2),
-  ('33333333-3333-3333-3333-333333333333', 'updater1',  'Uma Updater',     'uma@example.com',  3);
+-- DEV CREDENTIALS: all three demo users have password 'fleet123'. The hashes are
+-- werkzeug pbkdf2:sha256 (ALS's default check_password_hash verifies them).
+-- Regenerate / change for any real deployment — see docs/AUTHENTICATION.md.
+INSERT INTO app_user (id, username, full_name, email, app_role_id, password_hash, phone, title) VALUES
+  ('11111111-1111-1111-1111-111111111111', 'dispatch1', 'Dana Dispatcher', 'dana@example.com', 1,
+   'pbkdf2:sha256:600000$711621b8ed38739b$1bcab2036eda81044bb0e6841a19f09683bedcb97f0c27dacb6e52db981e9d34',
+   '555-0100', 'Lead Dispatcher'),
+  ('22222222-2222-2222-2222-222222222222', 'driver1',   'Pat Diesel',      'pat@example.com',  2,
+   'pbkdf2:sha256:600000$3d4791e76e547105$b5a2b998f49605430828ad1adc0f76458546d255111d8378fe2ca13bf7f4d33b',
+   '555-0101', 'Owner-Operator'),
+  ('33333333-3333-3333-3333-333333333333', 'updater1',  'Uma Updater',     'uma@example.com',  3,
+   'pbkdf2:sha256:600000$f99fb81bfd5651ff$05475d4d2da19ccbfc98bf1164fce3afb830fe1ed07c7495323da703c27000f8',
+   '555-0102', 'Dispatch Updater');
 
 -- Drivers (company + owner-operator) ----------------------------------------
 INSERT INTO driver (id, name, driver_type_id, phone, home_base, user_id) VALUES
@@ -150,9 +159,15 @@ INSERT INTO document_type (id, code, name) VALUES
   (6, 'license',          'License / permit'),
   (7, 'other',            'Other');
 
+INSERT INTO pin_scope (id, code, name) VALUES
+  (1, 'self',     'Only me'),
+  (2, 'channel',  'Everyone in the channel'),
+  (3, 'everyone', 'Everyone');
+
 SELECT setval(pg_get_serial_sequence('channel_type', 'id'),        (SELECT max(id) FROM channel_type));
 SELECT setval(pg_get_serial_sequence('channel_member_role', 'id'), (SELECT max(id) FROM channel_member_role));
 SELECT setval(pg_get_serial_sequence('document_type', 'id'),       (SELECT max(id) FROM document_type));
+SELECT setval(pg_get_serial_sequence('pin_scope', 'id'),           (SELECT max(id) FROM pin_scope));
 
 -- A group channel for the week's dispatch chatter.
 INSERT INTO channel (id, name, channel_type_id, created_by) VALUES
@@ -180,6 +195,16 @@ INSERT INTO message_document (id, message_id, document_id) VALUES
 
 INSERT INTO load_document (id, load_id, document_id) VALUES
   ('222d0c00-0000-0000-0000-000000000001', '88888888-0000-0000-0000-000000000001', 'd0c00000-0000-0000-0000-000000000001');
+
+-- Dana pins the dispatch message for the whole channel (scope = channel).
+INSERT INTO message_pin (id, message_id, channel_id, pinned_by, pin_scope_id) VALUES
+  ('9171ed00-0000-0000-0000-000000000001', '5e55a6e0-0000-0000-0000-000000000001',
+   'c4a11e10-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111', 2);
+
+-- Pat saves the BOL message to their personal archive with a note.
+INSERT INTO saved_message (id, user_id, message_id, note) VALUES
+  ('5a7ed000-0000-0000-0000-000000000001', '22222222-2222-2222-2222-222222222222',
+   '5e55a6e0-0000-0000-0000-000000000001', 'BOL for the Denver run');
 
 -- ===========================================================================
 -- Telemetry — truck locations

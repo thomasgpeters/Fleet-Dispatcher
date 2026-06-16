@@ -18,7 +18,7 @@ schema, the API, and both portals to keep design and discussion aligned:
                └────────────────┬───────────────────┘
                                 │
                   ┌─────────────▼─────────────┐
-                  │   ApiLogicServer          │   middleware  (port 5656)
+                  │   ApiLogicServer          │   middleware  (port 5659)
                   │   JSON:API / SAFRS        │
                   │   LogicBank business rules│
                   └─────────────┬─────────────┘
@@ -32,17 +32,80 @@ schema, the API, and both portals to keep design and discussion aligned:
 > ApiLogicServer (JSON:API / SAFRS) over PostgreSQL, with multiple portals
 > sharing one middleware and one backend.
 
-## Repository layout
+## Project structure
 
-| Path                          | Tier       | Description                                                            |
-| ----------------------------- | ---------- | ---------------------------------------------------------------------- |
-| `docs/MIDDLEWARE_SETUP.md`    | middleware | How to generate/run the ApiLogicServer middleware (managed outside this repo) on `:5656`. |
-| `database/`                   | backend    | PostgreSQL `schema.sql` (in the `fleet` schema), `seed_data.sql`, `gis_bootstrap.sql`. |
-| `geospatial/`                 | middleware | FastAPI endpoint for PostGIS spatial queries (off the ALS path).      |
-| `scripts/db-setup.sh`         | —          | One-shot DB standup (role+db, schema, seed, PostGIS).                 |
-| `portals/dispatcher-desktop/` | client     | Desktop dispatcher portal — C++ / Wt.                                  |
-| `portals/mobile/`             | client     | Driver & Updater mobile app — React / Ionic / Capacitor.              |
-| `docs/`                       | —          | Architecture, domain model, and DDD pattern notes.                     |
+This repo is a **monorepo and the source of truth** for the whole system, but it
+holds **several independently-built components** (different languages, different
+build tools, different deploy targets). It is *not* a single buildable app — each
+subtree below builds and deploys on its own.
+
+```
+Fleet-Dispatcher/                  ← this monorepo (source of truth)
+├── database/                      backend — PostgreSQL (SQL, applied by a DBA)
+│   ├── schema.sql                 app tables in the `fleet` schema
+│   ├── seed_data.sql              reference + demo data
+│   └── gis_bootstrap.sql          PostGIS into the shared `gis` schema
+├── geospatial/                    spatial endpoint — Python / FastAPI
+│   ├── app/main.py                /health, /truck-stops/nearest, /trucks/near …
+│   ├── requirements.txt · Dockerfile · README.md
+├── assistant/                     "Hey Dispatch" voice assistant — Python / FastAPI
+│   ├── app/                       FastAPI + tools + pluggable AI providers/
+│   ├── requirements.txt · Dockerfile · README.md
+├── portals/
+│   ├── dispatcher-desktop/        Dispatcher portal — C++ / Wt      ◀ VCP builds
+│   │   ├── src/                   shell, board, load form, HUD, API client
+│   │   ├── CMakeLists.txt         build (also deploys the Wt resources/ tree)
+│   │   └── deploy/                systemd unit + env
+│   └── mobile/                    Driver/Updater app — TS / Ionic   ◀ VCP builds
+│       ├── src/                   pages + JSON:API client
+│       └── package.json · vite.config.ts · capacitor.config.ts
+├── scripts/                       db-setup.sh · publish-mobile.sh
+├── docs/                          architecture, domain model, DEPLOYMENT, TODO, log
+├── Makefile                       publish-mobile / pull-mobile / mobile-build
+├── docker-compose.yml             local PostgreSQL
+└── .env.example
+```
+
+> The **middleware (ApiLogicServer)** is **not** in this repo — it is *generated*
+> from `database/schema.sql` and run separately (see
+> [`docs/MIDDLEWARE_SETUP.md`](docs/MIDDLEWARE_SETUP.md)).
+
+### Components — how each one is built & deployed
+
+| Component            | Source                          | Build                                            | Produces              | Deployed by |
+| -------------------- | ------------------------------- | ------------------------------------------------ | --------------------- | ----------- |
+| **Mobile** (TS)      | `portals/mobile` → published to the `Fleet-Dispatcher-Mobile` repo | `npm ci && npm run build` | static SPA (`dist/`)  | **VCP**     |
+| **Dispatcher desktop** (C++) | `portals/dispatcher-desktop`            | `cmake -S . -B build && cmake --build build`      | Wt HTTP server binary | **VCP**     |
+| ALS middleware       | generated from `database/schema.sql`     | `ApiLogicServer create` / `run`                   | JSON:API on `:5659`   | separately (not VCP) |
+| Geospatial endpoint  | `geospatial/`                            | `pip install -r requirements.txt`                 | FastAPI on `:5701`    | own Dockerfile / systemd |
+| Voice assistant      | `assistant/`                             | `pip install -r requirements.txt`                 | FastAPI on `:5710`    | own Dockerfile / systemd |
+| PostgreSQL           | `database/*.sql`                         | `scripts/db-setup.sh`                             | `fleet` + `gis` schemas | DBA / psql |
+
+### Building with VCP
+
+VCP builds container images **from source** for the **C++ and TS apps**. Two
+components here are VCP-built:
+
+- **Mobile (TS/Ionic).** VCP builds the standalone **`Fleet-Dispatcher-Mobile`**
+  repo (a TS app at its repo root). We develop it here under `portals/mobile`
+  and publish it to that repo with `make publish-mobile` (git subtree — see
+  [Mobile module](#mobile-module-fleet-dispatcher-mobile) below). VCP runs the
+  npm build and serves the static `dist/`.
+- **Dispatcher desktop (C++/Wt).** VCP builds `portals/dispatcher-desktop` from
+  source against your **pre-staged Wt template image**; `CMakeLists.txt` compiles
+  the binary and deploys the Wt `resources/` tree beside it. Run it as a Wt HTTP
+  server (`--docroot … --http-port …`); see the portal README + `deploy/` unit.
+
+The remaining components are **not** VCP-built (they aren't C++/TS):
+- **ALS** is generated and run on its own (`docs/MIDDLEWARE_SETUP.md`).
+- **Geospatial endpoint** is Python/FastAPI — deploy via its `Dockerfile` or a
+  systemd unit (`geospatial/README.md`).
+- **PostgreSQL** is provisioned with SQL (`scripts/db-setup.sh`, `docs/DEPLOYMENT.md`).
+
+> **Note on the desktop + VCP:** the mobile app gets its own repo because VCP
+> builds from a repo root. If VCP also wants the **desktop** as its own repo
+> root, we can mirror the mobile approach with a `publish-desktop` git-subtree of
+> `portals/dispatcher-desktop` — say the word and I'll add it.
 
 ## Key documents
 

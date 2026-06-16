@@ -1,0 +1,58 @@
+# Fleet Dispatcher — "Hey Dispatch" assistant (FastAPI/uvicorn) systemd unit.
+#
+# Serves the driver voice-assistant API:
+#   http://<host>:5710/assist   (POST)   ·   http://<host>:5710/health
+#
+# Install procedure (see assistant/README.md):
+#   sudo useradd --system --no-create-home --shell /usr/sbin/nologin fleet   # once (shared)
+#   sudo mkdir -p /opt/fleet-dispatcher/assistant
+#   sudo cp -r assistant/app /opt/fleet-dispatcher/assistant/
+#   sudo cp assistant/requirements.txt /opt/fleet-dispatcher/assistant/
+#   sudo python3 -m venv /opt/fleet-dispatcher/assistant/venv
+#   sudo /opt/fleet-dispatcher/assistant/venv/bin/pip install -r \
+#        /opt/fleet-dispatcher/assistant/requirements.txt
+#   sudo mkdir -p /etc/fleet-dispatcher
+#   sudo cp assistant/deploy/assistant.env.example /etc/fleet-dispatcher/assistant.env
+#   sudo chmod 600 /etc/fleet-dispatcher/assistant.env     # holds the AI provider key
+#   sudo $EDITOR /etc/fleet-dispatcher/assistant.env       # set ASSISTANT_PROVIDER + its key
+#   sudo cp assistant/deploy/fleet-dispatcher-assistant.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now fleet-dispatcher-assistant
+#
+# Change the port: set ASSISTANT_PORT in assistant.env (ExecStart reads it), or
+#   sudo systemctl edit fleet-dispatcher-assistant   (override ExecStart).
+#
+# Logs:   journalctl -u fleet-dispatcher-assistant -f
+
+[Unit]
+Description=Fleet Dispatcher — Hey Dispatch assistant (FastAPI)
+# Talks to the ApiLogicServer JSON:API; start after it when co-located.
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=fleet
+Group=fleet
+
+WorkingDirectory=/opt/fleet-dispatcher/assistant
+# Default port; assistant.env may override it (EnvironmentFile wins over Environment).
+Environment=ASSISTANT_PORT=5710
+# assistant.env supplies ASSISTANT_PROVIDER + the provider key, FLEET_API_BASE_URL,
+# HERE_API_KEY (optional), and ASSISTANT_PORT. Leading '-' = ok if absent.
+EnvironmentFile=-/etc/fleet-dispatcher/assistant.env
+ExecStart=/opt/fleet-dispatcher/assistant/venv/bin/uvicorn app.main:app \
+    --host 0.0.0.0 \
+    --port ${ASSISTANT_PORT}
+
+Restart=on-failure
+RestartSec=2
+
+# Hardening (optional; relax if it interferes with your setup).
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

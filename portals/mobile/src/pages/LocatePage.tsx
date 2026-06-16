@@ -13,11 +13,8 @@ import {
 import { locateOutline } from "ionicons/icons";
 
 import { api } from "../api/client";
-import {
-  CURRENT_DRIVER_ID,
-  CURRENT_EQUIPMENT_ID,
-  PHONE_PUSH_SOURCE_ID,
-} from "../currentUser";
+import { PHONE_PUSH_SOURCE_ID } from "../currentUser";
+import { useAuth } from "../auth/AuthContext";
 
 const MS_TO_MPH = 2.23694;
 
@@ -26,6 +23,7 @@ const MS_TO_MPH = 2.23694;
  * (phone_push) for the current rig. Feeds the dispatcher HUD's truck locations.
  */
 export function LocatePage() {
+  const { driverId, equipmentId } = useAuth();
   const [status, setStatus] = useState<string>("");
   const [last, setLast] = useState<{ lat: number; lng: number } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -43,8 +41,8 @@ export function LocatePage() {
         api
           .postPosition({
             location_source_id: PHONE_PUSH_SOURCE_ID,
-            driver_id: CURRENT_DRIVER_ID,
-            equipment_id: CURRENT_EQUIPMENT_ID,
+            driver_id: driverId ?? undefined,
+            equipment_id: equipmentId ?? undefined,
             lat: latitude,
             lng: longitude,
             accuracy_m: accuracy ?? undefined,

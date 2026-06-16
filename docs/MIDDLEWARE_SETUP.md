@@ -1,7 +1,7 @@
 # Middleware setup — ApiLogicServer
 
 The application + API tier. [ApiLogicServer](https://apilogicserver.github.io/Docs/)
-exposes the PostgreSQL domain as a **JSON:API** (via **SAFRS**) on **port 5656**
+exposes the PostgreSQL domain as a **JSON:API** (via **SAFRS**) on **port 5659**
 and enforces business rules declaratively with **LogicBank**.
 
 > The middleware is **generated and managed outside this repository** — no
@@ -27,9 +27,9 @@ ApiLogicServer create \
     --project_name=fleet-dispatcher-api \
     --db_url="$DATABASE_URL"
 
-# 3. Run it (serves JSON:API + Swagger on :5656)
+# 3. Run it (serves JSON:API + Swagger on :5659)
 cd fleet-dispatcher-api
-ApiLogicServer run --port "${API_PORT:-5656}"
+ApiLogicServer run --port "${API_PORT:-5659}"
 ```
 
 Generated project layout (after step 2):
@@ -59,7 +59,7 @@ model for reference.
 ## Configuration
 
 Port and database come from the environment (see [`../.env.example`](../.env.example)):
-`API_PORT` (default 5656), `DATABASE_URL`. The `db` service in
+`API_PORT` (default 5659), `DATABASE_URL`. The `db` service in
 [`../docker-compose.yml`](../docker-compose.yml) brings up PostgreSQL with the
 schema + seed applied for local development.
 

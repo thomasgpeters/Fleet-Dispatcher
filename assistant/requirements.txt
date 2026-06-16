@@ -1,0 +1,9 @@
+fastapi>=0.110
+uvicorn[standard]>=0.29
+httpx>=0.27
+pydantic>=2.6
+
+# AI provider SDKs — install the one(s) for the provider(s) you run. Both are
+# listed for convenience; imports are lazy, so an unused SDK is never loaded.
+anthropic>=0.40    # ASSISTANT_PROVIDER=anthropic (default)
+openai>=1.30       # ASSISTANT_PROVIDER=openai or ollama (OpenAI-compatible)

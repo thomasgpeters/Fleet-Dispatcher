@@ -3,6 +3,102 @@
 Newest first. One entry per meaningful change set; pair with the checklist in
 [`TODO.md`](TODO.md).
 
+## 2026-06-11
+
+### Desktop (Wt) console login + profile (same ALS JWT credentials)
+- ApiClient: holds the bearer token (`setAuthToken`/`clearAuthToken`/`hasAuthToken`)
+  and adds `Authorization: Bearer` to every GET/POST/PATCH; new `login()`
+  (POST /api/auth/login via a plain-JSON helper), `fetchUserByUsername()`
+  (GET /AppUser?filter[username]=), and `updateUser()` (PATCH /AppUser/{id} via a
+  new patch helper). Added `parseUser`, `urlEncode`, `AppUser` model.
+- New `LoginView` gates the console (DispatcherApp shows login → Shell on success;
+  Shell's Sign out returns to login). New `ProfileView` (view/edit profile,
+  PATCH). Shell now takes `(ApiClient*, AppUser, onLogout)`, shows name·role +
+  Sign out in the app bar, and a Profile nav item. CMake gains the two sources.
+- Token lives **server-side** in the Wt session (not in the browser). HUD entry
+  point stays unauthenticated for now (wall display) — noted for a service token.
+- **Not compiled in the sandbox** (no Wt). Version-sensitive spots flagged:
+  `Http::Method::Patch` (older Wt may lack PATCH → PUT fallback) alongside the
+  existing `done()` error_code / `Json::Type::Null` notes. Avatar upload deferred.
+
+### Authentication + user profile (ALS built-in JWT, mobile-first)
+- Schema: `app_user` gains `password_hash` (werkzeug pbkdf2:sha256) + profile
+  fields (`phone`, `title`, `timezone`, `avatar_document_id` → CMS `document`,
+  `last_login_at`). Avatar FK added after `document` (ordering). Seeded the three
+  demo users with password `fleet123` (hashes verified) + titles/phones.
+  **Verified** schema+seed on PostgreSQL 16; avatar FK present.
+- Mobile: ALS JWT auth. New `auth/AuthContext` (`useAuth()` → user, driverId,
+  equipmentId, token, login/logout), `api/auth.ts` login (POST /api/auth/login),
+  bearer header on every client call + 401/403 auto-logout, `LoginPage` gate
+  (shown until authed), `ProfilePage` (view/edit + avatar upload via CMS + sign
+  out), profile button in the Loads header. Replaced the `currentUser.ts`
+  identity placeholder with `useAuth()` across Channels/Channel/Saved/Locate/
+  Trips/Assistant (only the `PHONE_PUSH_SOURCE_ID` lookup constant remains).
+- Docs: new `AUTHENTICATION.md` (ALS add-auth + auth_provider sketch verifying
+  the werkzeug hash, login endpoint, JWT secret, roles, token storage); TODO,
+  domain-model. Token in localStorage for now (Capacitor Secure Storage = TODO).
+- **Needs ALS regeneration** so `AppUser` exposes the new columns + the
+  AppUser↔Document avatar relationship. Mobile `npm run build` clean.
+
+### Feature 1 — reply-to-message (threaded quotes)
+- Mobile: swipe a message → **Reply**; the composer shows a "Replying to …"
+  banner with a one-line snippet of the original + cancel, and the sent message
+  renders a quoted snippet (left-bar) above its body. Uses the existing
+  `message.reply_to_id` self-reference (no schema change); `createMessage` gained
+  an optional `replyToId`. Quotes resolve client-side from the loaded timeline
+  (falls back to "quoted message" if the original isn't loaded).
+- Verified: mobile `npm run build` clean.
+
+### Feature 1 — emoji support in the messaging composer
+- Mobile: a dependency-free `EmojiPicker` (curated set incl. trucking symbols:
+  🚛 ⛽ 📍 🛣️ …) opened from a composer button (IonPopover); tapping appends to
+  the draft. No emoji library — keeps the bundle lean; emojis are plain UTF-8
+  text so display/storage need nothing special.
+- Verified the storage/transport path round-trips a 4-byte emoji through
+  `message.body` (TEXT) on a UTF8 PostgreSQL 16 cluster (24 chars / 32 bytes
+  preserved); JSON:API passes UTF-8 through unchanged — no schema change.
+- Desktop messaging view (not yet built) will get emoji for free: Wt's
+  WText/WLineEdit are UTF-8 native.
+
+### Feature 1 (Phase 2) — pinned messages + personal saved archive
+- Schema: `pin_scope` lookup (`self`/`channel`/`everyone`) + `message_pin`
+  (user-selectable visibility per pin; `channel_id` carried for direct filtering;
+  one pin per (message, user)) + `saved_message` (per-user cross-channel archive
+  with an optional note). +3 tables → **40** in `fleet`. Seeded a channel-scope
+  pin and a saved message; **verified** schema+seed on PostgreSQL 16.
+- Mobile: pin a message via a scope picker (Only me / Channel / Everyone), a
+  "Pinned" strip atop the channel showing visible pins + scope, swipe actions to
+  pin-unpin / save-unsave, and inline pin/saved markers. New personal **Saved**
+  view (cross-channel archive) reached from the Message Board header.
+- API client: `MessagePin`/`SavedMessage` types, `PIN_SCOPE` ids, pin/unpin/
+  repin, visible-pins filter (self pins only for the pinner), save/unsave,
+  single-message getter; added a JSON:API DELETE helper.
+- Note: pin-visibility is filtered **client-side** for now — a server-side rule
+  (auth/LogicBank) is the production approach. Mobile `npm run build` clean.
+
+### Feature 3 — "Hey Dispatch" driver voice assistant (pluggable AI provider)
+- New `assistant/` FastAPI service (port `5710`): `POST /assist` takes an
+  on-device STT transcript + the driver's trusted context and returns a spoken
+  reply + the actions it took; `GET /health` reports provider/model/config.
+- Tool use (5 intents): `send_message_to_dispatcher` (→ ALS JSON:API `Message`),
+  `get_eta`, `validate_route`, `alternate_routes` (→ HERE truck routing, with
+  straight-line / "not configured" fallbacks), `tech_help` (built-in KB). Trusted
+  context (driver, position, destination, truck profile) comes from the request,
+  never the model.
+- **Pluggable AI provider** (`app/providers/`): admin picks via
+  `ASSISTANT_PROVIDER` — `anthropic` (default; adaptive thinking, effort,
+  prompt-cached system+tools prefix), `openai`, or `ollama` (OpenAI-compatible
+  adapter, local base URL). SDK imports are lazy, so only the chosen provider's
+  package is loaded. The brain (`app/assistant.py`) owns the prompt + tool
+  dispatch/action-recording and delegates the model loop to the provider.
+- Mobile: new **Dispatch** tab (`AssistantPage`) — push-to-talk via Web Speech
+  API (STT) → `/assist` → `speechSynthesis` (TTS); pulls the dispatcher channel +
+  active-trip destination for context. New `VITE_ASSISTANT_BASE_URL`, assistant
+  API client, and minimal `SpeechRecognition` typings.
+- Verified: service `py_compile`s and imports without the AI SDKs (lazy);
+  mobile `npm run build` clean. Docs: DEPLOYMENT (port table + step 8), TODO,
+  new `AI_ASSISTANT.md`.
+
 ## 2026-06-02
 
 ### Shared-instance schema move + geospatial endpoint + one-shot (verified)

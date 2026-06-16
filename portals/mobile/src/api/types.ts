@@ -30,6 +30,35 @@ export interface LoadStatus {
   name: string;
 }
 
+// --- Identity & access ---
+export interface AppRole {
+  id: number;
+  code: "dispatcher" | "driver" | "updater";
+  name: string;
+}
+
+export interface AppUser {
+  id: string;
+  username: string;
+  full_name: string;
+  email?: string;
+  app_role_id: number; // -> AppRole
+  active: boolean;
+  // Profile (editable); password_hash is never exposed to the client.
+  phone?: string;
+  title?: string;
+  timezone?: string;
+  avatar_document_id?: string | null; // -> Document (profile photo via CMS)
+  last_login_at?: string | null;
+}
+
+// Join: which equipment a driver is assigned (drives equipment context).
+export interface DriverEquipment {
+  id: string;
+  driver_id: string;
+  equipment_id: string;
+}
+
 // --- Domain resources (UUID ids, lookup FKs) ---
 export interface Driver {
   id: string;
@@ -120,6 +149,33 @@ export interface MessageDocument {
   id: string;
   message_id: string;
   document_id: string;
+}
+
+// Visibility a user picks when pinning a message.
+export interface PinScope {
+  id: number;
+  code: "self" | "channel" | "everyone";
+  name: string;
+}
+
+// A pinned message. `pin_scope_id` controls who sees it: self (just the pinner),
+// channel (channel members), everyone (org-wide).
+export interface MessagePin {
+  id: string;
+  message_id: string;
+  channel_id: string;
+  pinned_by: string;
+  pin_scope_id: number; // -> PinScope
+  pinned_at: string;
+}
+
+// A user's personal saved/archive entry for a message (cross-channel).
+export interface SavedMessage {
+  id: string;
+  user_id: string;
+  message_id: string;
+  note?: string | null;
+  saved_at: string;
 }
 
 // --- Telemetry (truck locations) ---

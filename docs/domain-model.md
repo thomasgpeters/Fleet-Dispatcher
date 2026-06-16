@@ -61,8 +61,12 @@ first, then propagate. Consistent terms keep design unambiguous and reviews fast
    and places involved. Owns load lifecycle and scheduling invariants.
 3. **Settlement** — turns a completed/dispatched load's rate into driver pay
    using the contract percentage from Fleet.
-4. **Identity & Access** — users and the three roles (Dispatcher, Driver,
-   Updater).
+4. **Identity & Access** — `app_user`s and the three roles (Dispatcher, Driver,
+   Updater). Each user carries auth (`username` + `password_hash`) and an editable
+   **profile** (`full_name`, `email`, `phone`, `title`, `timezone`, plus an avatar
+   stored as a CMS `document`). Authentication is ApiLogicServer's built-in JWT,
+   verified against `app_user` — see [`AUTHENTICATION.md`](AUTHENTICATION.md). A
+   `driver` may link to a login via `driver.user_id`.
 
 The **Driver** is shared by Fleet, Dispatch, and Settlement; Fleet is its
 *owning* context. Other contexts reference it by identity (`driver_id`).
@@ -162,6 +166,7 @@ resources). Codes shown below match the `code` column in
   `generators`, `lifts`.
 - `channel_type`: `direct`, `group`, `broadcast`.
 - `channel_member_role`: `owner`, `member`.
+- `pin_scope`: `self`, `channel`, `everyone` (visibility chosen when pinning).
 - `document_type`: `document`, `image`, `bill_of_lading`, `invoice`,
   `inspection_photo`, `license`, `other`.
 
@@ -193,6 +198,12 @@ drivers, dispatchers, and updaters all converse through one model.
   (`owner`/`member`) and `last_read_at` (drives per-user unread counts).
 - **Message** — text posted to a channel by an author; `reply_to` supports
   threaded replies; may be empty when it only carries documents.
+- **MessagePin** — a message a user pinned, with a `pin_scope` controlling who
+  sees it: `self` (only the pinner), `channel` (channel members), or `everyone`
+  (org-wide). One pin per (message, user); re-scoping updates the row.
+- **SavedMessage** — a user's personal archive entry for a message (from any
+  channel), with an optional note. Distinct from channels (organization) and
+  pins (shared importance) — this collection is per-user.
 
 A message references **Documents** (below) through the `message_document` link,
 so attachments are shared content rather than message-private blobs.

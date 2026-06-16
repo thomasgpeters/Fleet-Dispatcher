@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import {
+  IonButton,
+  IonButtons,
   IonContent,
   IonHeader,
+  IonIcon,
   IonItem,
   IonLabel,
   IonList,
@@ -11,6 +14,7 @@ import {
   IonTitle,
   IonToolbar,
 } from "@ionic/react";
+import { personCircleOutline } from "ionicons/icons";
 
 import { api, API_BASE_URL } from "../api/client";
 import type { Load } from "../api/types";
@@ -40,6 +44,11 @@ export function LoadsPage() {
       <IonHeader>
         <IonToolbar>
           <IonTitle>Fleet Dispatcher — Loads</IonTitle>
+          <IonButtons slot="end">
+            <IonButton routerLink="/profile" aria-label="Profile">
+              <IonIcon slot="icon-only" icon={personCircleOutline} />
+            </IonButton>
+          </IonButtons>
         </IonToolbar>
       </IonHeader>
       <IonContent className="ion-padding">

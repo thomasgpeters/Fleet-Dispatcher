@@ -3,13 +3,25 @@
 #include <functional>
 
 #include <Wt/WString.h>
-#include <Wt/WText.h>
 
 #include "HudControlBus.h"
+#include "ProfileView.h"
 
 namespace fd {
 
-Shell::Shell() : api_(std::make_unique<ApiClient>(ApiClient::baseUrlFromEnv())) {
+namespace {
+const char* roleLabel(int id) {
+    switch (id) {
+        case 1: return "Dispatcher";
+        case 2: return "Driver";
+        case 3: return "Updater";
+        default: return "User";
+    }
+}
+}  // namespace
+
+Shell::Shell(ApiClient* api, AppUser user, std::function<void()> onLogout)
+    : api_(api), user_(std::move(user)), onLogout_(std::move(onLogout)) {
     addStyleClass("container py-3");
 
     // --- App bar ---------------------------------------------------------
@@ -20,7 +32,19 @@ Shell::Shell() : api_(std::make_unique<ApiClient>(ApiClient::baseUrlFromEnv())) 
     brand->addNew<Wt::WText>(
         Wt::WString::fromUTF8("<small class=\"text-muted\">Dispatcher console · API " +
                               api_->baseUrl() + "</small>"));
-    // (Right side: user/role/health — added with auth later.)
+
+    // Right side: signed-in user + role, then Sign out.
+    auto* account = bar->addNew<Wt::WContainerWidget>();
+    account->addStyleClass("d-flex align-items-center gap-2");
+    userLabel_ = account->addNew<Wt::WText>();
+    userLabel_->addStyleClass("text-muted");
+    updateUserLabel();
+    auto* signOut = account->addNew<Wt::WPushButton>("Sign out");
+    signOut->addStyleClass("btn btn-sm btn-outline-secondary");
+    signOut->clicked().connect([this] {
+        api_->clearAuthToken();
+        if (onLogout_) onLogout_();
+    });
 
     // --- Navigation ------------------------------------------------------
     auto* nav = addNew<Wt::WContainerWidget>();
@@ -35,6 +59,7 @@ Shell::Shell() : api_(std::make_unique<ApiClient>(ApiClient::baseUrlFromEnv())) 
     addNav("New Load", [this] { showLoadForm(); });
     addNav("Drivers", [this] { showPlaceholder("Drivers"); });
     addNav("Messages", [this] { showPlaceholder("Messages"); });
+    addNav("Profile", [this] { showProfile(); });
 
     // --- Command bar (Today | Week) -------------------------------------
     commandBar_ = addNew<Wt::WContainerWidget>();
@@ -73,7 +98,7 @@ void Shell::showBoard() {
     commandBar_->show();
     refreshModeButtons();
     content_->clear();
-    board_ = content_->addNew<BoardView>(api_.get(), mode_);
+    board_ = content_->addNew<BoardView>(api_, mode_);
 }
 
 void Shell::showLoadForm() {
@@ -81,7 +106,22 @@ void Shell::showLoadForm() {
     commandBar_->hide();
     content_->clear();
     // On success, return to the board (which reloads from the API).
-    content_->addNew<LoadForm>(api_.get(), [this] { showBoard(); });
+    content_->addNew<LoadForm>(api_, [this] { showBoard(); });
+}
+
+void Shell::showProfile() {
+    board_ = nullptr;
+    commandBar_->hide();
+    content_->clear();
+    content_->addNew<ProfileView>(api_, user_, [this](AppUser updated) {
+        user_ = std::move(updated);
+        updateUserLabel();
+    });
+}
+
+void Shell::updateUserLabel() {
+    userLabel_->setText(Wt::WString::fromUTF8(
+        user_.full_name + " · " + roleLabel(user_.app_role_id)));
 }
 
 void Shell::showPlaceholder(const std::string& title) {

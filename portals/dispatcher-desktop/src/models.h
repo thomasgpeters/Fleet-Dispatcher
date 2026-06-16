@@ -5,6 +5,19 @@
 
 namespace fd {
 
+// The signed-in user (from app_user), with editable profile fields.
+struct AppUser {
+    std::string id;
+    std::string username;
+    std::string full_name;
+    std::string email;
+    std::string phone;
+    std::string title;
+    std::string timezone;
+    int app_role_id = 0;            // 1 dispatcher · 2 driver · 3 updater
+    std::string avatar_document_id;
+};
+
 struct Driver {
     std::string id;
     std::string name;
