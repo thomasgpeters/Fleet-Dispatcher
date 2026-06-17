@@ -18,7 +18,11 @@ add_executable(fleet_dispatcher_desktop
     src/LoginView.cpp
     src/ProfileView.cpp
     src/CommPanel.cpp
+    src/CommBus.cpp
     src/Toaster.cpp
+    src/FleetView.cpp
+    src/MapView.cpp
+    src/SettingsView.cpp
 )
 
 target_link_libraries(fleet_dispatcher_desktop

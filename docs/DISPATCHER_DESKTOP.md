@@ -38,14 +38,19 @@ light/dark themes:
   aesthetic: **▼ when open**, a pointing arrow when closed (**▶** left panel,
   **◀** right panel).
 - **Three-column body**:
-  - **Left panel** — the **menuing system** (Board · New Load · Drivers ·
-    Communications) plus **work-panel toggles** that operate the center: mode
-    (**Today | Week**) and **Compact rows**.
-  - **Center work panel** — the active view outlet. Selecting **Communications**
-    in the menu lets comms take over the **full work area**.
-  - **Right panel** — **Communications** (`CommPanel`): the channel list, the
-    selected conversation (polled live), and a composer. Collapsible; a new
-    message from someone else raises a top-right **toast**.
+  - **Left panel** — the **menuing system** (Board · Fleet · Map · New Load ·
+    Communications · Settings) plus **work-panel toggles** that operate the
+    center: mode (**Today | Week**) and **Compact rows**.
+  - **Center work panel** — the active view outlet. It has **no hide/show toggle**;
+    it simply **swaps** the visible view based on the selected menu item:
+    - **Board** — Today/Week dispatch board.
+    - **Fleet** — `FleetView`: a list of drivers + equipment.
+    - **Map** — `MapView`: **geo-positioning** of fleet locations on a Leaflet
+      map (latest position per rig) + a detail table, refreshed on a timer.
+    - **New Load** — the load intake form.
+    - **Communications** — comms take over the **full work area** (`CommPanel`).
+    - **Settings** — `SettingsView`: appearance (theme) + account/connection info.
+  - **Right panel** — **Communications** rail (`CommPanel`), collapsible.
   - Panels hide/show via `.fd-collapsed` and stack under the center on narrow
     viewports.
 - **Full-width footer** — copyright + links (HUD, Docs, Support).
@@ -53,10 +58,26 @@ light/dark themes:
   confirmations, errors. One sweeper timer auto-dismisses (no delete-in-callback).
 - **Profile** — `ProfileView`: view/edit profile fields (`PATCH /AppUser/{id}`);
   avatar upload is a follow-up.
-- **Dynamic** — Wt server push (`enableUpdates`) + a `WTimer` poll in `CommPanel`
-  keep comms live; toasts surface events without interrupting the work area.
 - **Owned state** — the signed-in `AppUser`; the JSON:API client (with the bearer
   token) is owned by the application and shared with the shell.
+
+### Real-time comms (push / WebSockets)
+
+`CommPanel` is push-driven, not polling-driven, for on-server traffic:
+
+- **`CommBus`** (in-process singleton, modeled on `HudControlBus`) broadcasts a
+  newly-sent message to every subscribed session via **Wt server push**
+  (`WServer::post` → handler → `triggerUpdate`).
+- Push is delivered over **WebSockets** — enable them in `wt_config.xml`
+  (`<web-sockets>true</web-sockets>`) and run with `-c wt_config.xml`.
+- A **slow reconcile poll** (30 s) bridges messages that originate **off-server**
+  (e.g. the mobile app). True cross-client realtime needs the middleware to emit
+  change events (SSE / WebSocket / broker) — a backend follow-up, since ALS is
+  generated outside this repo.
+
+The **Map** view reads telemetry (`PositionReport`) on a 15 s timer — positions
+flow device → DB, and the console reads them via the API; realtime telemetry push
+is a similar backend follow-up.
 
 ## Board modes
 

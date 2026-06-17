@@ -97,8 +97,15 @@ Pivot here after Phase 1. Talks to the same JSON:API; Bootstrap theme + Wt
       channels + live conversation + composer); **toasts** (`Toaster`, top-right);
       panel toggles as disclosure arrows (▼/▶/◀); Communications menu item takes
       the full work area
-- [ ] Wire left panel filters + a right-panel selected-load inspector to data
-- [ ] CommPanel: switch the 10s poll to server push / websockets for the rail
+- [x] **Views**: Fleet (drivers + equipment list), **Map** (geo-positioning of
+      fleet locations, Leaflet + table), Settings (appearance + info) — center
+      swaps per menu item
+- [x] **Comms push/WebSockets**: `CommBus` + Wt server push delivers sent
+      messages instantly; `wt_config.xml` enables WebSockets; 30 s reconcile poll
+      bridges off-server messages
+- [ ] Cross-client realtime (mobile→desktop) + realtime telemetry: needs the
+      middleware to emit change events (SSE / WebSocket / broker)
+- [ ] Wire left-panel filters + a right-panel selected-load inspector to data
 - [x] Load intake form (new load) + driver/equipment assignment (POST /Load)
 - [x] **HUD** surface (`/hud`) + `HudControlBus` (Wt server push): the console's
       Today/Week toggle publishes `SetMode`; HUD sessions auto-switch

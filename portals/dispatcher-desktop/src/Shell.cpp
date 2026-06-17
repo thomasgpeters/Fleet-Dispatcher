@@ -6,8 +6,11 @@
 #include <Wt/WString.h>
 
 #include "CommPanel.h"
+#include "FleetView.h"
 #include "HudControlBus.h"
+#include "MapView.h"
 #include "ProfileView.h"
+#include "SettingsView.h"
 #include "Toaster.h"
 
 namespace fd {
@@ -137,10 +140,12 @@ void Shell::buildLeftMenu() {
         return b;
     };
     addItem("Board", [this] { showBoard(); });
+    addItem("Fleet", [this] { showFleet(); });
+    addItem("Map", [this] { showMap(); });
     addItem("New Load", [this] { showLoadForm(); });
-    addItem("Drivers", [this] { showPlaceholder("Drivers"); });
     // Selecting Communications lets comms take over the full work area.
     addItem("Communications", [this] { showComms(); });
+    addItem("Settings", [this] { showSettings(); });
 
     // Work-panel toggles: drive how the center renders.
     leftPanel_->addNew<Wt::WText>(
@@ -269,6 +274,24 @@ void Shell::showComms() {
     // Comms take over the full work area. Pass a null toaster so only the
     // always-on right rail raises new-message toasts (avoids duplicates).
     content_->addNew<CommPanel>(api_, user_, /*toaster=*/nullptr);
+}
+
+void Shell::showFleet() {
+    board_ = nullptr;
+    content_->clear();
+    content_->addNew<FleetView>(api_);
+}
+
+void Shell::showMap() {
+    board_ = nullptr;
+    content_->clear();
+    content_->addNew<MapView>(api_);
+}
+
+void Shell::showSettings() {
+    board_ = nullptr;
+    content_->clear();
+    content_->addNew<SettingsView>(api_, user_);
 }
 
 void Shell::showPlaceholder(const std::string& title) {

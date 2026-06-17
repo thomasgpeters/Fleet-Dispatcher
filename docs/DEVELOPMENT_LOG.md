@@ -5,6 +5,25 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-06-11
 
+### Desktop: Fleet/Map/Settings views + comms WebSocket push
+- Menu now: Board · Fleet · Map · New Load · Communications · Settings. The
+  center work panel has no hide/show toggle — it swaps the visible view per menu
+  item (left/right panels remain collapsible).
+- `FleetView` — list of drivers (fetchDrivers) + equipment (unit numbers).
+- `MapView` — geo-positioning of fleet locations: a Leaflet map (latest position
+  per rig) + detail table, 15 s telemetry refresh (mirrors the HUD map).
+- `SettingsView` — appearance (System/Light/Dark → data-fd-theme + localStorage,
+  shared with the header toggle) + account/connection info.
+- **Comms push/WebSockets**: new `CommBus` (in-process singleton like
+  `HudControlBus`) broadcasts sent messages to every session via Wt server push;
+  `CommPanel` now subscribes and renders pushed messages instantly (and toasts),
+  publishes on send, and keeps only a 30 s reconcile poll for off-server (mobile)
+  messages. New `wt_config.xml` enables `<web-sockets>true` for the push transport.
+- Note: full cross-client realtime (mobile→desktop) needs the middleware to emit
+  change events (SSE/WebSocket/broker) — backend follow-up (ALS is generated).
+- **Not compiled in the sandbox**; new code reuses known-good Wt patterns
+  (WLeafletMap from HudView, WServer::post bus from HudControlBus). CMake updated.
+
 ### Desktop dynamic shell: menu, communications rail, toasts
 - Header: **logo top-left**; **profile (name) + logged-in role + Sign out
   top-right**, plus theme toggle and panel toggles. Panel toggles use the

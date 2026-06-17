@@ -63,8 +63,11 @@ private:
 
     void showBoard();
     void showLoadForm();
+    void showFleet();     // fleet list (drivers + equipment)
+    void showMap();       // geo-positioning of fleet locations
+    void showComms();     // communications take over the full center work area
+    void showSettings();  // appearance + app info
     void showProfile();
-    void showComms();  // communications take over the full center work area
     void showPlaceholder(const std::string& title);
     void setMode(BoardMode mode);
     void refreshModeButtons();
