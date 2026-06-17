@@ -5,6 +5,29 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-06-11
 
+### Shared design system across mobile, desktop, and HUD
+- New `docs/DESIGN_SYSTEM.md` — one palette (subtle blues, sparse orange accent,
+  white/light standard theme + complementary dark) as the source of truth,
+  implemented as design tokens in each client. Default follows the OS
+  (`prefers-color-scheme`); a manual override wins (persisted).
+- Desktop (`docroot/css/fleet-dispatcher.css`): rewrote with `--fd-*` light/dark
+  tokens, aligned Bootstrap primary to the brand blue, and added the **app frame**
+  — full-width header (nav), three-column body (collapsible left panel · center
+  work panel · collapsible right panel), full-width footer.
+- Desktop `Shell` restructured into that frame: header with nav + theme toggle +
+  panel show/hide toggles (`◧`/`◨`) + user·role + Sign out; left "Filters" panel;
+  center command bar + content outlet; right "Details" inspector; footer
+  (copyright + links). Active-nav gets the orange underline. Theme toggle flips
+  `data-fd-theme` on `<html>` and persists to localStorage.
+- HUD forces the dark theme (wall display) via `data-fd-theme="dark"`.
+- Mobile: new `src/theme/variables.css` (Ionic vars from the same palette, light
+  + dark) and `theme.ts` (System/Light/Dark, persisted, applied at startup);
+  imported in `main.tsx`; **Appearance** picker added to Profile. Blue toolbars
+  match the desktop nav. `npm run build` clean.
+- **Desktop not compiled in the sandbox**; CSS is static, the Wt layout uses
+  plain containers + `doJavaScript` for the theme toggle (no version-sensitive
+  APIs added). Build on a Linux box to confirm.
+
 ### Desktop (Wt) console login + profile (same ALS JWT credentials)
 - ApiClient: holds the bearer token (`setAuthToken`/`clearAuthToken`/`hasAuthToken`)
   and adds `Authorization: Bearer` to every GET/POST/PATCH; new `login()`

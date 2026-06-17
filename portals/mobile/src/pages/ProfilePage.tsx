@@ -9,9 +9,12 @@ import {
   IonIcon,
   IonInput,
   IonItem,
+  IonLabel,
   IonList,
   IonNote,
   IonPage,
+  IonSegment,
+  IonSegmentButton,
   IonText,
   IonTitle,
   IonToolbar,
@@ -21,6 +24,7 @@ import { cameraOutline, logOutOutline, personCircleOutline } from "ionicons/icon
 import { api } from "../api/client";
 import type { Document } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
+import { getThemePref, setThemePref, type ThemePref } from "../theme/theme";
 
 const ROLE_LABEL: Record<number, string> = {
   1: "Dispatcher",
@@ -49,7 +53,13 @@ export function ProfilePage() {
   const [avatar, setAvatar] = useState<string | null>(null); // data URL
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [theme, setTheme] = useState<ThemePref>(getThemePref());
   const fileInput = useRef<HTMLInputElement>(null);
+
+  const changeTheme = (pref: ThemePref) => {
+    setTheme(pref);
+    setThemePref(pref);
+  };
 
   // Seed the form from the signed-in user.
   useEffect(() => {
@@ -210,6 +220,26 @@ export function ProfilePage() {
             />
           </IonItem>
         </IonList>
+
+        <div className="ion-margin-top">
+          <IonNote>Appearance</IonNote>
+          <IonSegment
+            value={theme}
+            onIonChange={(e) =>
+              changeTheme((e.detail.value as ThemePref) ?? "system")
+            }
+          >
+            <IonSegmentButton value="system">
+              <IonLabel>System</IonLabel>
+            </IonSegmentButton>
+            <IonSegmentButton value="light">
+              <IonLabel>Light</IonLabel>
+            </IonSegmentButton>
+            <IonSegmentButton value="dark">
+              <IonLabel>Dark</IonLabel>
+            </IonSegmentButton>
+          </IonSegment>
+        </div>
 
         {status && (
           <IonText color="medium">

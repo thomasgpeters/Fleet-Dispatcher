@@ -1,30 +1,236 @@
-/* Fleet Dispatcher — desktop portal app-specific styles.
+/* Fleet Dispatcher — desktop + HUD app styles.
  *
- * Loaded on top of the Wt Bootstrap theme (see src/main.cpp). The Bootstrap
- * CSS/JS itself comes from the deployed Wt resources/ folder; put only project
- * overrides and custom components here.
- *
- * This file is served from the docroot at runtime; CMake copies the docroot/
- * tree next to the executable on build.
+ * Loaded on top of the Wt Bootstrap 5 theme (see src/main.cpp). Implements the
+ * shared design system (docs/DESIGN_SYSTEM.md): subtle blues, sparse orange
+ * accents, white/light standard theme + a complementary dark theme. Served from
+ * the docroot at runtime (CMake copies docroot/ next to the executable).
  */
 
+/* ===========================================================================
+ * Design tokens
+ * Default follows the OS; data-fd-theme on <html> overrides it. The HUD forces
+ * dark (see HudView).
+ * ======================================================================== */
 :root {
-    /* Dispatcher brand accents — tweak to taste. */
-    --fd-accent: #0d6efd;       /* Bootstrap primary */
+    --fd-bg: #f4f7fb;
+    --fd-surface: #ffffff;
+    --fd-surface-2: #eef3f9;
+    --fd-text: #18222e;
+    --fd-text-muted: #5b6b7b;
+    --fd-border: #d8e1ec;
+    --fd-primary: #2c6fb3;
+    --fd-primary-strong: #1f4e79;
+    --fd-primary-contrast: #ffffff;
+    --fd-accent: #e8833a;
+    --fd-accent-contrast: #2a1a0c;
+    --fd-header-bg: #1f4e79;
+    --fd-header-text: #eaf1f8;
+    --fd-header-border: #18405f;
+    --fd-footer-bg: #eef3f9;
+    --fd-footer-text: #5b6b7b;
+    --fd-link: #2c6fb3;
+    --fd-shadow: rgba(20, 40, 70, 0.08);
+
     --fd-board-gap: 0.75rem;
+    --fd-panel-w: 260px;
 }
 
+/* Dark tokens, shared by the OS-dark default and the explicit override. */
+@media (prefers-color-scheme: dark) {
+    :root:not([data-fd-theme="light"]) {
+        --fd-bg: #0f1722;
+        --fd-surface: #16212e;
+        --fd-surface-2: #1b2937;
+        --fd-text: #e6edf4;
+        --fd-text-muted: #9fb1c2;
+        --fd-border: #29384a;
+        --fd-primary: #4a90d9;
+        --fd-primary-strong: #6aa6e0;
+        --fd-primary-contrast: #0b1420;
+        --fd-accent: #f0954e;
+        --fd-accent-contrast: #241405;
+        --fd-header-bg: #0d1925;
+        --fd-header-text: #e6edf4;
+        --fd-header-border: #1d2d3e;
+        --fd-footer-bg: #0d1925;
+        --fd-footer-text: #9fb1c2;
+        --fd-link: #6aa6e0;
+        --fd-shadow: rgba(0, 0, 0, 0.4);
+    }
+}
+:root[data-fd-theme="dark"] {
+    --fd-bg: #0f1722;
+    --fd-surface: #16212e;
+    --fd-surface-2: #1b2937;
+    --fd-text: #e6edf4;
+    --fd-text-muted: #9fb1c2;
+    --fd-border: #29384a;
+    --fd-primary: #4a90d9;
+    --fd-primary-strong: #6aa6e0;
+    --fd-primary-contrast: #0b1420;
+    --fd-accent: #f0954e;
+    --fd-accent-contrast: #241405;
+    --fd-header-bg: #0d1925;
+    --fd-header-text: #e6edf4;
+    --fd-header-border: #1d2d3e;
+    --fd-footer-bg: #0d1925;
+    --fd-footer-text: #9fb1c2;
+    --fd-link: #6aa6e0;
+    --fd-shadow: rgba(0, 0, 0, 0.4);
+}
+
+/* ===========================================================================
+ * Base
+ * ======================================================================== */
+html, body { height: 100%; }
 body {
-    background-color: #f5f6f8;
+    margin: 0;
+    background-color: var(--fd-bg);
+    color: var(--fd-text);
 }
 
-/* Weekly board grid placeholder (Mon -> Mon). */
+/* Align the Bootstrap theme + common components with the palette. */
+.btn-primary {
+    background-color: var(--fd-primary);
+    border-color: var(--fd-primary);
+    --bs-btn-bg: var(--fd-primary);
+    --bs-btn-border-color: var(--fd-primary);
+}
+.btn-primary:hover {
+    background-color: var(--fd-primary-strong);
+    border-color: var(--fd-primary-strong);
+}
+.btn-outline-primary { color: var(--fd-primary); border-color: var(--fd-primary); }
+.btn-outline-primary:hover {
+    background-color: var(--fd-primary);
+    border-color: var(--fd-primary);
+    color: #fff;
+}
+.badge.bg-primary { background-color: var(--fd-primary) !important; }
+.text-accent { color: var(--fd-accent); }
+.bg-accent { background-color: var(--fd-accent); color: var(--fd-accent-contrast); }
+.card {
+    background-color: var(--fd-surface);
+    border: 1px solid var(--fd-border);
+    color: var(--fd-text);
+}
+
+/* ===========================================================================
+ * App frame: header (full width) · body[left|center|right] · footer (full width)
+ * ======================================================================== */
+.fd-app { display: flex; flex-direction: column; min-height: 100vh; }
+
+/* Full-width header / navigation */
+.fd-header {
+    position: sticky;
+    top: 0;
+    z-index: 1020;
+    background-color: var(--fd-header-bg);
+    color: var(--fd-header-text);
+    border-bottom: 1px solid var(--fd-header-border);
+}
+.fd-header-inner {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.55rem 1rem;
+}
+.fd-brand { font-weight: 600; font-size: 1.05rem; white-space: nowrap; }
+.fd-brand small { display: block; font-weight: 400; font-size: 0.72rem; opacity: 0.75; }
+.fd-nav { display: flex; gap: 0.25rem; flex-wrap: wrap; }
+.fd-nav .btn {
+    color: var(--fd-header-text);
+    border-color: transparent;
+    background-color: transparent;
+}
+.fd-nav .btn:hover { background-color: rgba(255, 255, 255, 0.12); color: var(--fd-header-text); }
+.fd-nav .btn.fd-active {
+    background-color: rgba(255, 255, 255, 0.16);
+    box-shadow: inset 0 -2px 0 var(--fd-accent);  /* sparse orange highlight */
+}
+.fd-header-spacer { flex: 1 1 auto; }
+.fd-header-tools { display: flex; align-items: center; gap: 0.4rem; }
+.fd-user { font-size: 0.85rem; opacity: 0.85; white-space: nowrap; }
+.fd-header .btn-icon {
+    color: var(--fd-header-text);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    background: transparent;
+    padding: 0.2rem 0.5rem;
+}
+.fd-header .btn-icon:hover { background-color: rgba(255, 255, 255, 0.12); }
+
+/* Three-column body */
+.fd-body { display: flex; flex: 1 1 auto; align-items: stretch; min-height: 0; }
+.fd-panel {
+    width: var(--fd-panel-w);
+    flex: 0 0 var(--fd-panel-w);
+    padding: 1rem;
+    overflow: auto;
+    background-color: var(--fd-surface-2);
+    border-right: 1px solid var(--fd-border);
+    transition: width 0.18s ease, flex-basis 0.18s ease, padding 0.18s ease;
+}
+.fd-panel-right { border-right: none; border-left: 1px solid var(--fd-border); }
+.fd-panel.fd-collapsed {
+    width: 0;
+    flex-basis: 0;
+    padding: 0;
+    overflow: hidden;
+    border-width: 0;
+}
+.fd-center { flex: 1 1 auto; min-width: 0; padding: 1rem 1.25rem; overflow: auto; }
+.fd-panel-title {
+    margin: 0 0 0.5rem;
+    font-size: 0.74rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--fd-text-muted);
+}
+.fd-muted { color: var(--fd-text-muted); }
+
+/* Full-width footer */
+.fd-footer {
+    background-color: var(--fd-footer-bg);
+    color: var(--fd-footer-text);
+    border-top: 1px solid var(--fd-border);
+}
+.fd-footer-inner {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    font-size: 0.82rem;
+}
+.fd-footer a { color: var(--fd-link); text-decoration: none; }
+.fd-footer a:hover { text-decoration: underline; }
+
+/* Narrow viewports: stack the panels under the center column. */
+@media (max-width: 900px) {
+    .fd-body { flex-direction: column; }
+    .fd-panel, .fd-panel-right {
+        width: auto;
+        flex-basis: auto;
+        border: none;
+        border-bottom: 1px solid var(--fd-border);
+    }
+    .fd-panel.fd-collapsed { display: none; }
+}
+
+/* ===========================================================================
+ * Board + HUD
+ * ======================================================================== */
 .fd-week-board {
     display: grid;
     grid-template-columns: repeat(7, minmax(0, 1fr));
     gap: var(--fd-board-gap);
 }
-
 .fd-load-card {
-    border-left: 4px solid var(--fd-accent);
+    border-left: 4px solid var(--fd-accent);  /* orange accent bar */
+    background-color: var(--fd-surface);
 }
+
+/* The HUD forces the dark theme (HudView sets data-fd-theme="dark"); higher
+ * contrast for a wall display. */
+.fd-hud { color: var(--fd-text); }
+.fd-hud .badge.bg-primary { background-color: var(--fd-primary) !important; }

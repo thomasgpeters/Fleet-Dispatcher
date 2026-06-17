@@ -117,6 +117,8 @@ The remaining components are **not** VCP-built (they aren't C++/TS):
   the ApiLogicServer middleware from the schema (managed outside this repo).
 - [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — full standup runbook: DB, schema,
   PostGIS (without breaking ALS), ALS, and portals.
+- [`docs/DESIGN_SYSTEM.md`](docs/DESIGN_SYSTEM.md) — shared visual language
+  (palette, light/dark themes, desktop layout) across mobile, desktop, and HUD.
 - [`docs/TODO.md`](docs/TODO.md) — sequenced plan of approach (checklist).
 - [`docs/DEVELOPMENT_LOG.md`](docs/DEVELOPMENT_LOG.md) — dated record of changes.
 - [`CLAUDE.md`](CLAUDE.md) — agent brief: conventions and workflow that load at
