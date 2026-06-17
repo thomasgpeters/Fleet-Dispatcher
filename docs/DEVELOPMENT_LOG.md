@@ -5,6 +5,24 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-06-11
 
+### Desktop dynamic shell: menu, communications rail, toasts
+- Header: **logo top-left**; **profile (name) + logged-in role + Sign out
+  top-right**, plus theme toggle and panel toggles. Panel toggles use the
+  disclosure aesthetic — **▼ open**, **▶/◀ closed** (left/right).
+- Left panel = **menuing system** (Board · New Load · Drivers · Communications)
+  + **work-panel toggles** (Today | Week, Compact rows) that drive the center.
+- Right panel = **Communications** (`CommPanel`): channel list + live conversation
+  (10s `WTimer` poll) + composer. Selecting **Communications** in the menu makes
+  comms take over the **full work area**.
+- **Toaster** (`Toaster`): top-right transient alerts (new messages, save/create
+  confirmations, errors). Single sweeper timer auto-dismisses; close marks for
+  removal (no delete-during-callback). New-message toasts come from the rail only.
+- ApiClient: `fetchChannels` / `fetchMessages` / `createMessage` (+ Channel,
+  Message models). Server push (`enableUpdates`) already on → live feel.
+- **Desktop not compiled in the sandbox**; new code uses plain Wt widgets +
+  `WTimer` + `doJavaScript` (no version-sensitive APIs beyond those already
+  flagged). Build on a Linux box to confirm.
+
 ### Shared design system across mobile, desktop, and HUD
 - New `docs/DESIGN_SYSTEM.md` — one palette (subtle blues, sparse orange accent,
   white/light standard theme + complementary dark) as the source of truth,

@@ -292,6 +292,26 @@ fd::AppUser parseUser(const Wt::Json::Object& res) {
     return u;
 }
 
+fd::Channel parseChannel(const Wt::Json::Object& res) {
+    const Wt::Json::Object& a = res.get("attributes");
+    Channel c;
+    c.id = jstr(res, "id");
+    c.name = jstr(a, "name");
+    c.channel_type_id = jint(a, "channel_type_id");
+    return c;
+}
+
+fd::Message parseMessage(const Wt::Json::Object& res) {
+    const Wt::Json::Object& a = res.get("attributes");
+    Message m;
+    m.id = jstr(res, "id");
+    m.channel_id = jstr(a, "channel_id");
+    m.author_id = jstr(a, "author_id");
+    m.body = jstr(a, "body");
+    m.posted_at = jstr(a, "posted_at");
+    return m;
+}
+
 }  // namespace
 
 ApiClient::ApiClient(std::string baseUrl) : baseUrl_(std::move(baseUrl)) {}
@@ -331,6 +351,44 @@ void ApiClient::fetchPositions(PositionsCallback onOk, ErrorCallback onErr) {
             for (const Wt::Json::Value& v : data) out.push_back(parsePosition(v));
             onOk(std::move(out));
         },
+        std::move(onErr));
+}
+
+void ApiClient::fetchChannels(ChannelsCallback onOk, ErrorCallback onErr) {
+    getCollection(
+        baseUrl_ + "/Channel", authToken_,
+        [onOk](const Wt::Json::Array& data) {
+            std::vector<Channel> out;
+            for (const Wt::Json::Value& v : data) out.push_back(parseChannel(v));
+            onOk(std::move(out));
+        },
+        std::move(onErr));
+}
+
+void ApiClient::fetchMessages(const std::string& channelId, MessagesCallback onOk,
+                              ErrorCallback onErr) {
+    getCollection(
+        baseUrl_ + "/Message?filter%5Bchannel_id%5D=" + urlEncode(channelId),
+        authToken_,
+        [onOk](const Wt::Json::Array& data) {
+            std::vector<Message> out;
+            for (const Wt::Json::Value& v : data) out.push_back(parseMessage(v));
+            onOk(std::move(out));
+        },
+        std::move(onErr));
+}
+
+void ApiClient::createMessage(const std::string& channelId,
+                              const std::string& authorId, const std::string& body,
+                              MessageCallback onOk, ErrorCallback onErr) {
+    const std::string payload =
+        "{\"data\":{\"type\":\"Message\",\"attributes\":{"
+        "\"channel_id\":\"" + jsonEscape(channelId) + "\","
+        "\"author_id\":\"" + jsonEscape(authorId) + "\","
+        "\"body\":\"" + jsonEscape(body) + "\"}}}";
+    postJson(
+        baseUrl_ + "/Message", payload, authToken_,
+        [onOk](const Wt::Json::Object& obj) { onOk(parseMessage(obj)); },
         std::move(onErr));
 }
 

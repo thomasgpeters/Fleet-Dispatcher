@@ -17,6 +17,8 @@ add_executable(fleet_dispatcher_desktop
     src/ApiClient.cpp
     src/LoginView.cpp
     src/ProfileView.cpp
+    src/CommPanel.cpp
+    src/Toaster.cpp
 )
 
 target_link_libraries(fleet_dispatcher_desktop

@@ -32,20 +32,29 @@ The shell is an **app frame** implementing the shared design system
 ([`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md)) — subtle blues, sparse orange accents,
 light/dark themes:
 
-- **Full-width header (navigation)** — brand, nav (Board · New Load · Drivers ·
-  Messages · **Profile**), a **theme toggle** (light/dark, persisted), the
-  **signed-in user · role**, and **Sign out**. Also hosts the panel show/hide
-  toggles (`◧` left, `◨` right).
+- **Full-width header** — **logo branding (top-left)**; **profile (name) + the
+  logged-in role + Sign out (top-right)**, plus a **theme toggle** (light/dark,
+  persisted) and the panel show/hide toggles. The toggles use the disclosure
+  aesthetic: **▼ when open**, a pointing arrow when closed (**▶** left panel,
+  **◀** right panel).
 - **Three-column body**:
-  - **Left panel** (collapsible) — filters / context.
-  - **Center work panel** — the command bar (mode toggle **Today | Week** + HUD
-    commands) and the active view outlet.
-  - **Right panel** (collapsible) — details / inspector.
-  - Panels hide/show via `.fd-collapsed` and stack under the center column on
-    narrow viewports.
+  - **Left panel** — the **menuing system** (Board · New Load · Drivers ·
+    Communications) plus **work-panel toggles** that operate the center: mode
+    (**Today | Week**) and **Compact rows**.
+  - **Center work panel** — the active view outlet. Selecting **Communications**
+    in the menu lets comms take over the **full work area**.
+  - **Right panel** — **Communications** (`CommPanel`): the channel list, the
+    selected conversation (polled live), and a composer. Collapsible; a new
+    message from someone else raises a top-right **toast**.
+  - Panels hide/show via `.fd-collapsed` and stack under the center on narrow
+    viewports.
 - **Full-width footer** — copyright + links (HUD, Docs, Support).
+- **Toaster** — top-right transient alerts (`Toaster`): new messages, save/create
+  confirmations, errors. One sweeper timer auto-dismisses (no delete-in-callback).
 - **Profile** — `ProfileView`: view/edit profile fields (`PATCH /AppUser/{id}`);
   avatar upload is a follow-up.
+- **Dynamic** — Wt server push (`enableUpdates`) + a `WTimer` poll in `CommPanel`
+  keep comms live; toasts surface events without interrupting the work area.
 - **Owned state** — the signed-in `AppUser`; the JSON:API client (with the bearer
   token) is owned by the application and shared with the shell.
 

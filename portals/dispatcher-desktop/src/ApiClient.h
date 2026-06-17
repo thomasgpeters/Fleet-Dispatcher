@@ -56,6 +56,9 @@ public:
     using PositionsCallback = std::function<void(std::vector<Position>)>;
     using OptionsCallback = std::function<void(std::vector<Option>)>;
     using LoadCallback = std::function<void(Load)>;
+    using ChannelsCallback = std::function<void(std::vector<Channel>)>;
+    using MessagesCallback = std::function<void(std::vector<Message>)>;
+    using MessageCallback = std::function<void(Message)>;
     using TokenCallback = std::function<void(std::string)>;
     using UserCallback = std::function<void(AppUser)>;
     using ErrorCallback = std::function<void(std::string)>;
@@ -84,6 +87,14 @@ public:
     void fetchDrivers(DriversCallback onOk, ErrorCallback onErr);
     void fetchLoads(LoadsCallback onOk, ErrorCallback onErr);
     void fetchPositions(PositionsCallback onOk, ErrorCallback onErr);
+
+    // --- Communications (right panel) ---
+    void fetchChannels(ChannelsCallback onOk, ErrorCallback onErr);
+    void fetchMessages(const std::string& channelId, MessagesCallback onOk,
+                       ErrorCallback onErr);
+    void createMessage(const std::string& channelId, const std::string& authorId,
+                       const std::string& body, MessageCallback onOk,
+                       ErrorCallback onErr);
 
     // Generic option fetch for form combos: GET /resource, label from labelAttr.
     void fetchOptions(const std::string& resource, const std::string& labelAttr,

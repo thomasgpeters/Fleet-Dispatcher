@@ -92,7 +92,13 @@ Pivot here after Phase 1. Talks to the same JSON:API; Bootstrap theme + Wt
       + full-width footer; subtle-blue/orange light + dark themes (toggle); HUD
       forced dark. Shared with mobile (Ionic vars) — same palette across clients
 - [ ] Add app-bar week selector + health indicator
-- [ ] Wire left panel (filters) and right panel (selected-load inspector) to data
+- [x] **Left menu** (Board · New Load · Drivers · Communications) + work-panel
+      toggles (Today|Week, Compact); **right Communications rail** (`CommPanel`:
+      channels + live conversation + composer); **toasts** (`Toaster`, top-right);
+      panel toggles as disclosure arrows (▼/▶/◀); Communications menu item takes
+      the full work area
+- [ ] Wire left panel filters + a right-panel selected-load inspector to data
+- [ ] CommPanel: switch the 10s poll to server push / websockets for the rail
 - [x] Load intake form (new load) + driver/equipment assignment (POST /Load)
 - [x] **HUD** surface (`/hud`) + `HudControlBus` (Wt server push): the console's
       Today/Week toggle publishes `SetMode`; HUD sessions auto-switch
