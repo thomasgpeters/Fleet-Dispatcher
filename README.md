@@ -119,6 +119,9 @@ The remaining components are **not** VCP-built (they aren't C++/TS):
   PostGIS (without breaking ALS), ALS, and portals.
 - [`docs/TODO.md`](docs/TODO.md) — sequenced plan of approach (checklist).
 - [`docs/DEVELOPMENT_LOG.md`](docs/DEVELOPMENT_LOG.md) — dated record of changes.
+- [`CLAUDE.md`](CLAUDE.md) — agent brief: conventions and workflow that load at
+  the start of a Claude Code session (plus `.claude/` for the `/verify-db`
+  command, permission allowlist, and a web SessionStart hook).
 
 ## Getting started
 
