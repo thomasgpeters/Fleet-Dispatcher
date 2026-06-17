@@ -87,7 +87,12 @@ Pivot here after Phase 1. Talks to the same JSON:API; Bootstrap theme + Wt
 - [x] **Board** with a **Today | Week** toggle (today's runs vs Mon→Mon grid),
       fed by an async `ApiClient` (Wt::Http::Client + Wt::Json)
 - [x] App-bar **user + role + Sign out** (auth); console gated by a Wt login
+- [x] **App frame + design system** ([`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md)):
+      full-width header (nav) + collapsible left/right panels + center work panel
+      + full-width footer; subtle-blue/orange light + dark themes (toggle); HUD
+      forced dark. Shared with mobile (Ionic vars) — same palette across clients
 - [ ] Add app-bar week selector + health indicator
+- [ ] Wire left panel (filters) and right panel (selected-load inspector) to data
 - [x] Load intake form (new load) + driver/equipment assignment (POST /Load)
 - [x] **HUD** surface (`/hud`) + `HudControlBus` (Wt server push): the console's
       Today/Week toggle publishes `SetMode`; HUD sessions auto-switch

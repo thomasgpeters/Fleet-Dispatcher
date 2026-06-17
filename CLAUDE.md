@@ -78,6 +78,7 @@ make publish-mobile
 
 - `docs/domain-model.md` — entities, aggregates, bounded contexts, lookups
 - `docs/architecture.md` — system architecture (+ `architecture.svg`)
+- `docs/DESIGN_SYSTEM.md` — shared palette/theme (mobile + desktop + HUD), layout
 - `docs/AUTHENTICATION.md` — ALS JWT auth + profiles
 - `docs/MIDDLEWARE_SETUP.md` — generating/running ALS
 - `docs/DISPATCHER_DESKTOP.md` — the Wt console + HUD

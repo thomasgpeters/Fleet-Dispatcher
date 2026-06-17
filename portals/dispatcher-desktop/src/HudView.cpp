@@ -27,6 +27,11 @@ std::string fmt(double v, const char* f) {
 HudView::HudView(ApiClient* api) : api_(api) {
     addStyleClass("container py-3 fd-hud");
 
+    // The HUD is a wall display: force the dark theme regardless of OS setting
+    // (shared design system — docs/DESIGN_SYSTEM.md).
+    Wt::WApplication::instance()->doJavaScript(
+        "document.documentElement.setAttribute('data-fd-theme','dark');");
+
     auto* header = addNew<Wt::WContainerWidget>();
     header->addStyleClass("d-flex justify-content-between align-items-center mb-3");
     header->addNew<Wt::WText>("<h1 class=\"h3 mb-0\">Fleet HUD</h1>");
