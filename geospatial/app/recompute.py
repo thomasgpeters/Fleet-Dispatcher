@@ -38,6 +38,13 @@ def recompute_route(trip_id: str) -> Optional[dict]:
             if len(rows) < 2:
                 return None
             stops = [(r["lat"], r["lng"]) for r in rows]
+
+            # Optimizer hook (deferred engine): when a trip is NOT route_locked,
+            # the route optimizer should reorder `stops` here for the optimal
+            # sequence (and persist the new waypoint seq) before we compute
+            # geometry — that's what "unlock → re-optimize" will do. Until the
+            # engine is chosen we keep the current order (recompute is
+            # order-preserving, safe for locked trips). See docs/TODO.md.
             r = compute(stops)
 
             # One route per trip: replace any existing.

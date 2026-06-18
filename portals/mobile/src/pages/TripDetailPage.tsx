@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import {
+  IonAlert,
   IonBackButton,
   IonButton,
   IonButtons,
@@ -17,7 +18,7 @@ import {
   IonTitle,
   IonToolbar,
 } from "@ionic/react";
-import { createOutline, navigateOutline } from "ionicons/icons";
+import { createOutline, navigateOutline, sparklesOutline } from "ionicons/icons";
 
 import { api } from "../api/client";
 import type { Route, Trip, Waypoint } from "../api/types";
@@ -44,6 +45,7 @@ export function TripDetailPage() {
   const [trip, setTrip] = useState<Trip | null>(null);
   const [stops, setStops] = useState<Waypoint[]>([]);
   const [route, setRoute] = useState<Route | null>(null);
+  const [confirmUnlock, setConfirmUnlock] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = async () => {
@@ -65,6 +67,17 @@ export function TripDetailPage() {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tripId]);
+
+  // Clearing the lock re-enables auto-optimization; the trip change flows through
+  // the event plane and the route is recomputed/re-optimized immediately.
+  const unlock = async () => {
+    try {
+      await api.updateTrip(tripId, { route_locked: false });
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
 
   return (
     <IonPage>
@@ -106,9 +119,35 @@ export function TripDetailPage() {
 
         {trip?.route_locked && (
           <IonItem lines="full">
-            <IonNote>Manual stop order — auto-optimization is off for this trip.</IonNote>
+            <IonLabel className="ion-text-wrap">
+              <IonNote>Manual stop order — auto-optimization is off.</IonNote>
+            </IonLabel>
+            <IonButton
+              slot="end"
+              fill="outline"
+              size="small"
+              onClick={() => setConfirmUnlock(true)}
+            >
+              <IonIcon slot="start" icon={sparklesOutline} />
+              Unlock &amp; re-optimize
+            </IonButton>
           </IonItem>
         )}
+
+        <IonAlert
+          isOpen={confirmUnlock}
+          onDidDismiss={() => setConfirmUnlock(false)}
+          header="Revert manual route?"
+          message="Are you sure you want to revert your manual updates to this route? The route will be re-optimized automatically."
+          buttons={[
+            { text: "Keep my order", role: "cancel" },
+            {
+              text: "Revert & re-optimize",
+              role: "destructive",
+              handler: () => void unlock(),
+            },
+          ]}
+        />
 
         <IonList>
           <IonListHeader>

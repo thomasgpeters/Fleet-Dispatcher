@@ -19,6 +19,15 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 - Docs: als-extensions/README, MIDDLEWARE_SETUP (post-generate step), REALTIME
   (producer points here), CLAUDE golden rule + component table.
 
+### Unlock & re-optimize (revert manual route, with confirmation)
+- Mobile trip overview: when `route_locked`, an **Unlock & re-optimize** button
+  with an **IonAlert confirmation** ("Are you sure you want to revert your manual
+  updates to this route?"). Confirm → `updateTrip(route_locked:false)`.
+- Clearing the lock is a trip change → flows through the event plane (`trip`
+  Kafka event → geospatial recompute consumer) so the route recomputes
+  **immediately**; it also re-enables the (deferred) optimizer. Added an explicit
+  optimizer hook comment in `recompute.py` (reorder when not locked).
+
 ### Drag-reorder waypoints + auto route recompute + manual-order lock
 - Mobile: **drag-and-drop reorder** in the waypoints editor (IonReorderGroup);
   persists new `seq` with a two-phase (offset-then-final) update to respect

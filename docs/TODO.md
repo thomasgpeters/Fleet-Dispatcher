@@ -152,7 +152,9 @@ Powers the HUD's map. See "Planned" in `domain-model.md`.
       or **drag-reorder** stops; stop types `lunch`+`load_stop`; waypoint edits
       stream live. **Auto route recompute** in `geospatial/` (Kafka
       `waypoint`/`trip` consumer → upsert `route`; haversine now, HERE pluggable).
-      **Manual edits set `trip.route_locked`** so the optimizer won't auto-reorder.
+      **Manual edits set `trip.route_locked`** so the optimizer won't auto-reorder;
+      a driver can **Unlock & re-optimize** (confirm dialog) to clear the lock and
+      trigger immediate recompute/re-optimization via the trip event.
 - [~] Trips: start/stop lifecycle, turn-by-turn navigate, POIs pending
 - [ ] **AI route optimization** (single + multi pickup/drop-off, shared-trailer
       capacity). DECISION DEFERRED (user researching the engine): OR-Tools VRP
