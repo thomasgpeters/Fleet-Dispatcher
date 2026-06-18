@@ -47,6 +47,11 @@ DEFAULT_ROUTES: Dict[str, dict] = {
         "broadcast": "trips",
         "scopes": [{"prefix": "driver", "field": "driver_id"}],
     },
+    # Mutable route waypoints (add/remove/reorder) — live map updates.
+    "waypoint": {
+        "broadcast": "waypoints",
+        "scopes": [{"prefix": "trip", "field": "trip_id"}],
+    },
     # Operational alerts — route is ready; a producer lands with an alert source.
     "alert": {
         "broadcast": "alerts",

@@ -234,7 +234,8 @@ INSERT INTO trip_status (id, code, name) VALUES
 INSERT INTO stop_type (id, code, name) VALUES
   (1, 'origin', 'Origin'), (2, 'destination', 'Destination'),
   (3, 'waypoint', 'Waypoint'), (4, 'fuel', 'Fuel'),
-  (5, 'rest', 'Rest'), (6, 'truck_stop', 'Truck stop');
+  (5, 'rest', 'Rest'), (6, 'truck_stop', 'Truck stop'),
+  (7, 'lunch', 'Lunch'), (8, 'load_stop', 'Load stop');
 
 INSERT INTO poi_category (id, code, name) VALUES
   (1, 'fuel', 'Fuel'), (2, 'rest_area', 'Rest area'),

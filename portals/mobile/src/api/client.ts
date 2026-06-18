@@ -17,6 +17,7 @@ import type {
   MessageDocument,
   MessagePin,
   PositionReport,
+  Route,
   SavedMessage,
   Trip,
   Waypoint,
@@ -464,5 +465,24 @@ export const api = {
     label?: string;
   }): Promise<Waypoint> {
     return createResource<Waypoint>("Waypoint", attrs);
+  },
+
+  /** Update a waypoint (re-label, re-sequence, or mark arrived). */
+  updateWaypoint(
+    id: string,
+    attrs: Partial<Pick<Waypoint, "seq" | "stop_type_id" | "label" | "arrived_at">>,
+  ): Promise<Waypoint> {
+    return updateResource<Waypoint>("Waypoint", id, attrs);
+  },
+
+  /** Remove a waypoint from a trip's route. */
+  deleteWaypoint(id: string): Promise<void> {
+    return deleteResource("Waypoint", id);
+  },
+
+  /** The computed route for a trip, if one exists. */
+  async routeForTrip(tripId: string): Promise<Route | null> {
+    const rows = await getCollection<Route>("Route", { trip_id: tripId });
+    return rows[0] ?? null;
   },
 };

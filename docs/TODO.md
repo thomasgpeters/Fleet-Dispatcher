@@ -147,8 +147,12 @@ Powers the HUD's map. See "Planned" in `domain-model.md`.
 - [x] Desktop HUD: truck-locations panel (latest per rig, 15s poll)
 - [x] Schema: navigation — `trip`, `waypoint`, `point_of_interest`, `route` +
       lookups (`trip_status`, `stop_type`, `poi_category`), lat/lng. Verified.
-- [~] Mobile Trips: list, start trip, add waypoint (done); trip start/stop
-      lifecycle, navigate, and POIs pending
+- [x] Mobile Trips: list, start trip; **mutable per-trip route** — trip overview
+      drills into an Edit-waypoints page to add (fuel/lunch/load-stop/…) or remove
+      stops; stop types `lunch`+`load_stop` added; waypoint edits stream live.
+- [~] Trips: start/stop lifecycle, turn-by-turn navigate, POIs, and route
+      recompute (geospatial recomputes polyline/distance when waypoints change)
+      pending
 - [x] `gis` bootstrap SQL (`database/gis_bootstrap.sql`): PostGIS into `gis` +
       derived geography views; **verified** `public` stays clean (ALS-safe).
       Full standup in [`DEPLOYMENT.md`](DEPLOYMENT.md).

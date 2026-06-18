@@ -36,6 +36,7 @@ TOPIC_MESSAGE = "message"
 TOPIC_POSITION = "position"
 TOPIC_LOAD = "load"
 TOPIC_TRIP = "trip"
+TOPIC_WAYPOINT = "waypoint"
 
 
 def _emit(logic_row: LogicRow, topic: str, key: str, payload: dict) -> None:
@@ -108,6 +109,21 @@ def _send_trip_event(row, old_row, logic_row: LogicRow) -> None:
     })
 
 
+def _send_waypoint_event(row, old_row, logic_row: LogicRow) -> None:
+    if not _is_change(logic_row):
+        return  # add / reorder / relabel of a route stop
+    _emit(logic_row, TOPIC_WAYPOINT, str(row.trip_id), {
+        "type": "waypoint",
+        "id": str(row.id),
+        "trip_id": str(row.trip_id),
+        "seq": row.seq,
+        "stop_type_id": row.stop_type_id,
+        "label": row.label,
+        "lat": row.lat,
+        "lng": row.lng,
+    })
+
+
 # Add new realtime purposes here as the app evolves — one topic per purpose, with
 # a correlation id as the kafka_key. Add a matching route in the bridge
 # (DEFAULT_ROUTES / KAFKA_TOPIC_ROUTES) and have clients subscribe. e.g. an
@@ -119,6 +135,7 @@ _PRODUCERS = [
     (models.PositionReport, _send_position_event),
     (models.Load, _send_load_event),
     (models.Trip, _send_trip_event),
+    (models.Waypoint, _send_waypoint_event),
 ]
 
 

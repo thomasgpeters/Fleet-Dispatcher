@@ -19,6 +19,21 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 - Docs: als-extensions/README, MIDDLEWARE_SETUP (post-generate step), REALTIME
   (producer points here), CLAUDE golden rule + component table.
 
+### Mutable per-trip GPS route — driver waypoints
+- Stop types added: `lunch` (7) + `load_stop` (8) for multi-load stops (schema
+  comment + seed; verified — 8 stop types). The `waypoint`/`route` tables already
+  modeled per-trip ordered, mutable stops.
+- Mobile: trip detail split for low clutter — **TripDetailPage** is a compact
+  overview (route summary: distance/ETA + read-only stops) that drills into a new
+  **TripWaypointsPage** (`/trips/:tripId/waypoints`) to add a stop at the current
+  GPS location by type (fuel / lunch / load stop / truck stop / waypoint) or
+  remove one (swipe); origin/destination fixed; new stops insert before the
+  destination (back-to-front seq bump to respect UNIQUE(trip_id, seq)).
+- API/types: `Route` type; `updateWaypoint`, `deleteWaypoint`, `routeForTrip`.
+- Realtime: seeded `waypoint` route + ALS `Waypoint` producer (insert/update,
+  key = trip_id) so route edits stream live (`waypoints`/`trip:<id>`) — map
+  updates as realtime data. mobile build clean; schema+seed verified.
+
 ### Realtime data plane: live data from the stream, not ALS reads
 - Defined two planes (docs/REALTIME.md + CLAUDE): **realtime** (messages, fleet
   locations / map updates, live status) flows from the **Kafka stream via the
