@@ -65,6 +65,30 @@ def _routes() -> Dict[str, dict]:
     return dict(DEFAULT_ROUTES)
 
 
+def _group_unique() -> bool:
+    return os.environ.get("KAFKA_GROUP_UNIQUE", "true").lower() != "false"
+
+
+def _group_id() -> str:
+    """Effective consumer group.id, computed once per process.
+
+    PUB/SUB (default): a UNIQUE group per instance, so EVERY bridge instance
+    receives EVERY event and fans it out to its own WebSocket clients — correct
+    for a relay and for running multiple instances (HA/scale).
+
+    Set KAFKA_GROUP_UNIQUE=false to share one fixed group (Kafka competing-
+    consumer / QUEUE semantics: each event handled by only one instance) — that's
+    for work distribution, NOT fan-out.
+    """
+    base = os.environ.get("KAFKA_GROUP_ID", "fleet-realtime-bridge")
+    if not _group_unique():
+        return base
+    import socket
+    import uuid
+
+    return f"{base}-{socket.gethostname()}-{os.getpid()}-{uuid.uuid4().hex[:8]}"
+
+
 @dataclass(frozen=True)
 class Config:
     # --- Kafka (consumer) ---
@@ -74,7 +98,9 @@ class Config:
         or os.environ.get("KAFKA_SERVER")
         or "localhost:9092"
     )
-    group_id: str = os.environ.get("KAFKA_GROUP_ID", "fleet-realtime-bridge")
+    # Unique per instance by default → pub/sub fan-out (see _group_id).
+    group_id: str = field(default_factory=_group_id)
+    group_unique: bool = field(default_factory=_group_unique)
     auto_offset_reset: str = os.environ.get("KAFKA_AUTO_OFFSET_RESET", "latest")
     # Topic -> routing registry (config-driven; see DEFAULT_ROUTES).
     routes: Dict[str, dict] = field(default_factory=_routes)
@@ -108,7 +134,10 @@ class Config:
             "bootstrap.servers": self.bootstrap_servers,
             "group.id": self.group_id,
             "auto.offset.reset": self.auto_offset_reset,
-            "enable.auto.commit": True,
+            # An ephemeral per-instance group only wants live events, so don't
+            # commit offsets (avoids offset-metadata churn). A shared/queue group
+            # commits so work resumes where it left off.
+            "enable.auto.commit": not self.group_unique,
         }
 
 

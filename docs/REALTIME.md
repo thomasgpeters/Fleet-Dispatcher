@@ -49,6 +49,34 @@ So a leaked client build exposes only a WebSocket URL and a (scoped, expiring)
 token — never the Kafka topology or the secret. Rotate secrets by editing the
 server-side env files; no client change needed.
 
+## Consumer model — publish/subscribe (one or more consumers)
+
+ALS produces each event **once** to a topic. Kafka then delivers it to **every
+consumer group** independently — that's the pub/sub part. So any number of
+independent consumers can pick up the same messages:
+
+```
+                              ┌─ group "realtime-bridge-A" → WS clients   (this service)
+ALS ─▶ topic ─▶ Kafka  ──────▶├─ group "realtime-bridge-B" → WS clients   (HA replica)
+        (one copy produced)   ├─ group "notifications"      → push/email   (future)
+                              └─ group "analytics"          → warehouse    (future)
+```
+
+Two rules that keep this correct:
+
+- **Different purpose ⇒ different `group.id`.** Each service is its own
+  subscriber and receives the **full** stream. Add consumers without touching the
+  producer or other consumers.
+- **The bridge is a FAN-OUT relay, so every instance needs every event.** Each
+  bridge instance therefore uses a **unique** group (`KAFKA_GROUP_UNIQUE=true`,
+  the default — base id + host/pid/uuid). Run as many instances as you like for
+  HA/scale; each fans out to its own connected WebSocket clients.
+- Set `KAFKA_GROUP_UNIQUE=false` (shared `KAFKA_GROUP_ID`) only when you *want*
+  Kafka's competing-consumer **queue** semantics — one event handled by exactly
+  one instance (work distribution, e.g. a notifications worker pool) — never for
+  fan-out. (The bridge also skips offset commits in unique mode — it only wants
+  live events.)
+
 ## Topic strategy — single topic per row type + correlation id (NOT topic-per-channel)
 
 **Decision:** one Kafka topic **per row type** (`message`, `position`), with the

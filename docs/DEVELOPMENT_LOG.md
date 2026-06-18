@@ -19,6 +19,20 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 - Docs: als-extensions/README, MIDDLEWARE_SETUP (post-generate step), REALTIME
   (producer points here), CLAUDE golden rule + component table.
 
+### Consumer model: true pub/sub (unique group per bridge instance)
+- Fixed the Kafka consumer-group semantics for fan-out: each bridge instance now
+  uses a **unique** `group.id` by default (`KAFKA_GROUP_UNIQUE=true` → base +
+  host/pid/uuid, computed once per process), so EVERY instance receives EVERY
+  event and fans out to its own WebSocket clients. A shared group would be
+  competing-consumer/queue semantics and would drop events per client across
+  replicas.
+- `KAFKA_GROUP_UNIQUE=false` opts into shared/queue mode (work distribution).
+  Unique mode also disables offset commit (relay only wants live events). Bridge
+  logs the group + mode. Independent services each use their own group (pub/sub):
+  the bridge is one consumer; notifications/analytics/etc. can add their own.
+- Docs: REALTIME "Consumer model — publish/subscribe"; .env documents
+  KAFKA_GROUP_ID/KAFKA_GROUP_UNIQUE. Verified both modes.
+
 ### Seed realtime routes: load, trip, alert
 - Bridge `DEFAULT_ROUTES` seeded with `load` (broadcast `loads`; scopes
   `driver:<id>`, `week:<id>`), `trip` (`trips`; `driver:<id>`), and `alert`

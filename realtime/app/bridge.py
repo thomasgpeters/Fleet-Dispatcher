@@ -189,7 +189,11 @@ def _consume_loop(loop: asyncio.AbstractEventLoop, queue: "asyncio.Queue[tuple[s
         try:
             consumer = Consumer(config.kafka_conf())
             consumer.subscribe(config.topics)
-            log.info("kafka consumer up: %s topics=%s", config.bootstrap_servers, config.topics)
+            log.info(
+                "kafka consumer up: %s topics=%s group=%s (%s)",
+                config.bootstrap_servers, config.topics, config.group_id,
+                "pub/sub" if config.group_unique else "shared/queue",
+            )
             backoff = 1.0
             while not stop.is_set():
                 rec = consumer.poll(1.0)
