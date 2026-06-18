@@ -36,47 +36,60 @@ TOPIC_MESSAGE = "message"
 TOPIC_POSITION = "position"
 
 
+def _emit(logic_row: LogicRow, topic: str, key: str, payload: dict) -> None:
+    """One topic per purpose; `key` is the correlation id (partition + ordering)."""
+    kafka_producer.send_kafka_message(
+        logic_row=logic_row, kafka_topic=topic, kafka_key=key, payload=payload
+    )
+
+
 def _send_message_event(row, old_row, logic_row: LogicRow) -> None:
     if not logic_row.is_inserted():
         return  # inserts only (new chat messages)
-    kafka_producer.send_kafka_message(
-        logic_row=logic_row,
-        kafka_topic=TOPIC_MESSAGE,
-        kafka_key=str(row.channel_id),  # correlation id -> partition + ordering
-        payload={
-            "type": "message",
-            "id": str(row.id),
-            "channel_id": str(row.channel_id),
-            "author_id": str(row.author_id),
-            "posted_at": str(row.posted_at),
-            "body": (row.body or "")[:240],
-        },
-    )
+    _emit(logic_row, TOPIC_MESSAGE, str(row.channel_id), {
+        "type": "message",
+        "id": str(row.id),
+        "channel_id": str(row.channel_id),
+        "author_id": str(row.author_id),
+        "posted_at": str(row.posted_at),
+        "body": (row.body or "")[:240],
+    })
 
 
 def _send_position_event(row, old_row, logic_row: LogicRow) -> None:
     if not logic_row.is_inserted():
         return  # inserts only (new telemetry fixes)
-    kafka_producer.send_kafka_message(
-        logic_row=logic_row,
-        kafka_topic=TOPIC_POSITION,
-        kafka_key=str(row.equipment_id or ""),
-        payload={
-            "type": "position",
-            "id": str(row.id),
-            "equipment_id": str(row.equipment_id) if row.equipment_id else None,
-            "driver_id": str(row.driver_id) if row.driver_id else None,
-            "lat": row.lat,
-            "lng": row.lng,
-            "recorded_at": str(row.recorded_at),
-        },
-    )
+    _emit(logic_row, TOPIC_POSITION, str(row.equipment_id or ""), {
+        "type": "position",
+        "id": str(row.id),
+        "equipment_id": str(row.equipment_id) if row.equipment_id else None,
+        "driver_id": str(row.driver_id) if row.driver_id else None,
+        "lat": row.lat,
+        "lng": row.lng,
+        "recorded_at": str(row.recorded_at),
+    })
+
+
+# Add new realtime purposes here as the app evolves — one topic per purpose, with
+# a correlation id as the kafka_key. Then add a matching route in the bridge
+# (DEFAULT_ROUTES / KAFKA_TOPIC_ROUTES) and have clients subscribe. Example:
+#
+#   def _send_load_event(row, old_row, logic_row):
+#       if logic_row.is_inserted():
+#           _emit(logic_row, "load", str(row.driver_id or ""),
+#                 {"type": "load", "id": str(row.id), "driver_id": str(row.driver_id)})
+
+# (model class, handler) pairs registered on startup. Extend this list to add types.
+_PRODUCERS = [
+    (models.Message, _send_message_event),
+    (models.PositionReport, _send_position_event),
+]
 
 
 def declare_logic() -> None:
     """Registered by ALS logic discovery on server start."""
-    Rule.after_flush_row_event(on_class=models.Message, calling=_send_message_event)
-    Rule.after_flush_row_event(
-        on_class=models.PositionReport, calling=_send_position_event
+    for model_cls, handler in _PRODUCERS:
+        Rule.after_flush_row_event(on_class=model_cls, calling=handler)
+    log.info(
+        "Fleet Dispatcher Kafka producers registered: %d type(s)", len(_PRODUCERS)
     )
-    log.info("Fleet Dispatcher Kafka producers registered (message, position)")

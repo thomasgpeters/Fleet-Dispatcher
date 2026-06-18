@@ -7,13 +7,47 @@ to. See docs/REALTIME.md.
 
 from __future__ import annotations
 
+import json
 import os
 from dataclasses import dataclass, field
-from typing import List
+from typing import Dict, List
 
 
 def _split(csv: str) -> List[str]:
     return [s.strip() for s in csv.split(",") if s.strip()]
+
+
+# Topic routing registry: maps each Kafka topic (one per purpose/row type) to how
+# the bridge derives WebSocket "keys" clients subscribe to. Adding a new topic is
+# CONFIG, not code — and an unknown topic still works (generic fallback in
+# bridge.py broadcasts it on its own name). Override the whole map with the env
+# var KAFKA_TOPIC_ROUTES (JSON) as the app evolves.
+#
+#   "broadcast": a key every subscriber to this stream uses (e.g. "messages")
+#   "scopes":    [{"prefix","field"}] -> targeted keys "<prefix>:<payload field>"
+DEFAULT_ROUTES: Dict[str, dict] = {
+    "message": {
+        "broadcast": "messages",
+        "scopes": [{"prefix": "channel", "field": "channel_id"}],
+    },
+    "position": {
+        "broadcast": "fleet",
+        "scopes": [{"prefix": "equipment", "field": "equipment_id"}],
+    },
+    # Future purposes are just more entries, e.g.:
+    #   "load":  {"broadcast": "loads",  "scopes": [{"prefix": "driver", "field": "driver_id"}]},
+    #   "alert": {"broadcast": "alerts", "scopes": [{"prefix": "driver", "field": "driver_id"}]},
+}
+
+
+def _routes() -> Dict[str, dict]:
+    raw = os.environ.get("KAFKA_TOPIC_ROUTES")
+    if raw:
+        try:
+            return json.loads(raw)
+        except ValueError:
+            pass  # fall back to defaults on bad JSON
+    return dict(DEFAULT_ROUTES)
 
 
 @dataclass(frozen=True)
@@ -27,10 +61,8 @@ class Config:
     )
     group_id: str = os.environ.get("KAFKA_GROUP_ID", "fleet-realtime-bridge")
     auto_offset_reset: str = os.environ.get("KAFKA_AUTO_OFFSET_RESET", "latest")
-    # Topics ALS produces to (one per row type). topic -> event type mapping.
-    topics: List[str] = field(
-        default_factory=lambda: _split(os.environ.get("KAFKA_TOPICS", "message,position"))
-    )
+    # Topic -> routing registry (config-driven; see DEFAULT_ROUTES).
+    routes: Dict[str, dict] = field(default_factory=_routes)
 
     # --- WebSocket server ---
     host: str = os.environ.get("BRIDGE_HOST", "0.0.0.0")
@@ -45,6 +77,16 @@ class Config:
     jwt_secret: str = os.environ.get("FLEET_JWT_SECRET") or os.environ.get("SECRET_KEY", "")
     jwt_algorithm: str = os.environ.get("FLEET_JWT_ALGORITHM", "HS256")
     auth_required: bool = os.environ.get("BRIDGE_AUTH_REQUIRED", "true").lower() != "false"
+
+    @property
+    def topics(self) -> List[str]:
+        """Topics to subscribe to: KAFKA_TOPICS override, else every routed topic."""
+        env = os.environ.get("KAFKA_TOPICS")
+        return _split(env) if env else list(self.routes.keys())
+
+    def route_for(self, topic: str) -> dict:
+        """Routing spec for a topic; generic fallback keeps unknown topics working."""
+        return self.routes.get(topic, {"broadcast": topic, "scopes": []})
 
     def kafka_conf(self) -> dict:
         return {

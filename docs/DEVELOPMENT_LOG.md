@@ -19,6 +19,18 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 - Docs: als-extensions/README, MIDDLEWARE_SETUP (post-generate step), REALTIME
   (producer points here), CLAUDE golden rule + component table.
 
+### Multi-topic ready: config-driven routing for new purposes
+- Bridge routing is now **config-driven** (`realtime/app/config.py` →
+  `DEFAULT_ROUTES`, overridable via `KAFKA_TOPIC_ROUTES` JSON env). Each topic maps
+  to a `broadcast` key + optional `scopes` ({prefix, field}); `routing_keys()` is
+  generic. **Unknown topics still work** (broadcast on their own name) so a
+  producer can ship ahead of a route entry — no fan-out code change to add a
+  purpose. Subscribed topics derive from the route map (or `KAFKA_TOPICS`).
+- ALS producer made extensible: a `_PRODUCERS` list + `_emit()` helper; adding a
+  type is one handler + one list entry (loads/trips/alerts… as the app evolves).
+- Docs: REALTIME "Multiple topics, and adding one" guide; .env.example shows
+  `KAFKA_TOPIC_ROUTES`. Bridge + snippet syntax-checked.
+
 ### Hide Kafka config — internal env files only
 - Hardened `.gitignore`: ignore `.env` + `*.env`, keep only `*.env.example`
   placeholder templates (verified with `git check-ignore`). No real broker/secret

@@ -61,20 +61,19 @@ def normalize(topic: str, raw: bytes) -> Optional[Dict[str, Any]]:
     return event
 
 
-def routing_keys(event: Dict[str, Any]) -> Set[str]:
-    """Topics a client must be subscribed to in order to receive this event."""
-    etype = event.get("type", "")
-    keys: Set[str] = {etype}  # e.g. "message" / "position"
-    if etype == "message":
-        keys.add("messages")
-        ch = event.get("channel_id")
-        if ch:
-            keys.add(f"channel:{ch}")
-    elif etype == "position":
-        keys.add("fleet")
-        eq = event.get("equipment_id")
-        if eq:
-            keys.add(f"equipment:{eq}")
+def routing_keys(topic: str, event: Dict[str, Any]) -> Set[str]:
+    """WebSocket subscription keys this event is delivered to — derived from the
+    config-driven route registry, so adding a topic/purpose needs no code change.
+    """
+    route = config.route_for(topic)
+    keys: Set[str] = {event.get("type") or topic}  # the type/topic stream itself
+    broadcast = route.get("broadcast")
+    if broadcast:
+        keys.add(broadcast)
+    for scope in route.get("scopes", []):
+        value = event.get(scope.get("field", ""))
+        if value:
+            keys.add(f"{scope['prefix']}:{value}")
     return keys
 
 
@@ -97,8 +96,8 @@ class Hub:
     def remove(self, c: Client) -> None:
         self.clients.discard(c)
 
-    async def fan_out(self, event: Dict[str, Any]) -> None:
-        keys = routing_keys(event)
+    async def fan_out(self, topic: str, event: Dict[str, Any]) -> None:
+        keys = routing_keys(topic, event)
         payload = json.dumps({"type": "event", "event": event})
         dead = []
         for c in list(self.clients):
@@ -178,7 +177,7 @@ async def handle(ws: WebSocketServerProtocol) -> None:
 
 # --- Kafka consumer (background thread) --------------------------------------
 
-def _consume_loop(loop: asyncio.AbstractEventLoop, queue: "asyncio.Queue[Dict[str, Any]]",
+def _consume_loop(loop: asyncio.AbstractEventLoop, queue: "asyncio.Queue[tuple[str, Dict[str, Any]]]",
                   stop: threading.Event) -> None:
     """Poll Kafka and hand events to the asyncio loop. Resilient to broker
     outages (confluent-kafka reconnects); fatal errors retry with backoff."""
@@ -202,7 +201,7 @@ def _consume_loop(loop: asyncio.AbstractEventLoop, queue: "asyncio.Queue[Dict[st
                     continue
                 event = normalize(rec.topic(), rec.value())
                 if event is not None:
-                    loop.call_soon_threadsafe(queue.put_nowait, event)
+                    loop.call_soon_threadsafe(queue.put_nowait, (rec.topic(), event))
         except Exception as e:  # broker unreachable, etc.
             log.error("kafka loop error (retry in %.0fs): %s", backoff, e)
             stop.wait(backoff)
@@ -215,10 +214,10 @@ def _consume_loop(loop: asyncio.AbstractEventLoop, queue: "asyncio.Queue[Dict[st
                     pass
 
 
-async def _dispatch(queue: "asyncio.Queue[Dict[str, Any]]") -> None:
+async def _dispatch(queue: "asyncio.Queue[tuple[str, Dict[str, Any]]]") -> None:
     while True:
-        event = await queue.get()
-        await hub.fan_out(event)
+        topic, event = await queue.get()
+        await hub.fan_out(topic, event)
 
 
 # --- Entry -------------------------------------------------------------------
@@ -231,7 +230,7 @@ async def run() -> None:
         )
 
     loop = asyncio.get_running_loop()
-    queue: "asyncio.Queue[Dict[str, Any]]" = asyncio.Queue()
+    queue: "asyncio.Queue[tuple[str, Dict[str, Any]]]" = asyncio.Queue()
     stop = threading.Event()
 
     consumer_thread = threading.Thread(

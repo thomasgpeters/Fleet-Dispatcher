@@ -71,7 +71,28 @@ Why not a Kafka topic per comms channel:
 channel land on the same partition and stay ordered, while the topic count stays
 fixed. (Correlation id in the payload; partition affinity via the key.)
 
-Use topic-per-*type* (what we do) — never topic-per-*instance*.
+Use topic-per-*type/purpose* (what we do) — never topic-per-*instance*.
+
+### Multiple topics, and adding one as the app evolves
+
+We expect more purposes over time (loads, trips, alerts, settlements, …). The
+bridge routing is **config-driven**, so a new topic is config, not code:
+
+- The bridge keeps a **route registry** (`realtime/app/config.py` →
+  `DEFAULT_ROUTES`, overridable with the `KAFKA_TOPIC_ROUTES` env JSON). Each
+  topic maps to a `broadcast` key + optional `scopes` (`{prefix, field}` →
+  `prefix:<payload value>`). An **unknown topic still works** — it's broadcast on
+  its own name (generic fallback), so nothing breaks if a producer ships ahead of
+  a route entry.
+- To add a purpose:
+  1. **ALS** — add a `_send_*` handler + entry in `_PRODUCERS`
+     (`als-extensions/logic_discovery/fleet_events.py`); one topic, correlation
+     id as `kafka_key`.
+  2. **Bridge** — add a route (in `DEFAULT_ROUTES` or via `KAFKA_TOPIC_ROUTES`)
+     if you want scoped keys; otherwise the fallback handles it.
+  3. **Clients** — `subscribe` to the new keys (e.g. `loads`, `driver:<id>`).
+
+No change to the consumer loop, auth, or fan-out — those are generic.
 
 ## Event envelope (the contract)
 
@@ -94,7 +115,8 @@ fields the clients use:
 1. Connect `ws://<host>:8765/?token=<ALS-JWT>` (HS256, verified with the shared
    `FLEET_JWT_SECRET`). Invalid/missing → close `4401`.
 2. `{"action":"subscribe","topics":["channel:<id>","fleet"]}`.
-   Topics: `channel:<id>`, `messages`, `fleet`, `equipment:<id>`.
+   Keys are whatever the route registry produces — currently `channel:<id>`,
+   `messages`, `fleet`, `equipment:<id>` — and grow as purposes are added.
 3. Receive `{"type":"event","event":{...}}`.
 
 ## Pieces
