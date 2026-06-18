@@ -460,6 +460,10 @@ CREATE TABLE trip (
     name           TEXT,
     started_at     TIMESTAMPTZ,
     ended_at       TIMESTAMPTZ,
+    -- Set TRUE when a driver manually edits the stop order (add/remove/reorder).
+    -- The route OPTIMIZER must not auto-reorder a locked trip; geometry recompute
+    -- (which preserves order) still runs. Clear it to re-enable optimization.
+    route_locked   BOOLEAN NOT NULL DEFAULT FALSE,
     created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
     CONSTRAINT trip_end_after_start CHECK (
         ended_at IS NULL OR started_at IS NULL OR ended_at >= started_at)

@@ -104,6 +104,12 @@ export function TripDetailPage() {
           </IonItem>
         )}
 
+        {trip?.route_locked && (
+          <IonItem lines="full">
+            <IonNote>Manual stop order — auto-optimization is off for this trip.</IonNote>
+          </IonItem>
+        )}
+
         <IonList>
           <IonListHeader>
             <IonLabel>Stops ({stops.length})</IonLabel>

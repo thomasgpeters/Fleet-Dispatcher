@@ -9,17 +9,17 @@ import {
   IonHeader,
   IonIcon,
   IonItem,
-  IonItemOption,
-  IonItemOptions,
-  IonItemSliding,
   IonLabel,
   IonList,
   IonNote,
   IonPage,
+  IonReorder,
+  IonReorderGroup,
   IonText,
   IonTitle,
   IonToolbar,
 } from "@ionic/react";
+import type { ItemReorderEventDetail } from "@ionic/react";
 import { addOutline, trashOutline } from "ionicons/icons";
 
 import { api } from "../api/client";
@@ -62,6 +62,11 @@ export function TripWaypointsPage() {
   const fail = (e: unknown) =>
     setError(e instanceof Error ? e.message : String(e));
 
+  // A manual edit (add/remove/reorder) locks the trip's order so the route
+  // optimizer won't auto-reorder it. (Geometry recompute still runs server-side.)
+  const lockOrder = () =>
+    api.updateTrip(tripId, { route_locked: true }).catch(() => undefined);
+
   const load = async () => {
     try {
       const w = await api.waypointsForTrip(tripId);
@@ -100,7 +105,10 @@ export function TripWaypointsPage() {
               lng: pos.coords.longitude,
               label,
             })
-            .then(() => load())
+            .then(() => {
+              void lockOrder();
+              return load();
+            })
             .catch(fail);
 
         if (dest) {
@@ -124,7 +132,40 @@ export function TripWaypointsPage() {
   };
 
   const removeStop = (w: Waypoint) => {
-    api.deleteWaypoint(w.id).then(() => load()).catch(fail);
+    api
+      .deleteWaypoint(w.id)
+      .then(() => {
+        void lockOrder();
+        return load();
+      })
+      .catch(fail);
+  };
+
+  // Drag-reorder: persist the new order as seq = 1..N. Two-phase (offset first)
+  // to respect UNIQUE (trip_id, seq) without mid-update collisions. The route is
+  // recomputed automatically server-side from the waypoint change events.
+  const persistOrder = async (ordered: Waypoint[]) => {
+    try {
+      await Promise.all(
+        ordered.map((w, i) => api.updateWaypoint(w.id, { seq: 1000 + i })),
+      );
+      await Promise.all(
+        ordered.map((w, i) => api.updateWaypoint(w.id, { seq: i + 1 })),
+      );
+      void lockOrder(); // manual reorder → optimizer leaves this trip alone
+      await load();
+    } catch (e) {
+      fail(e);
+    }
+  };
+
+  const handleReorder = (e: CustomEvent<ItemReorderEventDetail>) => {
+    const reordered = [...stops];
+    const [moved] = reordered.splice(e.detail.from, 1);
+    reordered.splice(e.detail.to, 0, moved);
+    e.detail.complete(); // finish the DOM move
+    setStops(reordered.map((w, i) => ({ ...w, seq: i + 1 })));
+    void persistOrder(reordered);
   };
 
   return (
@@ -150,9 +191,9 @@ export function TripWaypointsPage() {
           </IonText>
         )}
         <IonList>
-          {stops.map((w) => (
-            <IonItemSliding key={w.id}>
-              <IonItem>
+          <IonReorderGroup disabled={false} onIonItemReorder={handleReorder}>
+            {stops.map((w) => (
+              <IonItem key={w.id}>
                 <IonLabel>
                   <h2>
                     {w.seq}. {w.label ?? STOP_TYPE[w.stop_type_id]}
@@ -163,19 +204,25 @@ export function TripWaypointsPage() {
                     {w.arrived_at ? " · arrived" : ""}
                   </IonNote>
                 </IonLabel>
-              </IonItem>
-              {w.stop_type_id !== 1 && w.stop_type_id !== 2 && (
-                <IonItemOptions slot="end">
-                  <IonItemOption color="danger" onClick={() => removeStop(w)}>
+                {/* Origin/destination stay put; intermediate stops are removable. */}
+                {w.stop_type_id !== 1 && w.stop_type_id !== 2 && (
+                  <IonButton
+                    slot="end"
+                    fill="clear"
+                    color="danger"
+                    onClick={() => removeStop(w)}
+                  >
                     <IonIcon slot="icon-only" icon={trashOutline} />
-                  </IonItemOption>
-                </IonItemOptions>
-              )}
-            </IonItemSliding>
-          ))}
+                  </IonButton>
+                )}
+                <IonReorder slot="end" />
+              </IonItem>
+            ))}
+          </IonReorderGroup>
         </IonList>
         <IonNote className="ion-padding" style={{ display: "block" }}>
-          Swipe a stop to remove it. Origin and destination are fixed.
+          Drag the handle to reorder stops; tap the trash to remove one. Origin and
+          destination are fixed. The route recomputes automatically.
         </IonNote>
       </IonContent>
 

@@ -205,6 +205,9 @@ export interface Trip {
   name?: string;
   started_at?: string;
   ended_at?: string;
+  // TRUE once the driver manually edits the stop order; the optimizer then
+  // leaves this trip's order alone (geometry still recomputes).
+  route_locked?: boolean;
 }
 
 export interface Waypoint {

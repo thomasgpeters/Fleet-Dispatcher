@@ -20,6 +20,24 @@ which owns the gis views and has `search_path = gis, fleet, public` preset.
 | `GET /truck-stops/nearest?lat=&lng=&limit=`     | nearest truck-stop POIs (KNN, `<->`)      |
 | `GET /trucks/near?lat=&lng=&radius_m=`          | latest position per rig within a radius   |
 | `GET /positions/latest`                         | latest position per rig (fleet-wide)      |
+| `POST /route/recompute/{trip_id}`               | recompute + upsert a trip's route         |
+
+## Auto route recompute
+
+Recomputes a trip's `route` (distance / ETA / polyline) from its ordered
+waypoints. It runs **automatically**: a Kafka consumer subscribes to the
+`waypoint`/`trip` change events (produced by ALS → Kafka, see
+[`../docs/REALTIME.md`](../docs/REALTIME.md)) and recomputes on every change, from
+any client. The `POST /route/recompute/{trip_id}` endpoint does the same on demand.
+
+- Recompute **preserves the waypoint order** — it never reorders — so it's safe
+  for trips a driver has manually ordered. (The separate, deferred route
+  *optimizer* that reorders must skip `trip.route_locked` trips.)
+- Provider: `haversine` (dev, great-circle) by default; swap a real road router
+  (HERE) via `ROUTING_PROVIDER`. Writes use `FLEET_DATABASE_URL` (the fleet role,
+  which can write `fleet.route`); reads of the gis views still use `fleet_gis`.
+- The consumer is **optional** — it starts only if Kafka is configured
+  (`KAFKA_BOOTSTRAP_SERVERS`/`KAFKA_SERVER`). See `.env.example`.
 
 ## Run
 

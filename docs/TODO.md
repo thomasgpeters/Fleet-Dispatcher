@@ -148,8 +148,11 @@ Powers the HUD's map. See "Planned" in `domain-model.md`.
 - [x] Schema: navigation — `trip`, `waypoint`, `point_of_interest`, `route` +
       lookups (`trip_status`, `stop_type`, `poi_category`), lat/lng. Verified.
 - [x] Mobile Trips: list, start trip; **mutable per-trip route** — trip overview
-      drills into an Edit-waypoints page to add (fuel/lunch/load-stop/…) or remove
-      stops; stop types `lunch`+`load_stop` added; waypoint edits stream live.
+      drills into an Edit-waypoints page to add (fuel/lunch/load-stop/…), remove,
+      or **drag-reorder** stops; stop types `lunch`+`load_stop`; waypoint edits
+      stream live. **Auto route recompute** in `geospatial/` (Kafka
+      `waypoint`/`trip` consumer → upsert `route`; haversine now, HERE pluggable).
+      **Manual edits set `trip.route_locked`** so the optimizer won't auto-reorder.
 - [~] Trips: start/stop lifecycle, turn-by-turn navigate, POIs pending
 - [ ] **AI route optimization** (single + multi pickup/drop-off, shared-trailer
       capacity). DECISION DEFERRED (user researching the engine): OR-Tools VRP
@@ -158,7 +161,8 @@ Powers the HUD's map. See "Planned" in `domain-model.md`.
       `equipment.weight_capacity_lbs` (per tractor/trailer config) and
       `load.deck_feet` + `load.weight_lbs`. Optimizer will be a capacitated
       pickup-and-delivery solve (pickup-before-dropoff, both dimensions) in
-      `geospatial/`, fed by a HERE/haversine travel matrix.
+      `geospatial/`, fed by a HERE/haversine travel matrix. MUST skip
+      `trip.route_locked` trips (driver manually ordered them).
 - [x] `gis` bootstrap SQL (`database/gis_bootstrap.sql`): PostGIS into `gis` +
       derived geography views; **verified** `public` stays clean (ALS-safe).
       Full standup in [`DEPLOYMENT.md`](DEPLOYMENT.md).

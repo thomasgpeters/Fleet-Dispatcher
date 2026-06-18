@@ -452,6 +452,14 @@ export const api = {
     return createResource<Trip>("Trip", attrs);
   },
 
+  /** Update trip fields (status, name, route_locked, …). */
+  updateTrip(
+    id: string,
+    attrs: Partial<Pick<Trip, "trip_status_id" | "name" | "route_locked">>,
+  ): Promise<Trip> {
+    return updateResource<Trip>("Trip", id, attrs);
+  },
+
   waypointsForTrip(tripId: string): Promise<Waypoint[]> {
     return getCollection<Waypoint>("Waypoint", { trip_id: tripId });
   },

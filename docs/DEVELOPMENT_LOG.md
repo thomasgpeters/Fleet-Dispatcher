@@ -19,6 +19,22 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 - Docs: als-extensions/README, MIDDLEWARE_SETUP (post-generate step), REALTIME
   (producer points here), CLAUDE golden rule + component table.
 
+### Drag-reorder waypoints + auto route recompute + manual-order lock
+- Mobile: **drag-and-drop reorder** in the waypoints editor (IonReorderGroup);
+  persists new `seq` with a two-phase (offset-then-final) update to respect
+  UNIQUE(trip_id, seq). Delete moved to a trailing button (reorder handle on end).
+- **Auto route recompute** (geospatial/): new `routing.py` (haversine dev provider;
+  HERE pluggable), `recompute.py` (reads ordered waypoints → upserts fleet.route
+  via FLEET_DATABASE_URL), and `recompute_consumer.py` (Kafka consumer on
+  `waypoint`/`trip` → recompute) started on FastAPI startup + a `POST
+  /route/recompute/{trip_id}` endpoint. Recompute **preserves order** (never
+  reorders), so it's safe for manually-ordered trips. Syntax-checked.
+- **Manual-order lock** (per request): new `trip.route_locked` (default FALSE).
+  Any manual waypoint edit (add/remove/**reorder**) sets it via `updateTrip`; the
+  (deferred) route OPTIMIZER must skip locked trips — geometry recompute still
+  runs. Trip overview shows a "manual order — optimization off" note. Verified
+  schema+seed (route_locked=f default); mobile build clean.
+
 ### Route-optimization capacity foundation (engine deferred)
 - Per user: the AI route-optimization **engine choice is deferred** (researching
   OR-Tools vs HERE Tour Planning vs LLM-as-caller) — recorded in TODO.

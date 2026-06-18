@@ -20,12 +20,44 @@ import psycopg
 from psycopg.rows import dict_row
 from fastapi import FastAPI, Query
 
+from .recompute import recompute_route
+from .recompute_consumer import start_auto_recompute
+
 GIS_DATABASE_URL = os.environ.get(
     "GIS_DATABASE_URL",
     "postgresql://fleet_gis:fleet_gis@localhost:5432/fleet_dispatcher",
 )
 
 app = FastAPI(title="Fleet Dispatcher — Geospatial endpoint")
+
+# Auto route recompute: consume waypoint/trip change events and recompute the
+# affected trip's route (geometry/distance/ETA). recompute keeps the existing
+# waypoint ORDER — it never reorders — so it's safe for manually-ordered trips.
+# (The route *optimizer* that reorders must skip trip.route_locked trips.)
+_recompute_stop = None
+
+
+@app.on_event("startup")
+def _start_recompute() -> None:
+    global _recompute_stop
+    _recompute_stop = start_auto_recompute()
+
+
+@app.on_event("shutdown")
+def _stop_recompute() -> None:
+    if _recompute_stop is not None:
+        _recompute_stop.set()
+
+
+@app.post("/route/recompute/{trip_id}")
+def route_recompute(trip_id: str) -> dict[str, Any]:
+    """On-demand recompute (the consumer does this automatically on changes)."""
+    r = recompute_route(trip_id)
+    return (
+        {"status": "ok", "route": r}
+        if r
+        else {"status": "skipped", "detail": "trip needs at least two waypoints"}
+    )
 
 
 @contextmanager
