@@ -15,6 +15,7 @@ is the orientation an agent needs first.
 | `portals/dispatcher-desktop/` | Dispatcher console + HUD | C++ / Wt |
 | `assistant/` | "Hey Dispatch" voice assistant service | Python |
 | `realtime/` | WebSocket bridge: ALS→Kafka events → clients | Python |
+| `als-extensions/` | ALS customizations to (re)install post-generate (Kafka producers) | Python |
 | `geospatial/` | Spatial helpers | Python |
 | `docs/` | Domain model, architecture, per-feature docs | Markdown |
 
@@ -28,7 +29,9 @@ All clients talk **only** to the JSON:API — never directly to PostgreSQL.
    Fleet lives in its own `fleet` schema (not `public`).
 2. **Don't write middleware Python.** ALS generates the API + LogicBank rules
    from the schema. Adding a redundant service is wrong unless explicitly asked.
-   A schema change means **ALS must be regenerated** — say so.
+   A schema change means **ALS must be regenerated** — say so. After a fresh ALS
+   generate, re-install our customizations with `make als-extensions` (the Kafka
+   event producers in `als-extensions/`; rebuilds preserve them).
 3. **Verify DB changes on a throwaway Postgres before committing.** Apply
    `schema.sql` + `seed_data.sql` to a fresh PG16 cluster and check it's clean.
    Use the `/verify-db` command. Never test against a persistent database.

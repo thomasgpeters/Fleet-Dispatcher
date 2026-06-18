@@ -80,7 +80,7 @@ fields the clients use:
 
 | Piece | Where | Notes |
 | --- | --- | --- |
-| Producer | ALS project (outside repo) | `KAFKA_PRODUCER` + `send_row_to_kafka`, key = correlation id |
+| Producer | ALS project (outside repo) | our snippet in [`als-extensions/`](../als-extensions/) — `Rule.after_flush_row_event` + `send_kafka_message`, key = correlation id; installed via `make als-extensions` |
 | Bridge | [`realtime/`](../realtime/) | confluent-kafka consumer → WebSocket; JWT; auto-reconnect |
 | Mobile | `portals/mobile/src/realtime/` | `RealtimeClient` (backoff reconnect) + `RealtimeProvider`; wired into Channel/Channels |
 | Desktop/HUD | `portals/dispatcher-desktop/` | intra-server push today (`CommBus` + Wt WebSockets, `wt_config.xml`); joining the bridge via a WS client is the next step |
@@ -90,4 +90,7 @@ fields the clients use:
 - Mobile: **done** — live channel messages + unread, with reconcile fallback.
 - Desktop: consumes its own sends instantly via `CommBus`; **joining the external
   bridge** (a WS client → `CommBus`) is the remaining step for mobile→desktop.
-- ALS: configure the Kafka producer + per-type mappers (keys = correlation ids).
+- ALS: the producer logic lives in [`als-extensions/`](../als-extensions/) and is
+  re-installed after each ALS generate with `make als-extensions` (ALS rebuilds
+  preserve `logic/`, so it's a one-time step per fresh `create`). Enable the
+  producer config (`KAFKA_CONNECT`) in the ALS project.

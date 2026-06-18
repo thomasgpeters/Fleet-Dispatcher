@@ -107,8 +107,9 @@ Pivot here after Phase 1. Talks to the same JSON:API; Bootstrap theme + Wt
       (`realtime/`, [`REALTIME.md`](REALTIME.md)). DONE: bridge service
       (Kafka consumer → WS, JWT, reconnect) + mobile client (live messages/unread,
       reconcile fallback); topic-per-type + channel_id correlation id (key for
-      ordering). REMAINING: configure the ALS Kafka producer + per-type mappers;
-      desktop/HUD WS client → `CommBus`; telemetry (position) wired to the map
+      ordering); ALS producer snippet + post-generate install automation in
+      `als-extensions/` (`make als-extensions`). REMAINING: enable `KAFKA_CONNECT`
+      in the ALS project; desktop/HUD WS client → `CommBus`; telemetry → the map
 - [ ] Wire left-panel filters + a right-panel selected-load inspector to data
 - [x] Load intake form (new load) + driver/equipment assignment (POST /Load)
 - [x] **HUD** surface (`/hud`) + `HudControlBus` (Wt server push): the console's

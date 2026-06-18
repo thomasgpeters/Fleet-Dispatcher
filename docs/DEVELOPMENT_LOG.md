@@ -5,6 +5,20 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-06-11
 
+### ALS Kafka producer snippet + post-generate install automation
+- New `als-extensions/`: customizations to layer onto the generated ALS project.
+  `logic_discovery/fleet_events.py` emits a Kafka event per Message/PositionReport
+  insert (`Rule.after_flush_row_event` + `kafka_producer.send_kafka_message`, key =
+  channel_id/equipment_id) — the producer side of the realtime bridge. Verified
+  the ALS API against GenAI-Logic source (`send_kafka_message` signature).
+- Automation: it installs into `logic/logic_discovery/`, which ALS **auto-discovers**
+  and a `rebuild` **preserves** — so it survives rebuilds; a fresh `create` just
+  needs `make als-extensions` (idempotent `install.sh`, target ALS_PROJECT).
+  Documented chaining it onto the generate step. Tested the installer against a
+  fake ALS project (copy + idempotent + rejects non-ALS dirs).
+- Docs: als-extensions/README, MIDDLEWARE_SETUP (post-generate step), REALTIME
+  (producer points here), CLAUDE golden rule + component table.
+
 ### Realtime: WebSocket bridge over ALS → Kafka
 - New `realtime/` service (`docs/REALTIME.md`): a **confluent-kafka consumer →
   WebSocket relay**. ALS already produces domain events to Kafka

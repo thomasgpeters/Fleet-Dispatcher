@@ -43,6 +43,24 @@ fleet-dispatcher-api/
   config/
 ```
 
+## After generating: install ALS extensions
+
+The repo keeps the customizations ALS doesn't generate (currently the **Kafka
+event producers** that feed the realtime bridge) in
+[`../als-extensions/`](../als-extensions/). Install them after a fresh
+`ApiLogicServer create`:
+
+```bash
+make als-extensions ALS_PROJECT=./fleet-dispatcher-api
+# or chain it onto the generate step:
+ApiLogicServer create --project_name=fleet-dispatcher-api ... \
+  && make als-extensions ALS_PROJECT=./fleet-dispatcher-api
+```
+
+They land in `logic/logic_discovery/`, which ALS auto-discovers and a `rebuild`
+preserves — so it's a one-time step per fresh generate. See
+[`REALTIME.md`](REALTIME.md) and `als-extensions/README.md`.
+
 ## Business rules
 
 The structural invariants from [`domain-model.md`](domain-model.md) are already

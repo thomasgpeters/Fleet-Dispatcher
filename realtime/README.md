@@ -46,17 +46,12 @@ systemd: see `deploy/`.
 
 ## ALS producer side (what this consumes)
 
-In the ALS project, enable the producer and emit a row event per change — the
-GenAI-Logic pattern (`Rule.after_flush_row_event` + a mapper's `row_to_dict`):
-
-```python
-# config: KAFKA_PRODUCER = '{"bootstrap.servers": "localhost:9092"}'
-# logic/declare_logic.py
-def send_message_to_kafka(row: models.Message, old_row, logic_row):
-    if logic_row.is_inserted():
-        send_row_to_kafka(row, mapper=MessageEvent, kafka_topic="message")
-Rule.after_flush_row_event(on_class=models.Message, calling=send_message_to_kafka)
-```
+The producer logic is maintained in [`../als-extensions/`](../als-extensions/)
+(`logic_discovery/fleet_events.py`) and installed into the generated ALS project
+with `make als-extensions`. It uses the GenAI-Logic pattern —
+`Rule.after_flush_row_event` + `kafka_producer.send_kafka_message(...)` with
+`kafka_key` = the correlation id (channel_id / equipment_id) for per-channel
+ordering. Enable the producer in the ALS config (`KAFKA_CONNECT`).
 
 The bridge maps **topic → event type** (`message`, `position`) and is tolerant of
 the envelope (accepts the row dict directly or wrapped in `payload`/`args`/`row`).
