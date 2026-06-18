@@ -94,6 +94,12 @@ bridge routing is **config-driven**, so a new topic is config, not code:
 
 No change to the consumer loop, auth, or fan-out — those are generic.
 
+**Seeded routes:** `message`, `position`, `load`, `trip`, `alert`. ALS producers
+exist for message/position and now **load/trip** (fire on insert *and* update, so
+status/assignment changes stream live — keys: `loads`/`driver:<id>`/`week:<id>`,
+`trips`/`driver:<id>`). `alert`'s route is ready; its producer lands with an
+alert source.
+
 ## Event envelope (the contract)
 
 The bridge maps **topic → type** and is tolerant of the ALS mapper's shape

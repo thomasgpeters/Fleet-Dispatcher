@@ -34,9 +34,24 @@ DEFAULT_ROUTES: Dict[str, dict] = {
         "broadcast": "fleet",
         "scopes": [{"prefix": "equipment", "field": "equipment_id"}],
     },
-    # Future purposes are just more entries, e.g.:
-    #   "load":  {"broadcast": "loads",  "scopes": [{"prefix": "driver", "field": "driver_id"}]},
-    #   "alert": {"broadcast": "alerts", "scopes": [{"prefix": "driver", "field": "driver_id"}]},
+    # Dispatch board / driver assignments (insert + status changes).
+    "load": {
+        "broadcast": "loads",
+        "scopes": [
+            {"prefix": "driver", "field": "driver_id"},
+            {"prefix": "week", "field": "dispatch_week_id"},
+        ],
+    },
+    # Driver trips (insert + status changes).
+    "trip": {
+        "broadcast": "trips",
+        "scopes": [{"prefix": "driver", "field": "driver_id"}],
+    },
+    # Operational alerts — route is ready; a producer lands with an alert source.
+    "alert": {
+        "broadcast": "alerts",
+        "scopes": [{"prefix": "driver", "field": "driver_id"}],
+    },
 }
 
 

@@ -34,6 +34,8 @@ log = logging.getLogger(__name__)
 
 TOPIC_MESSAGE = "message"
 TOPIC_POSITION = "position"
+TOPIC_LOAD = "load"
+TOPIC_TRIP = "trip"
 
 
 def _emit(logic_row: LogicRow, topic: str, key: str, payload: dict) -> None:
@@ -41,6 +43,12 @@ def _emit(logic_row: LogicRow, topic: str, key: str, payload: dict) -> None:
     kafka_producer.send_kafka_message(
         logic_row=logic_row, kafka_topic=topic, kafka_key=key, payload=payload
     )
+
+
+def _is_change(logic_row: LogicRow) -> bool:
+    """Insert or update (status transitions matter for loads/trips).
+    NOTE (ALS version): is_updated() — adjust if your LogicRow differs."""
+    return logic_row.is_inserted() or logic_row.is_updated()
 
 
 def _send_message_event(row, old_row, logic_row: LogicRow) -> None:
@@ -70,19 +78,44 @@ def _send_position_event(row, old_row, logic_row: LogicRow) -> None:
     })
 
 
+def _send_load_event(row, old_row, logic_row: LogicRow) -> None:
+    if not _is_change(logic_row):
+        return  # insert or status/assignment change
+    _emit(logic_row, TOPIC_LOAD, str(row.id), {
+        "type": "load",
+        "id": str(row.id),
+        "driver_id": str(row.driver_id) if row.driver_id else None,
+        "dispatch_week_id": str(row.dispatch_week_id),
+        "load_status_id": row.load_status_id,
+        "pickup_date": str(row.pickup_date) if row.pickup_date else None,
+        "delivery_date": str(row.delivery_date) if row.delivery_date else None,
+    })
+
+
+def _send_trip_event(row, old_row, logic_row: LogicRow) -> None:
+    if not _is_change(logic_row):
+        return
+    _emit(logic_row, TOPIC_TRIP, str(row.id), {
+        "type": "trip",
+        "id": str(row.id),
+        "driver_id": str(row.driver_id) if row.driver_id else None,
+        "equipment_id": str(row.equipment_id) if row.equipment_id else None,
+        "load_id": str(row.load_id) if row.load_id else None,
+        "trip_status_id": row.trip_status_id,
+    })
+
+
 # Add new realtime purposes here as the app evolves — one topic per purpose, with
-# a correlation id as the kafka_key. Then add a matching route in the bridge
-# (DEFAULT_ROUTES / KAFKA_TOPIC_ROUTES) and have clients subscribe. Example:
-#
-#   def _send_load_event(row, old_row, logic_row):
-#       if logic_row.is_inserted():
-#           _emit(logic_row, "load", str(row.driver_id or ""),
-#                 {"type": "load", "id": str(row.id), "driver_id": str(row.driver_id)})
+# a correlation id as the kafka_key. Add a matching route in the bridge
+# (DEFAULT_ROUTES / KAFKA_TOPIC_ROUTES) and have clients subscribe. e.g. an
+# "alert" producer (route already seeded) once an alert source/table exists.
 
 # (model class, handler) pairs registered on startup. Extend this list to add types.
 _PRODUCERS = [
     (models.Message, _send_message_event),
     (models.PositionReport, _send_position_event),
+    (models.Load, _send_load_event),
+    (models.Trip, _send_trip_event),
 ]
 
 

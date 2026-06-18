@@ -19,6 +19,16 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 - Docs: als-extensions/README, MIDDLEWARE_SETUP (post-generate step), REALTIME
   (producer points here), CLAUDE golden rule + component table.
 
+### Seed realtime routes: load, trip, alert
+- Bridge `DEFAULT_ROUTES` seeded with `load` (broadcast `loads`; scopes
+  `driver:<id>`, `week:<id>`), `trip` (`trips`; `driver:<id>`), and `alert`
+  (`alerts`; `driver:<id>`).
+- ALS producers added for **Load** and **Trip** (`_PRODUCERS`), firing on insert
+  OR update via a new `_is_change()` helper — so status/assignment changes stream
+  live, keyed by the row's own id. `alert` route is ready; producer awaits an
+  alert source. Bridge + snippet syntax-checked (routes load: message, position,
+  load, trip, alert).
+
 ### Multi-topic ready: config-driven routing for new purposes
 - Bridge routing is now **config-driven** (`realtime/app/config.py` →
   `DEFAULT_ROUTES`, overridable via `KAFKA_TOPIC_ROUTES` JSON env). Each topic maps
