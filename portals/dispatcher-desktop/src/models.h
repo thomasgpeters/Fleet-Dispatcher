@@ -25,6 +25,21 @@ struct Driver {
     bool active = true;
 };
 
+// Messaging (right-panel communications).
+struct Channel {
+    std::string id;
+    std::string name;
+    int channel_type_id = 0;
+};
+
+struct Message {
+    std::string id;
+    std::string channel_id;
+    std::string author_id;
+    std::string body;
+    std::string posted_at;   // ISO8601
+};
+
 struct Load {
     std::string id;
     std::string driver_id;        // may be empty (unassigned)

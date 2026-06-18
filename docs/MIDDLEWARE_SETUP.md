@@ -43,6 +43,37 @@ fleet-dispatcher-api/
   config/
 ```
 
+## After generating: install ALS extensions
+
+The repo keeps the customizations ALS doesn't generate (currently the **Kafka
+event producers** that feed the realtime bridge) in
+[`../als-extensions/`](../als-extensions/). Install them after a fresh
+`ApiLogicServer create`:
+
+```bash
+make als-extensions ALS_PROJECT=./fleet-dispatcher-api
+# or chain it onto the generate step:
+ApiLogicServer create --project_name=fleet-dispatcher-api ... \
+  && make als-extensions ALS_PROJECT=./fleet-dispatcher-api
+```
+
+They land in `logic/logic_discovery/`, which ALS auto-discovers and a `rebuild`
+preserves — so it's a one-time step per fresh generate. See
+[`REALTIME.md`](REALTIME.md) and `als-extensions/README.md`.
+
+Enable the Kafka producer from the **environment** (keep brokers/creds out of
+committed config — the ALS project's `.env` should be gitignored):
+
+```python
+# config/config.py
+import os
+KAFKA_CONNECT = os.getenv("KAFKA_CONNECT")   # internal: broker addr / creds
+```
+
+Kafka configuration and the JWT secret are internal server-side settings; clients
+only ever get the bridge WebSocket URL + a token (see [`REALTIME.md`](REALTIME.md)
+→ "Configuration & secrets").
+
 ## Business rules
 
 The structural invariants from [`domain-model.md`](domain-model.md) are already

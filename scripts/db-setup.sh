@@ -69,7 +69,7 @@ END
 \$do\$;
 SELECT 'CREATE DATABASE "${DB_NAME}" OWNER "${DB_USER}"'
  WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '${DB_NAME}')\gexec
--- Shared instance: let the app role create its own `fleet` schema, and reflect
+-- Shared instance: let the app role create its own fleet schema, and reflect
 -- it by default so ALS sees the fleet schema (not public).
 GRANT CREATE ON DATABASE "${DB_NAME}" TO "${DB_USER}";
 ALTER ROLE "${DB_USER}" SET search_path = fleet, public;

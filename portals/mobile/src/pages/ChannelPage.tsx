@@ -45,6 +45,7 @@ import {
 import { EmojiPicker } from "../components/EmojiPicker";
 import { api, PIN_SCOPE } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
+import { useRealtime } from "../realtime/RealtimeContext";
 import type {
   Channel,
   Document,
@@ -85,6 +86,7 @@ function fileToBase64(file: File): Promise<string> {
 export function ChannelPage() {
   const { channelId } = useParams<{ channelId: string }>();
   const { user } = useAuth();
+  const { subscribe, addListener } = useRealtime();
   const userId = user?.id ?? "";
   const [channel, setChannel] = useState<Channel | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -155,6 +157,34 @@ export function ChannelPage() {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channelId]);
+
+  // Realtime: the live conversation comes from the Kafka stream (via the bridge),
+  // not by re-reading the DB through ALS. The initial `load()` is the snapshot;
+  // every new message is applied directly from the event payload (de-duped by id,
+  // which also absorbs our own optimistic append on send).
+  useEffect(() => {
+    subscribe([`channel:${channelId}`]);
+    const off = addListener((evt) => {
+      if (evt.type !== "message" || evt.channel_id !== channelId) return;
+      const incoming: Message = {
+        id: String(evt.id),
+        channel_id: String(evt.channel_id),
+        author_id: String(evt.author_id),
+        body: String(evt.body ?? ""),
+        posted_at: String(evt.posted_at ?? new Date().toISOString()),
+        reply_to_id: evt.reply_to_id ? String(evt.reply_to_id) : undefined,
+      };
+      setMessages((prev) =>
+        prev.some((m) => m.id === incoming.id)
+          ? prev
+          : [...prev, incoming].sort((a, b) =>
+              a.posted_at.localeCompare(b.posted_at),
+            ),
+      );
+    });
+    return off;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [channelId, subscribe, addListener]);
 
   const send_ = async () => {
     if (!draft.trim()) return;

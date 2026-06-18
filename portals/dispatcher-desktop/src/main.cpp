@@ -23,6 +23,9 @@
 #include "LoginView.h"
 #include "Shell.h"
 #include "models.h"
+#ifdef FD_REALTIME_CLIENT
+#include "RealtimeClient.h"
+#endif
 
 namespace {
 
@@ -94,7 +97,26 @@ int main(int argc, char** argv) {
                 return std::make_unique<HudApp>(env);
             },
             "/hud");
-        server.run();
+
+        // Start the server, then (optionally) the realtime bridge client, which
+        // feeds CommBus from ALS->Kafka events. Use start/wait/stop (instead of
+        // run) so the client gets a clean lifecycle.
+        if (server.start()) {
+#ifdef FD_REALTIME_CLIENT
+            auto realtime = fd::RealtimeClient::fromEnv();  // null if unconfigured
+            if (realtime) {
+                realtime->start();
+                std::cerr << "realtime: bridge client started\n";
+            } else {
+                std::cerr << "realtime: FLEET_REALTIME_URL/TOKEN unset — client off\n";
+            }
+#endif
+            Wt::WServer::waitForShutdown();
+#ifdef FD_REALTIME_CLIENT
+            if (realtime) realtime->stop();
+#endif
+            server.stop();
+        }
         return 0;
     } catch (const std::exception& e) {
         std::cerr << "fatal: " << e.what() << std::endl;

@@ -23,6 +23,7 @@ import { bookmarkOutline } from "ionicons/icons";
 import { api } from "../api/client";
 import type { Channel } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
+import { useRealtime } from "../realtime/RealtimeContext";
 
 /**
  * Message board — channel list with unread badges. Tapping a channel pushes its
@@ -34,6 +35,7 @@ import { useAuth } from "../auth/AuthContext";
  */
 export function ChannelsPage() {
   const { user } = useAuth();
+  const { subscribe, addListener } = useRealtime();
   const [channels, setChannels] = useState<Channel[]>([]);
   const [unread, setUnread] = useState<Record<string, number>>({});
   const [error, setError] = useState<string | null>(null);
@@ -69,6 +71,20 @@ export function ChannelsPage() {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
+
+  // Realtime: bump unread straight from the Kafka stream (via the bridge) — no
+  // DB re-read through ALS. The initial counts come from the snapshot `load()`.
+  useEffect(() => {
+    subscribe(["messages"]);
+    const off = addListener((evt) => {
+      if (evt.type !== "message") return;
+      if (user && evt.author_id === user.id) return; // our own message
+      const ch = String(evt.channel_id);
+      setUnread((prev) => ({ ...prev, [ch]: (prev[ch] ?? 0) + 1 }));
+    });
+    return off;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subscribe, addListener, user]);
 
   const refresh = async (e: RefresherCustomEvent) => {
     await load();

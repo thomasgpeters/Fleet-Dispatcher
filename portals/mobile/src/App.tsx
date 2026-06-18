@@ -26,10 +26,12 @@ import { SavedPage } from "./pages/SavedPage";
 import { LocatePage } from "./pages/LocatePage";
 import { TripsPage } from "./pages/TripsPage";
 import { TripDetailPage } from "./pages/TripDetailPage";
+import { TripWaypointsPage } from "./pages/TripWaypointsPage";
 import { AssistantPage } from "./pages/AssistantPage";
 import { LoginPage } from "./pages/LoginPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { AuthProvider, useAuth } from "./auth/AuthContext";
+import { RealtimeProvider } from "./realtime/RealtimeContext";
 
 /* Ionic router add-on CSS. */
 import "@ionic/react/css/padding.css";
@@ -66,6 +68,7 @@ function Gate() {
 
 function AuthedApp() {
   return (
+    <RealtimeProvider>
     <IonReactRouter>
       <IonTabs>
         <IonRouterOutlet>
@@ -73,6 +76,7 @@ function AuthedApp() {
           <Route exact path="/loads/:loadId" component={LoadDetailPage} />
           <Route exact path="/trips" component={TripsPage} />
           <Route exact path="/trips/:tripId" component={TripDetailPage} />
+          <Route exact path="/trips/:tripId/waypoints" component={TripWaypointsPage} />
           <Route exact path="/messages" component={ChannelsPage} />
           <Route exact path="/saved" component={SavedPage} />
           <Route exact path="/messages/:channelId" component={ChannelPage} />
@@ -107,5 +111,6 @@ function AuthedApp() {
         </IonTabBar>
       </IonTabs>
     </IonReactRouter>
+    </RealtimeProvider>
   );
 }

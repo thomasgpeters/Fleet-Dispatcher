@@ -40,9 +40,11 @@ private:
     Wt::WContainerWidget* positionsBody_ = nullptr;
     std::vector<Position> positions_;
     std::map<std::string, std::string> equipName_;  // equipment_id -> unit_number
+    std::string posToken_;  // PositionBus subscription (realtime fleet locations)
 
     void apply(const HudCommand& command);
     void loadPositions();
+    void applyLive(const Position& p);
     void updateMap();
     void renderPositions();
 };

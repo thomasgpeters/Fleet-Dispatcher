@@ -86,6 +86,9 @@ export interface Load {
   loaded_miles: number;
   rate: number; // post-broker
   currency: string;
+  // Footprint for multi-load (shared-trailer) route optimization.
+  deck_feet?: number;
+  weight_lbs?: number;
   pickup_date?: string; // YYYY-MM-DD, within the dispatch week
   delivery_date?: string;
 }
@@ -202,18 +205,38 @@ export interface Trip {
   name?: string;
   started_at?: string;
   ended_at?: string;
+  // TRUE once the driver manually edits the stop order; the optimizer then
+  // leaves this trip's order alone (geometry still recomputes).
+  route_locked?: boolean;
 }
 
 export interface Waypoint {
   id: string;
   trip_id: string;
   seq: number;
-  stop_type_id: number; // 1 origin · 2 destination · 3 waypoint · 4 fuel · 5 rest · 6 truck_stop
+  // 1 origin · 2 destination · 3 waypoint · 4 fuel · 5 rest · 6 truck_stop ·
+  // 7 lunch · 8 load_stop
+  stop_type_id: number;
   label?: string;
   lat: number;
   lng: number;
   planned_arrival?: string;
   arrived_at?: string;
+}
+
+// The computed GPS route for a trip (polyline/distance derived by geospatial/
+// from the trip's waypoints; recomputed when waypoints change).
+export interface Route {
+  id: string;
+  trip_id?: string;
+  origin_lat?: number;
+  origin_lng?: number;
+  dest_lat?: number;
+  dest_lng?: number;
+  polyline?: string;
+  distance_mi?: number;
+  drive_minutes?: number;
+  provider?: string;
 }
 
 // JSON:API envelope (subset).

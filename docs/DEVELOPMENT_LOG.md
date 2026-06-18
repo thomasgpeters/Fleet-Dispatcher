@@ -5,6 +5,220 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-06-11
 
+### ALS Kafka producer snippet + post-generate install automation
+- New `als-extensions/`: customizations to layer onto the generated ALS project.
+  `logic_discovery/fleet_events.py` emits a Kafka event per Message/PositionReport
+  insert (`Rule.after_flush_row_event` + `kafka_producer.send_kafka_message`, key =
+  channel_id/equipment_id) — the producer side of the realtime bridge. Verified
+  the ALS API against GenAI-Logic source (`send_kafka_message` signature).
+- Automation: it installs into `logic/logic_discovery/`, which ALS **auto-discovers**
+  and a `rebuild` **preserves** — so it survives rebuilds; a fresh `create` just
+  needs `make als-extensions` (idempotent `install.sh`, target ALS_PROJECT).
+  Documented chaining it onto the generate step. Tested the installer against a
+  fake ALS project (copy + idempotent + rejects non-ALS dirs).
+- Docs: als-extensions/README, MIDDLEWARE_SETUP (post-generate step), REALTIME
+  (producer points here), CLAUDE golden rule + component table.
+
+### Interim nearest-neighbor optimizer (no API key)
+- `geospatial/optimize.py`: nearest-neighbor stop ordering (origin first / dest
+  last, distance-greedy) — a no-key default so "auto-optimize" / unlock actually
+  reorders without HERE. `recompute.py` runs it when a trip is NOT `route_locked`,
+  persists the new `seq` (two-phase, atomic, via psycopg → no Kafka echo), then
+  computes geometry; locked trips keep the manual order (geometry only).
+- Race-safety: the mobile editor now **locks first (awaited)** before any
+  add/remove/reorder; recompute reads `route_locked` fresh from the DB, so a
+  manual edit is never clobbered by the optimizer regardless of Kafka event order.
+- Limits (documented): NN minimizes distance only — multi-load pickup-before-
+  dropoff precedence + trailer capacity (deck feet/weight) remain the deferred
+  full solver. mobile build clean; geospatial py_compile clean.
+
+### Unlock & re-optimize (revert manual route, with confirmation)
+- Mobile trip overview: when `route_locked`, an **Unlock & re-optimize** button
+  with an **IonAlert confirmation** ("Are you sure you want to revert your manual
+  updates to this route?"). Confirm → `updateTrip(route_locked:false)`.
+- Clearing the lock is a trip change → flows through the event plane (`trip`
+  Kafka event → geospatial recompute consumer) so the route recomputes
+  **immediately**; it also re-enables the (deferred) optimizer. Added an explicit
+  optimizer hook comment in `recompute.py` (reorder when not locked).
+
+### Drag-reorder waypoints + auto route recompute + manual-order lock
+- Mobile: **drag-and-drop reorder** in the waypoints editor (IonReorderGroup);
+  persists new `seq` with a two-phase (offset-then-final) update to respect
+  UNIQUE(trip_id, seq). Delete moved to a trailing button (reorder handle on end).
+- **Auto route recompute** (geospatial/): new `routing.py` (haversine dev provider;
+  HERE pluggable), `recompute.py` (reads ordered waypoints → upserts fleet.route
+  via FLEET_DATABASE_URL), and `recompute_consumer.py` (Kafka consumer on
+  `waypoint`/`trip` → recompute) started on FastAPI startup + a `POST
+  /route/recompute/{trip_id}` endpoint. Recompute **preserves order** (never
+  reorders), so it's safe for manually-ordered trips. Syntax-checked.
+- **Manual-order lock** (per request): new `trip.route_locked` (default FALSE).
+  Any manual waypoint edit (add/remove/**reorder**) sets it via `updateTrip`; the
+  (deferred) route OPTIMIZER must skip locked trips — geometry recompute still
+  runs. Trip overview shows a "manual order — optimization off" note. Verified
+  schema+seed (route_locked=f default); mobile build clean.
+
+### Route-optimization capacity foundation (engine deferred)
+- Per user: the AI route-optimization **engine choice is deferred** (researching
+  OR-Tools vs HERE Tour Planning vs LLM-as-caller) — recorded in TODO.
+- Laid the data foundation: capacity is **two dimensions, per tractor/trailer
+  config** — added `equipment.weight_capacity_lbs` (deck_length_ft already there)
+  and `load.deck_feet` + `load.weight_lbs`. Seeded realistic values; **verified**
+  schema+seed on PG16. Mobile `Load` type updated. (ALS regen needed to expose.)
+
+### Mutable per-trip GPS route — driver waypoints
+- Stop types added: `lunch` (7) + `load_stop` (8) for multi-load stops (schema
+  comment + seed; verified — 8 stop types). The `waypoint`/`route` tables already
+  modeled per-trip ordered, mutable stops.
+- Mobile: trip detail split for low clutter — **TripDetailPage** is a compact
+  overview (route summary: distance/ETA + read-only stops) that drills into a new
+  **TripWaypointsPage** (`/trips/:tripId/waypoints`) to add a stop at the current
+  GPS location by type (fuel / lunch / load stop / truck stop / waypoint) or
+  remove one (swipe); origin/destination fixed; new stops insert before the
+  destination (back-to-front seq bump to respect UNIQUE(trip_id, seq)).
+- API/types: `Route` type; `updateWaypoint`, `deleteWaypoint`, `routeForTrip`.
+- Realtime: seeded `waypoint` route + ALS `Waypoint` producer (insert/update,
+  key = trip_id) so route edits stream live (`waypoints`/`trip:<id>`) — map
+  updates as realtime data. mobile build clean; schema+seed verified.
+
+### Realtime data plane: live data from the stream, not ALS reads
+- Defined two planes (docs/REALTIME.md + CLAUDE): **realtime** (messages, fleet
+  locations / map updates, live status) flows from the **Kafka stream via the
+  bridge**; **everything else** (CRUD, lookups, snapshots, detail/forms, writes)
+  stays **ALS JSON:API**. Kafka stream is now public infra — but clients integrate
+  **through the bridge** (URL + JWT); brokers stay internal.
+- Mobile: ChannelPage/ChannelsPage now **apply event payloads directly** from the
+  stream (append message / bump unread) instead of re-reading via ALS; initial
+  snapshot still via ALS. De-duped by id (absorbs the optimistic own-send).
+- Desktop: `RealtimeClient` now also relays **position** events into a new
+  `PositionBus`; `MapView` + `HudView` apply live fleet locations (upsert + render)
+  with a 60 s ALS reconcile fallback. ALS producer payloads enriched
+  (`reply_to_id` on message, `speed_mph` on position) so clients render live with
+  no read-back. Bridge + snippet syntax-checked; mobile build clean.
+
+### Consumer model: true pub/sub (unique group per bridge instance)
+- Fixed the Kafka consumer-group semantics for fan-out: each bridge instance now
+  uses a **unique** `group.id` by default (`KAFKA_GROUP_UNIQUE=true` → base +
+  host/pid/uuid, computed once per process), so EVERY instance receives EVERY
+  event and fans out to its own WebSocket clients. A shared group would be
+  competing-consumer/queue semantics and would drop events per client across
+  replicas.
+- `KAFKA_GROUP_UNIQUE=false` opts into shared/queue mode (work distribution).
+  Unique mode also disables offset commit (relay only wants live events). Bridge
+  logs the group + mode. Independent services each use their own group (pub/sub):
+  the bridge is one consumer; notifications/analytics/etc. can add their own.
+- Docs: REALTIME "Consumer model — publish/subscribe"; .env documents
+  KAFKA_GROUP_ID/KAFKA_GROUP_UNIQUE. Verified both modes.
+
+### Seed realtime routes: load, trip, alert
+- Bridge `DEFAULT_ROUTES` seeded with `load` (broadcast `loads`; scopes
+  `driver:<id>`, `week:<id>`), `trip` (`trips`; `driver:<id>`), and `alert`
+  (`alerts`; `driver:<id>`).
+- ALS producers added for **Load** and **Trip** (`_PRODUCERS`), firing on insert
+  OR update via a new `_is_change()` helper — so status/assignment changes stream
+  live, keyed by the row's own id. `alert` route is ready; producer awaits an
+  alert source. Bridge + snippet syntax-checked (routes load: message, position,
+  load, trip, alert).
+
+### Multi-topic ready: config-driven routing for new purposes
+- Bridge routing is now **config-driven** (`realtime/app/config.py` →
+  `DEFAULT_ROUTES`, overridable via `KAFKA_TOPIC_ROUTES` JSON env). Each topic maps
+  to a `broadcast` key + optional `scopes` ({prefix, field}); `routing_keys()` is
+  generic. **Unknown topics still work** (broadcast on their own name) so a
+  producer can ship ahead of a route entry — no fan-out code change to add a
+  purpose. Subscribed topics derive from the route map (or `KAFKA_TOPICS`).
+- ALS producer made extensible: a `_PRODUCERS` list + `_emit()` helper; adding a
+  type is one handler + one list entry (loads/trips/alerts… as the app evolves).
+- Docs: REALTIME "Multiple topics, and adding one" guide; .env.example shows
+  `KAFKA_TOPIC_ROUTES`. Bridge + snippet syntax-checked.
+
+### Hide Kafka config — internal env files only
+- Hardened `.gitignore`: ignore `.env` + `*.env`, keep only `*.env.example`
+  placeholder templates (verified with `git check-ignore`). No real broker/secret
+  is committed (audited: only `localhost:9092` / `change-me` placeholders).
+- New `docs/REALTIME.md` → "Configuration & secrets": Kafka brokers/creds, the
+  consumer group, and the JWT secret live ONLY in server-side env files
+  (bridge `.env`, ALS project `.env`). **Clients never see Kafka** — they get only
+  the bridge WebSocket URL + a JWT (the bridge is the encapsulation boundary).
+- ALS producer config is env-driven (`KAFKA_CONNECT = os.getenv(...)`), not a
+  hardcoded/committed broker; ALS project `.env` should be gitignored
+  (als-extensions/README, MIDDLEWARE_SETUP updated).
+
+### Desktop/HUD: realtime bridge WebSocket client → CommBus
+- New `RealtimeClient` (`portals/dispatcher-desktop/src/`): one **server-wide**
+  Boost.Beast WebSocket client that consumes the realtime bridge and publishes
+  message events into `CommBus` (which already fans out to every session via Wt
+  server push). Sync read loop on a worker thread with exponential-backoff
+  reconnect; `stop()` closes the socket to unwind the blocking read.
+- **Opt-in** via CMake `-DFD_REALTIME_CLIENT=ON` (needs Boost.Beast). Default OFF
+  → Boost-less builds still work and the desktop falls back to intra-server
+  `CommBus` + the 30 s reconcile poll. Configured by `FLEET_REALTIME_URL` +
+  `FLEET_REALTIME_TOKEN` (a bridge service JWT); `main.cpp` uses start/wait/stop.
+- `CommPanel` now **de-dups by message id** (a `std::set`), so a desktop user's
+  own send (intra-`CommBus` + the bridge echo of the same row) renders once;
+  toasts only for others.
+- Not compiled in the sandbox; Beast client + cross-thread socket close are
+  flagged for Linux build/verify. Positions→HUD/map is the next hook.
+
+### Realtime: WebSocket bridge over ALS → Kafka
+- New `realtime/` service (`docs/REALTIME.md`): a **confluent-kafka consumer →
+  WebSocket relay**. ALS already produces domain events to Kafka
+  (`Rule.after_flush_row_event` + mapper, per GenAI-Logic Sample-Integration);
+  the bridge fans them out to clients. Stateless, JWT-authed (shared ALS secret),
+  auto-reconnecting Kafka loop + WS heartbeats. Mirrors the `assistant/` layout
+  (app/, requirements, Dockerfile, deploy/ systemd).
+- **Topic strategy (decision):** one Kafka topic **per row type** (`message`,
+  `position`) with **`channel_id` as a correlation id in the payload** and the
+  Kafka **key = channel_id** for per-channel ordering — NOT a topic per channel
+  (channels are dynamic UUID objects → topic explosion). Per-channel fan-out is
+  done at the WebSocket layer (`channel:<id>` subscriptions).
+- Mobile: `RealtimeClient` (exponential-backoff reconnect, re-subscribe on
+  connect, status) + `RealtimeProvider`/`useRealtime`; wired into ChannelPage
+  (live messages) and ChannelsPage (live unread). Accelerator only — initial
+  load + pull-to-refresh remain the fallback. `npm run build` clean.
+- Considered Postgres LISTEN/NOTIFY as the source but **reverted** it: ALS→Kafka
+  is the canonical producer the team already uses; two sources = fragile.
+- Robustness: DB/JSON:API stays canonical; Kafka durable; clients degrade to a
+  reconcile poll if the bridge/Kafka is down.
+- Desktop: still uses intra-server push (`CommBus` + Wt WebSockets); joining the
+  external bridge via a WS client is the documented next step.
+
+### Desktop: Fleet/Map/Settings views + comms WebSocket push
+- Menu now: Board · Fleet · Map · New Load · Communications · Settings. The
+  center work panel has no hide/show toggle — it swaps the visible view per menu
+  item (left/right panels remain collapsible).
+- `FleetView` — list of drivers (fetchDrivers) + equipment (unit numbers).
+- `MapView` — geo-positioning of fleet locations: a Leaflet map (latest position
+  per rig) + detail table, 15 s telemetry refresh (mirrors the HUD map).
+- `SettingsView` — appearance (System/Light/Dark → data-fd-theme + localStorage,
+  shared with the header toggle) + account/connection info.
+- **Comms push/WebSockets**: new `CommBus` (in-process singleton like
+  `HudControlBus`) broadcasts sent messages to every session via Wt server push;
+  `CommPanel` now subscribes and renders pushed messages instantly (and toasts),
+  publishes on send, and keeps only a 30 s reconcile poll for off-server (mobile)
+  messages. New `wt_config.xml` enables `<web-sockets>true` for the push transport.
+- Note: full cross-client realtime (mobile→desktop) needs the middleware to emit
+  change events (SSE/WebSocket/broker) — backend follow-up (ALS is generated).
+- **Not compiled in the sandbox**; new code reuses known-good Wt patterns
+  (WLeafletMap from HudView, WServer::post bus from HudControlBus). CMake updated.
+
+### Desktop dynamic shell: menu, communications rail, toasts
+- Header: **logo top-left**; **profile (name) + logged-in role + Sign out
+  top-right**, plus theme toggle and panel toggles. Panel toggles use the
+  disclosure aesthetic — **▼ open**, **▶/◀ closed** (left/right).
+- Left panel = **menuing system** (Board · New Load · Drivers · Communications)
+  + **work-panel toggles** (Today | Week, Compact rows) that drive the center.
+- Right panel = **Communications** (`CommPanel`): channel list + live conversation
+  (10s `WTimer` poll) + composer. Selecting **Communications** in the menu makes
+  comms take over the **full work area**.
+- **Toaster** (`Toaster`): top-right transient alerts (new messages, save/create
+  confirmations, errors). Single sweeper timer auto-dismisses; close marks for
+  removal (no delete-during-callback). New-message toasts come from the rail only.
+- ApiClient: `fetchChannels` / `fetchMessages` / `createMessage` (+ Channel,
+  Message models). Server push (`enableUpdates`) already on → live feel.
+- **Desktop not compiled in the sandbox**; new code uses plain Wt widgets +
+  `WTimer` + `doJavaScript` (no version-sensitive APIs beyond those already
+  flagged). Build on a Linux box to confirm.
+
 ### Shared design system across mobile, desktop, and HUD
 - New `docs/DESIGN_SYSTEM.md` — one palette (subtle blues, sparse orange accent,
   white/light standard theme + complementary dark) as the source of truth,

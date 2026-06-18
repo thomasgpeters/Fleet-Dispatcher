@@ -86,11 +86,11 @@ INSERT INTO driver (id, name, driver_type_id, phone, home_base, user_id) VALUES
   ('aaaaaaaa-0000-0000-0000-000000000002', 'Sam Hauler', 1, '555-0102', 'Denver, CO', NULL);
 
 -- Equipment (varied rigs) ---------------------------------------------------
-INSERT INTO equipment (id, unit_number, power_unit_id, trailer_type_id, has_ramps, deck_length_ft, has_duals) VALUES
-  ('bbbbbbbb-0000-0000-0000-000000000001', 'T-101', 1, 1, TRUE,  52,   FALSE),  -- tractor + step-deck 52 w/ ramps
-  ('bbbbbbbb-0000-0000-0000-000000000002', 'T-102', 1, 2, FALSE, NULL, FALSE),  -- tractor + RGN low-boy
-  ('bbbbbbbb-0000-0000-0000-000000000003', 'T-103', 1, 3, FALSE, 52,   FALSE),  -- tractor + flatbed 52
-  ('bbbbbbbb-0000-0000-0000-000000000004', 'R-201', 2, 4, FALSE, NULL, TRUE);   -- RAM 3500 duals + car carrier
+INSERT INTO equipment (id, unit_number, power_unit_id, trailer_type_id, has_ramps, deck_length_ft, weight_capacity_lbs, has_duals) VALUES
+  ('bbbbbbbb-0000-0000-0000-000000000001', 'T-101', 1, 1, TRUE,  52,   48000, FALSE),  -- tractor + step-deck 52 w/ ramps
+  ('bbbbbbbb-0000-0000-0000-000000000002', 'T-102', 1, 2, FALSE, 29,   80000, FALSE),  -- tractor + RGN low-boy
+  ('bbbbbbbb-0000-0000-0000-000000000003', 'T-103', 1, 3, FALSE, 52,   48000, FALSE),  -- tractor + flatbed 52
+  ('bbbbbbbb-0000-0000-0000-000000000004', 'R-201', 2, 4, FALSE, 24,   12000, TRUE);   -- RAM 3500 duals + car carrier
 
 INSERT INTO driver_equipment (id, driver_id, equipment_id) VALUES
   ('a1a1a1a1-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-000000000001', 'bbbbbbbb-0000-0000-0000-000000000002'),
@@ -121,7 +121,7 @@ INSERT INTO dispatch_week (id, week_start) VALUES
 INSERT INTO load (
   id, dispatch_week_id, driver_id, equipment_id, shipper_id, receiver_id,
   commodity_id, pickup_id, dropoff_id, run_type_id, load_status_id,
-  deadhead_miles, loaded_miles, rate, pickup_date, delivery_date
+  deadhead_miles, loaded_miles, rate, deck_feet, weight_lbs, pickup_date, delivery_date
 ) VALUES (
   '88888888-0000-0000-0000-000000000001',
   '99999999-0000-0000-0000-000000000001',
@@ -135,6 +135,7 @@ INSERT INTO load (
   1,  -- run_type = long_haul
   2,  -- load_status = dispatched
   85.0, 780.0, 4200.00,
+  29.0, 42000,                             -- footprint: fills the low-boy deck
   DATE '2026-06-02', DATE '2026-06-04'    -- within week of 2026-06-01
 );
 
@@ -234,7 +235,8 @@ INSERT INTO trip_status (id, code, name) VALUES
 INSERT INTO stop_type (id, code, name) VALUES
   (1, 'origin', 'Origin'), (2, 'destination', 'Destination'),
   (3, 'waypoint', 'Waypoint'), (4, 'fuel', 'Fuel'),
-  (5, 'rest', 'Rest'), (6, 'truck_stop', 'Truck stop');
+  (5, 'rest', 'Rest'), (6, 'truck_stop', 'Truck stop'),
+  (7, 'lunch', 'Lunch'), (8, 'load_stop', 'Load stop');
 
 INSERT INTO poi_category (id, code, name) VALUES
   (1, 'fuel', 'Fuel'), (2, 'rest_area', 'Rest area'),

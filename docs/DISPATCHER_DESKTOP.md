@@ -32,22 +32,56 @@ The shell is an **app frame** implementing the shared design system
 ([`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md)) — subtle blues, sparse orange accents,
 light/dark themes:
 
-- **Full-width header (navigation)** — brand, nav (Board · New Load · Drivers ·
-  Messages · **Profile**), a **theme toggle** (light/dark, persisted), the
-  **signed-in user · role**, and **Sign out**. Also hosts the panel show/hide
-  toggles (`◧` left, `◨` right).
+- **Full-width header** — **logo branding (top-left)**; **profile (name) + the
+  logged-in role + Sign out (top-right)**, plus a **theme toggle** (light/dark,
+  persisted) and the panel show/hide toggles. The toggles use the disclosure
+  aesthetic: **▼ when open**, a pointing arrow when closed (**▶** left panel,
+  **◀** right panel).
 - **Three-column body**:
-  - **Left panel** (collapsible) — filters / context.
-  - **Center work panel** — the command bar (mode toggle **Today | Week** + HUD
-    commands) and the active view outlet.
-  - **Right panel** (collapsible) — details / inspector.
-  - Panels hide/show via `.fd-collapsed` and stack under the center column on
-    narrow viewports.
+  - **Left panel** — the **menuing system** (Board · Fleet · Map · New Load ·
+    Communications · Settings) plus **work-panel toggles** that operate the
+    center: mode (**Today | Week**) and **Compact rows**.
+  - **Center work panel** — the active view outlet. It has **no hide/show toggle**;
+    it simply **swaps** the visible view based on the selected menu item:
+    - **Board** — Today/Week dispatch board.
+    - **Fleet** — `FleetView`: a list of drivers + equipment.
+    - **Map** — `MapView`: **geo-positioning** of fleet locations on a Leaflet
+      map (latest position per rig) + a detail table, refreshed on a timer.
+    - **New Load** — the load intake form.
+    - **Communications** — comms take over the **full work area** (`CommPanel`).
+    - **Settings** — `SettingsView`: appearance (theme) + account/connection info.
+  - **Right panel** — **Communications** rail (`CommPanel`), collapsible.
+  - Panels hide/show via `.fd-collapsed` and stack under the center on narrow
+    viewports.
 - **Full-width footer** — copyright + links (HUD, Docs, Support).
+- **Toaster** — top-right transient alerts (`Toaster`): new messages, save/create
+  confirmations, errors. One sweeper timer auto-dismisses (no delete-in-callback).
 - **Profile** — `ProfileView`: view/edit profile fields (`PATCH /AppUser/{id}`);
   avatar upload is a follow-up.
 - **Owned state** — the signed-in `AppUser`; the JSON:API client (with the bearer
   token) is owned by the application and shared with the shell.
+
+### Real-time comms (push / WebSockets)
+
+`CommPanel` is push-driven, not polling-driven, for on-server traffic:
+
+- **`CommBus`** (in-process singleton, modeled on `HudControlBus`) broadcasts a
+  newly-sent message to every subscribed session via **Wt server push**
+  (`WServer::post` → handler → `triggerUpdate`).
+- Push is delivered over **WebSockets** — enable them in `wt_config.xml`
+  (`<web-sockets>true</web-sockets>`) and run with `-c wt_config.xml`.
+- **Cross-app** (e.g. a mobile message): `RealtimeClient` — a server-wide
+  Boost.Beast WebSocket client (opt-in `cmake -DFD_REALTIME_CLIENT=ON`) — connects
+  to the realtime bridge (`FLEET_REALTIME_URL` + `FLEET_REALTIME_TOKEN`), consumes
+  ALS→Kafka events, and publishes them into `CommBus`, which pushes to every
+  session. `CommPanel` de-dups by message id so an own send (intra-`CommBus` +
+  bridge echo) renders once. See [`REALTIME.md`](REALTIME.md).
+- A **slow reconcile poll** (30 s) remains the fallback when the client is off or
+  the bridge/Kafka is unavailable — so comms are never fragile.
+
+The **Map** view reads telemetry (`PositionReport`) on a 15 s timer — positions
+flow device → DB, and the console reads them via the API; realtime telemetry push
+is a similar backend follow-up.
 
 ## Board modes
 

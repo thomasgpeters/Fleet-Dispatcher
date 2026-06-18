@@ -92,7 +92,30 @@ Pivot here after Phase 1. Talks to the same JSON:API; Bootstrap theme + Wt
       + full-width footer; subtle-blue/orange light + dark themes (toggle); HUD
       forced dark. Shared with mobile (Ionic vars) — same palette across clients
 - [ ] Add app-bar week selector + health indicator
-- [ ] Wire left panel (filters) and right panel (selected-load inspector) to data
+- [x] **Left menu** (Board · New Load · Drivers · Communications) + work-panel
+      toggles (Today|Week, Compact); **right Communications rail** (`CommPanel`:
+      channels + live conversation + composer); **toasts** (`Toaster`, top-right);
+      panel toggles as disclosure arrows (▼/▶/◀); Communications menu item takes
+      the full work area
+- [x] **Views**: Fleet (drivers + equipment list), **Map** (geo-positioning of
+      fleet locations, Leaflet + table), Settings (appearance + info) — center
+      swaps per menu item
+- [x] **Comms push/WebSockets**: `CommBus` + Wt server push delivers sent
+      messages instantly; `wt_config.xml` enables WebSockets; 30 s reconcile poll
+      bridges off-server messages
+- [~] **Cross-client realtime** via a **WebSocket bridge over ALS → Kafka**
+      (`realtime/`, [`REALTIME.md`](REALTIME.md)). DONE: bridge service
+      (Kafka consumer → WS, JWT, reconnect) + mobile client (live messages/unread,
+      reconcile fallback); topic-per-type + channel_id correlation id (key for
+      ordering); ALS producer snippet + post-generate install automation in
+      `als-extensions/` (`make als-extensions`); **desktop `RealtimeClient`**
+      (Boost.Beast, opt-in `-DFD_REALTIME_CLIENT=ON`) → `CommBus` with id de-dup.
+      config-driven multi-topic routing (`DEFAULT_ROUTES` / `KAFKA_TOPIC_ROUTES`)
+      so new purposes (loads/trips/alerts…) are config, not code. Realtime data
+      plane: mobile applies message events directly; desktop `PositionBus` drives
+      live HUD/Map fleet locations. REMAINING: enable `KAFKA_CONNECT` in ALS;
+      build/verify the desktop client on Linux
+- [ ] Wire left-panel filters + a right-panel selected-load inspector to data
 - [x] Load intake form (new load) + driver/equipment assignment (POST /Load)
 - [x] **HUD** surface (`/hud`) + `HudControlBus` (Wt server push): the console's
       Today/Week toggle publishes `SetMode`; HUD sessions auto-switch
@@ -124,8 +147,25 @@ Powers the HUD's map. See "Planned" in `domain-model.md`.
 - [x] Desktop HUD: truck-locations panel (latest per rig, 15s poll)
 - [x] Schema: navigation — `trip`, `waypoint`, `point_of_interest`, `route` +
       lookups (`trip_status`, `stop_type`, `poi_category`), lat/lng. Verified.
-- [~] Mobile Trips: list, start trip, add waypoint (done); trip start/stop
-      lifecycle, navigate, and POIs pending
+- [x] Mobile Trips: list, start trip; **mutable per-trip route** — trip overview
+      drills into an Edit-waypoints page to add (fuel/lunch/load-stop/…), remove,
+      or **drag-reorder** stops; stop types `lunch`+`load_stop`; waypoint edits
+      stream live. **Auto route recompute** in `geospatial/` (Kafka
+      `waypoint`/`trip` consumer → upsert `route`; haversine now, HERE pluggable).
+      **Manual edits set `trip.route_locked`** so the optimizer won't auto-reorder;
+      a driver can **Unlock & re-optimize** (confirm dialog) to clear the lock and
+      trigger immediate recompute/re-optimization via the trip event.
+- [~] Trips: start/stop lifecycle, turn-by-turn navigate, POIs pending
+- [~] **AI route optimization** (single + multi pickup/drop-off, shared-trailer
+      capacity). INTERIM DONE: nearest-neighbor optimizer (`geospatial/optimize.py`,
+      no API key) runs on recompute for non-`route_locked` trips — origin/dest
+      anchored, distance-greedy, persists new seq. FOUNDATION: two capacity
+      dimensions — `equipment.deck_length_ft` + `equipment.weight_capacity_lbs`
+      (per tractor/trailer config) and `load.deck_feet` + `load.weight_lbs`.
+      DEFERRED (user researching the engine): the full **capacitated
+      pickup-and-delivery** solve (pickup-before-dropoff + both capacity
+      dimensions) — OR-Tools (self-hosted) vs HERE Tour Planning vs LLM-as-caller.
+      It replaces the NN heuristic and still skips `route_locked` trips.
 - [x] `gis` bootstrap SQL (`database/gis_bootstrap.sql`): PostGIS into `gis` +
       derived geography views; **verified** `public` stays clean (ALS-safe).
       Full standup in [`DEPLOYMENT.md`](DEPLOYMENT.md).

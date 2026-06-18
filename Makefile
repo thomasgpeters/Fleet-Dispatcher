@@ -10,13 +10,24 @@ MOBILE_REMOTE_NAME ?= mobile
 MOBILE_BRANCH ?= main
 MOBILE_PREFIX := portals/mobile
 
-.PHONY: help publish-mobile pull-mobile mobile-build
+# ALS project to install our extensions into (override as needed):
+#   make als-extensions ALS_PROJECT=/path/to/fleet-dispatcher-api
+ALS_PROJECT ?= ../fleet-dispatcher-api
+
+.PHONY: help publish-mobile pull-mobile mobile-build als-extensions
 
 help:
 	@echo "Targets:"
 	@echo "  publish-mobile   Push portals/mobile -> Fleet-Dispatcher-Mobile (git subtree)"
 	@echo "  pull-mobile      Pull changes made in Fleet-Dispatcher-Mobile back into portals/mobile"
 	@echo "  mobile-build     npm install + build the mobile app locally"
+	@echo "  als-extensions   Install ALS Kafka-event logic into \$$ALS_PROJECT (run after ALS create)"
+
+# Install our auto-discovered ALS customizations (Kafka event producers) into a
+# generated ApiLogicServer project. Run after `ApiLogicServer create`; rebuilds
+# preserve logic/, so this is a one-time step per fresh generate.
+als-extensions:
+	als-extensions/install.sh "$(ALS_PROJECT)"
 
 # Publish the mobile subtree to its standalone repo.
 publish-mobile:

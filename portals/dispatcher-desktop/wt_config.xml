@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  Wt server configuration for the dispatcher console + HUD.
+
+  WebSockets are enabled so server push (CommBus comms + HudControlBus) is
+  delivered over a persistent socket instead of long-polling — this is what
+  makes the comms rail update in real time. Run the app with:
+
+    ./fleet_dispatcher_desktop --docroot . --http-listen 0.0.0.0:8080 \
+        -c wt_config.xml
+
+  See docs/DISPATCHER_DESKTOP.md.
+-->
+<server>
+  <application-settings location="*">
+    <!-- Real-time server push transport. -->
+    <web-sockets>true</web-sockets>
+
+    <!-- Server push needs sessions kept alive while a socket is open. -->
+    <session-management>
+      <dedicated-process>
+        <max-num-sessions>100</max-num-sessions>
+      </dedicated-process>
+    </session-management>
+
+    <!-- Keep idle pushy sessions around long enough for the socket. -->
+    <session-timeout>600</session-timeout>
+  </application-settings>
+</server>

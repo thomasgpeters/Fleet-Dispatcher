@@ -5,8 +5,13 @@
 #include <Wt/WApplication.h>
 #include <Wt/WString.h>
 
+#include "CommPanel.h"
+#include "FleetView.h"
 #include "HudControlBus.h"
+#include "MapView.h"
 #include "ProfileView.h"
+#include "SettingsView.h"
+#include "Toaster.h"
 
 namespace fd {
 
@@ -31,11 +36,17 @@ Shell::Shell(ApiClient* api, AppUser user, std::function<void()> onLogout)
         "(function(){var t=localStorage.getItem('fd-theme');"
         "if(t){document.documentElement.setAttribute('data-fd-theme',t);}})();");
 
+    // Top-right toaster lives above the frame (CSS pins it fixed). Create it
+    // first — the comms panel built below takes a pointer to it.
+    toaster_ = addNew<Toaster>();
+
     buildHeader();
     buildBody();
     buildFooter();
 
     showBoard();
+    if (!menuButtons_.empty()) setActiveMenu(menuButtons_.front());  // Board active
+    toaster_->notify("Welcome back", user_.full_name, Toaster::Level::Success, 4000);
 }
 
 void Shell::buildHeader() {
@@ -44,57 +55,45 @@ void Shell::buildHeader() {
     auto* inner = header->addNew<Wt::WContainerWidget>();
     inner->addStyleClass("fd-header-inner");
 
-    // Brand.
+    // --- Logo branding (top-left) ---
     auto* brand = inner->addNew<Wt::WContainerWidget>();
     brand->addStyleClass("fd-brand");
-    brand->addNew<Wt::WText>("Fleet Dispatcher");
     brand->addNew<Wt::WText>(Wt::WString::fromUTF8(
-        "<small>Dispatcher console · API " + api_->baseUrl() + "</small>"));
-
-    // Panel toggles (left).
-    auto* leftToggle = inner->addNew<Wt::WPushButton>(Wt::WString::fromUTF8("◧"));
-    leftToggle->addStyleClass("btn btn-sm btn-icon");
-    leftToggle->setToolTip("Toggle left panel");
-    leftToggle->clicked().connect(this, &Shell::toggleLeft);
-
-    // Navigation (full-width header == navigation).
-    auto* nav = inner->addNew<Wt::WContainerWidget>();
-    nav->addStyleClass("fd-nav");
-    auto addNav = [&](const char* label, std::function<void()> on) {
-        auto* b = nav->addNew<Wt::WPushButton>(label);
-        b->addStyleClass("btn btn-sm");
-        b->clicked().connect([this, b, on] {
-            setActiveNav(b);
-            on();
-        });
-        navButtons_.push_back(b);
-        return b;
-    };
-    addNav("Board", [this] { showBoard(); });
-    addNav("New Load", [this] { showLoadForm(); });
-    addNav("Drivers", [this] { showPlaceholder("Drivers"); });
-    addNav("Messages", [this] { showPlaceholder("Messages"); });
-    addNav("Profile", [this] { showProfile(); });
+        "<span class=\"fd-logo\">🚚</span> Fleet Dispatcher"));
 
     inner->addNew<Wt::WContainerWidget>()->addStyleClass("fd-header-spacer");
 
-    // Tools (right): right-panel toggle, theme toggle, user/role, sign out.
+    // --- Tools + profile/role (top-right) ---
     auto* tools = inner->addNew<Wt::WContainerWidget>();
     tools->addStyleClass("fd-header-tools");
 
-    auto* rightToggle = tools->addNew<Wt::WPushButton>(Wt::WString::fromUTF8("◨"));
-    rightToggle->addStyleClass("btn btn-sm btn-icon");
-    rightToggle->setToolTip("Toggle right panel");
-    rightToggle->clicked().connect(this, &Shell::toggleRight);
+    auto iconBtn = [&](const Wt::WString& glyph, const char* tip,
+                       void (Shell::*slot)()) {
+        auto* b = tools->addNew<Wt::WPushButton>(glyph);
+        b->addStyleClass("btn btn-sm btn-icon");
+        b->setToolTip(tip);
+        b->clicked().connect(this, slot);
+        return b;
+    };
+    // Panel toggles use the disclosure aesthetic: ▼ when open, a pointing arrow
+    // when closed (▶ for the left panel, ◀ for the right).
+    leftToggleBtn_ =
+        iconBtn(Wt::WString::fromUTF8("▼"), "Hide / show left panel", &Shell::toggleLeft);
+    rightToggleBtn_ =
+        iconBtn(Wt::WString::fromUTF8("▼"), "Hide / show right panel", &Shell::toggleRight);
+    iconBtn(Wt::WString::fromUTF8("◐"), "Toggle light / dark theme",
+            &Shell::toggleTheme);
 
-    auto* themeBtn = tools->addNew<Wt::WPushButton>(Wt::WString::fromUTF8("◐"));
-    themeBtn->addStyleClass("btn btn-sm btn-icon");
-    themeBtn->setToolTip("Toggle light / dark theme");
-    themeBtn->clicked().connect(this, &Shell::toggleTheme);
+    // Profile (name) + logged-in role.
+    auto* profileBtn = tools->addNew<Wt::WPushButton>(
+        Wt::WString::fromUTF8(user_.full_name));
+    profileBtn->addStyleClass("btn btn-sm fd-profile-btn");
+    profileBtn->setToolTip("Profile");
+    profileBtn->clicked().connect(this, &Shell::showProfile);
 
-    userLabel_ = tools->addNew<Wt::WText>();
-    userLabel_->addStyleClass("fd-user");
-    updateUserLabel();
+    auto* role = tools->addNew<Wt::WText>(
+        Wt::WString::fromUTF8(roleLabel(user_.app_role_id)));
+    role->addStyleClass("fd-role-badge");
 
     auto* signOut = tools->addNew<Wt::WPushButton>("Sign out");
     signOut->addStyleClass("btn btn-sm btn-icon");
@@ -108,31 +107,60 @@ void Shell::buildBody() {
     auto* body = addNew<Wt::WContainerWidget>();
     body->addStyleClass("fd-body");
 
-    // Left panel — filters / context (collapsible).
+    // Left panel — menuing system + work-panel toggles (collapsible).
     leftPanel_ = body->addNew<Wt::WContainerWidget>();
     leftPanel_->addStyleClass("fd-panel fd-panel-left");
-    leftPanel_->addNew<Wt::WText>("<div class=\"fd-panel-title\">Filters</div>");
-    leftPanel_->addNew<Wt::WText>(Wt::WString::fromUTF8(
-        "<p class=\"fd-muted\">Dispatch week, driver, and status filters land "
-        "here.</p>"));
+    buildLeftMenu();
 
-    // Center — command bar + active view.
+    // Center — the work panel (active view outlet).
     auto* center = body->addNew<Wt::WContainerWidget>();
     center->addStyleClass("fd-center");
-    commandBar_ = center->addNew<Wt::WContainerWidget>();
-    commandBar_->addStyleClass("btn-group mb-3");
-    todayBtn_ = commandBar_->addNew<Wt::WPushButton>("Today");
-    weekBtn_ = commandBar_->addNew<Wt::WPushButton>("Week");
-    todayBtn_->clicked().connect([this] { setMode(BoardMode::Today); });
-    weekBtn_->clicked().connect([this] { setMode(BoardMode::Week); });
     content_ = center->addNew<Wt::WContainerWidget>();
+    content_->addStyleClass("fd-work");
 
-    // Right panel — details / inspector (collapsible).
+    // Right panel — communications (channels), collapsible.
     rightPanel_ = body->addNew<Wt::WContainerWidget>();
     rightPanel_->addStyleClass("fd-panel fd-panel-right");
-    rightPanel_->addNew<Wt::WText>("<div class=\"fd-panel-title\">Details</div>");
-    rightPanel_->addNew<Wt::WText>(Wt::WString::fromUTF8(
-        "<p class=\"fd-muted\">Select a load to inspect it here.</p>"));
+    rightPanel_->addNew<CommPanel>(api_, user_, toaster_);
+}
+
+void Shell::buildLeftMenu() {
+    leftPanel_->addNew<Wt::WText>("<div class=\"fd-panel-title\">Menu</div>");
+
+    auto* menu = leftPanel_->addNew<Wt::WContainerWidget>();
+    menu->addStyleClass("fd-menu");
+    auto addItem = [&](const char* label, std::function<void()> on) {
+        auto* b = menu->addNew<Wt::WPushButton>(label);
+        b->addStyleClass("fd-menu-item btn btn-sm");
+        b->clicked().connect([this, b, on] {
+            setActiveMenu(b);
+            on();
+        });
+        menuButtons_.push_back(b);
+        return b;
+    };
+    addItem("Board", [this] { showBoard(); });
+    addItem("Fleet", [this] { showFleet(); });
+    addItem("Map", [this] { showMap(); });
+    addItem("New Load", [this] { showLoadForm(); });
+    // Selecting Communications lets comms take over the full work area.
+    addItem("Communications", [this] { showComms(); });
+    addItem("Settings", [this] { showSettings(); });
+
+    // Work-panel toggles: drive how the center renders.
+    leftPanel_->addNew<Wt::WText>(
+        "<div class=\"fd-panel-title mt-3\">Work panel</div>");
+
+    auto* modeGroup = leftPanel_->addNew<Wt::WContainerWidget>();
+    modeGroup->addStyleClass("btn-group w-100 mb-2");
+    todayBtn_ = modeGroup->addNew<Wt::WPushButton>("Today");
+    weekBtn_ = modeGroup->addNew<Wt::WPushButton>("Week");
+    todayBtn_->clicked().connect([this] { setMode(BoardMode::Today); });
+    weekBtn_->clicked().connect([this] { setMode(BoardMode::Week); });
+
+    auto* compactBtn = leftPanel_->addNew<Wt::WPushButton>("Compact rows");
+    compactBtn->addStyleClass("btn btn-sm btn-outline-secondary w-100");
+    compactBtn->clicked().connect(this, &Shell::toggleCompact);
 }
 
 void Shell::buildFooter() {
@@ -140,17 +168,15 @@ void Shell::buildFooter() {
     footer->addStyleClass("fd-footer");
     auto* inner = footer->addNew<Wt::WContainerWidget>();
     inner->addStyleClass("fd-footer-inner");
-    inner->addNew<Wt::WText>(Wt::WString::fromUTF8(
-        "<span>© 2026 Fleet Dispatcher</span>"));
+    inner->addNew<Wt::WText>(Wt::WString::fromUTF8("<span>© 2026 Fleet Dispatcher</span>"));
     inner->addNew<Wt::WText>(Wt::WString::fromUTF8(
         "<span><a href=\"/hud\" target=\"_blank\">HUD</a> · "
         "<a href=\"https://github.com/thomasgpeters/fleet-dispatcher\" "
-        "target=\"_blank\">Docs</a> · "
-        "<a href=\"#\">Support</a></span>"));
+        "target=\"_blank\">Docs</a> · <a href=\"#\">Support</a></span>"));
 }
 
-void Shell::setActiveNav(Wt::WPushButton* active) {
-    for (auto* b : navButtons_) {
+void Shell::setActiveMenu(Wt::WPushButton* active) {
+    for (auto* b : menuButtons_) {
         if (b == active) {
             b->addStyleClass("fd-active");
         } else {
@@ -163,8 +189,10 @@ void Shell::toggleLeft() {
     leftCollapsed_ = !leftCollapsed_;
     if (leftCollapsed_) {
         leftPanel_->addStyleClass("fd-collapsed");
+        leftToggleBtn_->setText(Wt::WString::fromUTF8("▶"));  // closed → points right
     } else {
         leftPanel_->removeStyleClass("fd-collapsed");
+        leftToggleBtn_->setText(Wt::WString::fromUTF8("▼"));  // open → down arrow
     }
 }
 
@@ -172,9 +200,17 @@ void Shell::toggleRight() {
     rightCollapsed_ = !rightCollapsed_;
     if (rightCollapsed_) {
         rightPanel_->addStyleClass("fd-collapsed");
+        rightToggleBtn_->setText(Wt::WString::fromUTF8("◀"));  // closed → points left
     } else {
         rightPanel_->removeStyleClass("fd-collapsed");
+        rightToggleBtn_->setText(Wt::WString::fromUTF8("▼"));  // open → down arrow
     }
+}
+
+void Shell::toggleCompact() {
+    compact_ = !compact_;
+    if (compact_) content_->addStyleClass("fd-compact");
+    else content_->removeStyleClass("fd-compact");
 }
 
 void Shell::toggleTheme() {
@@ -194,27 +230,20 @@ void Shell::setMode(BoardMode mode) {
     refreshModeButtons();
     if (board_) board_->setMode(mode_);
 
-    // Drive the HUD: the same console control pushes a command to every HUD
-    // session (in-process, instant) and records it for remote/distributed HUDs.
+    // Drive the HUD: in-process push to every HUD session + a recorded command.
     const std::string arg = (mode_ == BoardMode::Today) ? "today" : "week";
     HudControlBus::instance().publish({HudCommand::SetMode, arg});
     api_->postHudCommand("set_mode", arg, [](std::string) { /* best-effort */ });
 }
 
 void Shell::refreshModeButtons() {
-    const char* active = "btn btn-primary";
-    const char* idle = "btn btn-outline-primary";
+    const char* active = "btn btn-sm btn-primary";
+    const char* idle = "btn btn-sm btn-outline-primary";
     todayBtn_->setStyleClass(mode_ == BoardMode::Today ? active : idle);
     weekBtn_->setStyleClass(mode_ == BoardMode::Week ? active : idle);
 }
 
-void Shell::updateUserLabel() {
-    userLabel_->setText(Wt::WString::fromUTF8(
-        user_.full_name + " · " + roleLabel(user_.app_role_id)));
-}
-
 void Shell::showBoard() {
-    commandBar_->show();
     refreshModeButtons();
     content_->clear();
     board_ = content_->addNew<BoardView>(api_, mode_);
@@ -222,24 +251,51 @@ void Shell::showBoard() {
 
 void Shell::showLoadForm() {
     board_ = nullptr;
-    commandBar_->hide();
     content_->clear();
-    content_->addNew<LoadForm>(api_, [this] { showBoard(); });
+    content_->addNew<LoadForm>(api_, [this] {
+        if (toaster_) toaster_->notify("Load created", "Added to the board",
+                                       Toaster::Level::Success);
+        showBoard();
+    });
 }
 
 void Shell::showProfile() {
     board_ = nullptr;
-    commandBar_->hide();
     content_->clear();
     content_->addNew<ProfileView>(api_, user_, [this](AppUser updated) {
         user_ = std::move(updated);
-        updateUserLabel();
+        if (toaster_) toaster_->notify("Profile saved", "", Toaster::Level::Success);
     });
+}
+
+void Shell::showComms() {
+    board_ = nullptr;
+    content_->clear();
+    // Comms take over the full work area. Pass a null toaster so only the
+    // always-on right rail raises new-message toasts (avoids duplicates).
+    content_->addNew<CommPanel>(api_, user_, /*toaster=*/nullptr);
+}
+
+void Shell::showFleet() {
+    board_ = nullptr;
+    content_->clear();
+    content_->addNew<FleetView>(api_);
+}
+
+void Shell::showMap() {
+    board_ = nullptr;
+    content_->clear();
+    content_->addNew<MapView>(api_);
+}
+
+void Shell::showSettings() {
+    board_ = nullptr;
+    content_->clear();
+    content_->addNew<SettingsView>(api_, user_);
 }
 
 void Shell::showPlaceholder(const std::string& title) {
     board_ = nullptr;
-    commandBar_->hide();
     content_->clear();
     content_->addNew<Wt::WText>(Wt::WString::fromUTF8(
         "<div class=\"card\"><div class=\"card-body\"><h2 class=\"h5\">" + title +

@@ -1,5 +1,6 @@
 #include "HudView.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cstdio>
 #include <map>
@@ -13,6 +14,8 @@
 #include <Wt/WText.h>
 #include <Wt/WTimer.h>
 #include <Wt/Json/Object.h>
+
+#include "PositionBus.h"
 
 namespace fd {
 
@@ -70,16 +73,37 @@ HudView::HudView(ApiClient* api) : api_(api) {
             if (auto* a = Wt::WApplication::instance()) a->triggerUpdate();
         });
 
-    // Live-ish refresh of truck locations (until realtime push from telemetry).
-    loadPositions();
+    loadPositions();  // initial snapshot (ALS)
+
+    // Realtime fleet locations from the Kafka stream (via the bridge →
+    // PositionBus). Live map updates with no DB read-back per fix.
+    posToken_ = PositionBus::instance().subscribe(
+        Wt::WApplication::instance()->sessionId(),
+        [this](const Position& p) {
+            applyLive(p);
+            if (auto* a = Wt::WApplication::instance()) a->triggerUpdate();
+        });
+
+    // Slow reconcile fallback (the stream is the primary live source).
     auto* timer = addChild(std::make_unique<Wt::WTimer>());
-    timer->setInterval(std::chrono::seconds(15));
+    timer->setInterval(std::chrono::seconds(60));
     timer->timeout().connect([this] { loadPositions(); });
     timer->start();
 }
 
 HudView::~HudView() {
     HudControlBus::instance().unsubscribe(token_);
+    PositionBus::instance().unsubscribe(posToken_);
+}
+
+void HudView::applyLive(const Position& p) {
+    positions_.erase(
+        std::remove_if(positions_.begin(), positions_.end(),
+                       [&](const Position& x) { return x.equipment_id == p.equipment_id; }),
+        positions_.end());
+    positions_.push_back(p);
+    updateMap();
+    renderPositions();
 }
 
 void HudView::apply(const HudCommand& command) {
