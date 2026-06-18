@@ -156,15 +156,16 @@ Powers the HUD's map. See "Planned" in `domain-model.md`.
       a driver can **Unlock & re-optimize** (confirm dialog) to clear the lock and
       trigger immediate recompute/re-optimization via the trip event.
 - [~] Trips: start/stop lifecycle, turn-by-turn navigate, POIs pending
-- [ ] **AI route optimization** (single + multi pickup/drop-off, shared-trailer
-      capacity). DECISION DEFERRED (user researching the engine): OR-Tools VRP
-      (self-hosted, recommended) vs HERE Tour Planning (managed) vs LLM-as-caller.
-      FOUNDATION DONE: two capacity dimensions — `equipment.deck_length_ft` +
-      `equipment.weight_capacity_lbs` (per tractor/trailer config) and
-      `load.deck_feet` + `load.weight_lbs`. Optimizer will be a capacitated
-      pickup-and-delivery solve (pickup-before-dropoff, both dimensions) in
-      `geospatial/`, fed by a HERE/haversine travel matrix. MUST skip
-      `trip.route_locked` trips (driver manually ordered them).
+- [~] **AI route optimization** (single + multi pickup/drop-off, shared-trailer
+      capacity). INTERIM DONE: nearest-neighbor optimizer (`geospatial/optimize.py`,
+      no API key) runs on recompute for non-`route_locked` trips — origin/dest
+      anchored, distance-greedy, persists new seq. FOUNDATION: two capacity
+      dimensions — `equipment.deck_length_ft` + `equipment.weight_capacity_lbs`
+      (per tractor/trailer config) and `load.deck_feet` + `load.weight_lbs`.
+      DEFERRED (user researching the engine): the full **capacitated
+      pickup-and-delivery** solve (pickup-before-dropoff + both capacity
+      dimensions) — OR-Tools (self-hosted) vs HERE Tour Planning vs LLM-as-caller.
+      It replaces the NN heuristic and still skips `route_locked` trips.
 - [x] `gis` bootstrap SQL (`database/gis_bootstrap.sql`): PostGIS into `gis` +
       derived geography views; **verified** `public` stays clean (ALS-safe).
       Full standup in [`DEPLOYMENT.md`](DEPLOYMENT.md).

@@ -30,9 +30,12 @@ waypoints. It runs **automatically**: a Kafka consumer subscribes to the
 [`../docs/REALTIME.md`](../docs/REALTIME.md)) and recomputes on every change, from
 any client. The `POST /route/recompute/{trip_id}` endpoint does the same on demand.
 
-- Recompute **preserves the waypoint order** — it never reorders — so it's safe
-  for trips a driver has manually ordered. (The separate, deferred route
-  *optimizer* that reorders must skip `trip.route_locked` trips.)
+- **Auto-optimize (interim):** for trips that are NOT `route_locked`, recompute
+  first reorders stops with a **nearest-neighbor** heuristic (`optimize.py`) —
+  origin first, destination last, distance-greedy — and persists the new order.
+  No API key needed. A `route_locked` trip keeps the driver's manual order
+  (geometry-only recompute). The full capacitated pickup-and-delivery solver
+  (capacity + precedence) is the deferred engine and replaces the heuristic.
 - Provider: `haversine` (dev, great-circle) by default; swap a real road router
   (HERE) via `ROUTING_PROVIDER`. Writes use `FLEET_DATABASE_URL` (the fleet role,
   which can write `fleet.route`); reads of the gis views still use `fleet_gis`.

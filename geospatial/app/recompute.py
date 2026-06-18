@@ -1,8 +1,13 @@
-"""Recompute a trip's route from its (ordered) waypoints and upsert fleet.route.
+"""Recompute a trip's route from its waypoints and upsert fleet.route.
 
-Reads/writes the `fleet` schema, so it uses FLEET_DATABASE_URL (the fleet app
-role with write on fleet.route) — distinct from the read-only fleet_gis role the
-spatial endpoints use.
+If the trip is NOT route_locked, first reorder the stops with the interim
+nearest-neighbor optimizer (persisting the new waypoint seq); a locked trip keeps
+the driver's manual order (geometry-only recompute). Reads/writes the `fleet`
+schema, so it uses FLEET_DATABASE_URL (the fleet app role) — distinct from the
+read-only fleet_gis role the spatial endpoints use.
+
+Writes go straight to the DB (psycopg), not through ALS, so reordering does NOT
+emit Kafka events — no recompute feedback loop.
 """
 
 from __future__ import annotations
@@ -14,6 +19,7 @@ from typing import Optional
 import psycopg
 from psycopg.rows import dict_row
 
+from .optimize import nearest_neighbor_order
 from .routing import compute
 
 log = logging.getLogger("fleet.geospatial.recompute")
@@ -24,30 +30,47 @@ FLEET_DATABASE_URL = os.environ.get(
 )
 
 
+def _persist_order(cur, ordered) -> None:
+    """Write the new seq (1..N) two-phase to respect UNIQUE(trip_id, seq)."""
+    for i, w in enumerate(ordered):
+        cur.execute("UPDATE waypoint SET seq = %s WHERE id = %s", (1000 + i, w["id"]))
+    for i, w in enumerate(ordered):
+        cur.execute("UPDATE waypoint SET seq = %s WHERE id = %s", (i + 1, w["id"]))
+
+
 def recompute_route(trip_id: str) -> Optional[dict]:
-    """Recompute and persist the route for one trip. Returns the route dict or
+    """Recompute and persist the route for one trip. Returns the route dict, or
     None when the trip has fewer than two waypoints."""
-    with psycopg.connect(FLEET_DATABASE_URL, autocommit=True, row_factory=dict_row) as conn:
+    with psycopg.connect(FLEET_DATABASE_URL, row_factory=dict_row) as conn:
         with conn.cursor() as cur:
             cur.execute("SET search_path = fleet, public")
+
+            cur.execute("SELECT route_locked FROM trip WHERE id = %s", (trip_id,))
+            trip = cur.fetchone()
+            locked = bool(trip and trip["route_locked"])
+
             cur.execute(
-                "SELECT lat, lng FROM waypoint WHERE trip_id = %s ORDER BY seq",
+                "SELECT id, stop_type_id, lat, lng FROM waypoint "
+                "WHERE trip_id = %s ORDER BY seq",
                 (trip_id,),
             )
             rows = cur.fetchall()
             if len(rows) < 2:
+                conn.commit()
                 return None
-            stops = [(r["lat"], r["lng"]) for r in rows]
 
-            # Optimizer hook (deferred engine): when a trip is NOT route_locked,
-            # the route optimizer should reorder `stops` here for the optimal
-            # sequence (and persist the new waypoint seq) before we compute
-            # geometry — that's what "unlock → re-optimize" will do. Until the
-            # engine is chosen we keep the current order (recompute is
-            # order-preserving, safe for locked trips). See docs/TODO.md.
+            ordered = rows
+            if not locked:
+                # Interim auto-optimize (nearest neighbor; no key needed). The
+                # full capacitated PDP solver replaces this when its engine lands.
+                optimized = nearest_neighbor_order(rows)
+                if [w["id"] for w in optimized] != [w["id"] for w in rows]:
+                    _persist_order(cur, optimized)
+                    ordered = optimized
+
+            stops = [(w["lat"], w["lng"]) for w in ordered]
             r = compute(stops)
 
-            # One route per trip: replace any existing.
             cur.execute("DELETE FROM route WHERE trip_id = %s", (trip_id,))
             cur.execute(
                 """
@@ -67,5 +90,9 @@ def recompute_route(trip_id: str) -> Optional[dict]:
                     "prov": r["provider"],
                 },
             )
-    log.info("recomputed route for trip %s: %s mi", trip_id, r["distance_mi"])
+        conn.commit()
+    log.info(
+        "recomputed route for trip %s: %s mi%s",
+        trip_id, r["distance_mi"], "" if locked else " (auto-ordered)",
+    )
     return r

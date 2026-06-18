@@ -82,77 +82,74 @@ export function TripWaypointsPage() {
   }, [tripId]);
 
   // Add a stop of the chosen type at the driver's current GPS location, inserted
-  // before the destination so it stays last on the route.
+  // before the destination so it stays last on the route. Locks FIRST (and waits)
+  // so the auto-optimizer — which reads route_locked from the DB — won't reorder
+  // the manual change (race-safe regardless of Kafka event ordering).
+  const applyAdd = async (
+    pos: GeolocationPosition,
+    stopTypeId: number,
+    label: string,
+  ) => {
+    try {
+      await lockOrder();
+      const dest = stops.find((s) => s.stop_type_id === 2);
+      const seq = dest
+        ? dest.seq
+        : (stops.length ? stops[stops.length - 1].seq : 0) + 1;
+      if (dest) {
+        // Bump destination (and anything after) down a slot — back to front to
+        // respect UNIQUE (trip_id, seq).
+        for (const s of stops.filter((x) => x.seq >= seq).sort((a, b) => b.seq - a.seq)) {
+          await api.updateWaypoint(s.id, { seq: s.seq + 1 });
+        }
+      }
+      await api.addWaypoint({
+        trip_id: tripId,
+        seq,
+        stop_type_id: stopTypeId,
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+        label,
+      });
+      await load();
+    } catch (e) {
+      fail(e);
+    }
+  };
+
   const addStop = (stopTypeId: number, label: string) => {
     if (!navigator.geolocation) {
       setError("Geolocation isn't available here.");
       return;
     }
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const dest = stops.find((s) => s.stop_type_id === 2);
-        const seq = dest
-          ? dest.seq
-          : (stops.length ? stops[stops.length - 1].seq : 0) + 1;
-
-        const doAdd = () =>
-          api
-            .addWaypoint({
-              trip_id: tripId,
-              seq,
-              stop_type_id: stopTypeId,
-              lat: pos.coords.latitude,
-              lng: pos.coords.longitude,
-              label,
-            })
-            .then(() => {
-              void lockOrder();
-              return load();
-            })
-            .catch(fail);
-
-        if (dest) {
-          // Bump destination (and anything after) down a slot — back to front to
-          // respect UNIQUE (trip_id, seq).
-          Promise.all(
-            stops
-              .filter((s) => s.seq >= seq)
-              .sort((a, b) => b.seq - a.seq)
-              .map((s) => api.updateWaypoint(s.id, { seq: s.seq + 1 })),
-          )
-            .then(doAdd)
-            .catch(fail);
-        } else {
-          void doAdd();
-        }
-      },
+      (pos) => void applyAdd(pos, stopTypeId, label),
       (err) => setError(`Location error: ${err.message}`),
       { enableHighAccuracy: true, timeout: 15000 },
     );
   };
 
-  const removeStop = (w: Waypoint) => {
-    api
-      .deleteWaypoint(w.id)
-      .then(() => {
-        void lockOrder();
-        return load();
-      })
-      .catch(fail);
+  const removeStop = async (w: Waypoint) => {
+    try {
+      await lockOrder();
+      await api.deleteWaypoint(w.id);
+      await load();
+    } catch (e) {
+      fail(e);
+    }
   };
 
-  // Drag-reorder: persist the new order as seq = 1..N. Two-phase (offset first)
-  // to respect UNIQUE (trip_id, seq) without mid-update collisions. The route is
-  // recomputed automatically server-side from the waypoint change events.
+  // Drag-reorder: persist the new order as seq = 1..N. Lock FIRST, then two-phase
+  // (offset then final) to respect UNIQUE (trip_id, seq) without collisions.
   const persistOrder = async (ordered: Waypoint[]) => {
     try {
+      await lockOrder(); // manual reorder → optimizer leaves this trip alone
       await Promise.all(
         ordered.map((w, i) => api.updateWaypoint(w.id, { seq: 1000 + i })),
       );
       await Promise.all(
         ordered.map((w, i) => api.updateWaypoint(w.id, { seq: i + 1 })),
       );
-      void lockOrder(); // manual reorder → optimizer leaves this trip alone
       await load();
     } catch (e) {
       fail(e);

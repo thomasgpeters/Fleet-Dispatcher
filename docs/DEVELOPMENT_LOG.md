@@ -19,6 +19,19 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 - Docs: als-extensions/README, MIDDLEWARE_SETUP (post-generate step), REALTIME
   (producer points here), CLAUDE golden rule + component table.
 
+### Interim nearest-neighbor optimizer (no API key)
+- `geospatial/optimize.py`: nearest-neighbor stop ordering (origin first / dest
+  last, distance-greedy) — a no-key default so "auto-optimize" / unlock actually
+  reorders without HERE. `recompute.py` runs it when a trip is NOT `route_locked`,
+  persists the new `seq` (two-phase, atomic, via psycopg → no Kafka echo), then
+  computes geometry; locked trips keep the manual order (geometry only).
+- Race-safety: the mobile editor now **locks first (awaited)** before any
+  add/remove/reorder; recompute reads `route_locked` fresh from the DB, so a
+  manual edit is never clobbered by the optimizer regardless of Kafka event order.
+- Limits (documented): NN minimizes distance only — multi-load pickup-before-
+  dropoff precedence + trailer capacity (deck feet/weight) remain the deferred
+  full solver. mobile build clean; geospatial py_compile clean.
+
 ### Unlock & re-optimize (revert manual route, with confirmation)
 - Mobile trip overview: when `route_locked`, an **Unlock & re-optimize** button
   with an **IonAlert confirmation** ("Are you sure you want to revert your manual
