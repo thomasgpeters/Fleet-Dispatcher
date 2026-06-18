@@ -34,6 +34,11 @@ python -m app.main          # ws://0.0.0.0:8765
 Docker: `docker build -t fleet-realtime . && docker run --env-file .env -p 8765:8765 fleet-realtime`.
 systemd: see `deploy/`.
 
+**Config is internal.** Kafka brokers/creds and `FLEET_JWT_SECRET` live only in
+this service's `.env` (gitignored) — never in committed source and never shipped
+to clients. Clients get only the bridge URL + a JWT. See `docs/REALTIME.md` →
+"Configuration & secrets".
+
 ## Client protocol
 
 1. Connect `ws://<host>:8765/?token=<ALS-JWT>` (HS256, verified with

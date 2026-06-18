@@ -21,12 +21,23 @@ make als-extensions
 als-extensions/install.sh /path/to/fleet-dispatcher-api
 ```
 
-Then enable the producer in the ALS project config and (re)start ALS:
+Then enable the producer in the ALS project and (re)start ALS — read the broker
+from the **environment**, never a hardcoded/committed value (keep the ALS
+project's `.env` out of git):
 
 ```python
 # config/config.py  (older ALS: KAFKA_PRODUCER)
-KAFKA_CONNECT = '{"bootstrap.servers": "localhost:9092"}'
+import os
+KAFKA_CONNECT = os.getenv("KAFKA_CONNECT")  # e.g. '{"bootstrap.servers": "broker:9092"}'
 ```
+
+```bash
+# ALS project .env (gitignored — internal only)
+KAFKA_CONNECT={"bootstrap.servers": "broker:9092"}
+```
+
+Kafka config is internal: brokers/creds and the JWT secret live only in
+server-side env files; clients never see them (see `docs/REALTIME.md`).
 
 ## Why this is low-maintenance
 

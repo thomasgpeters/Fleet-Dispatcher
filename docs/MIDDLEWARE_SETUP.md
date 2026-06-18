@@ -61,6 +61,19 @@ They land in `logic/logic_discovery/`, which ALS auto-discovers and a `rebuild`
 preserves — so it's a one-time step per fresh generate. See
 [`REALTIME.md`](REALTIME.md) and `als-extensions/README.md`.
 
+Enable the Kafka producer from the **environment** (keep brokers/creds out of
+committed config — the ALS project's `.env` should be gitignored):
+
+```python
+# config/config.py
+import os
+KAFKA_CONNECT = os.getenv("KAFKA_CONNECT")   # internal: broker addr / creds
+```
+
+Kafka configuration and the JWT secret are internal server-side settings; clients
+only ever get the bridge WebSocket URL + a token (see [`REALTIME.md`](REALTIME.md)
+→ "Configuration & secrets").
+
 ## Business rules
 
 The structural invariants from [`domain-model.md`](domain-model.md) are already

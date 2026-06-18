@@ -1,5 +1,9 @@
-# --- Environment ---
+# --- Environment / secrets ---
+# Real config (Kafka brokers/creds, JWT secret, DB URLs) lives in *.env files and
+# stays out of git. Only *.env.example templates (placeholders) are committed.
 .env
+*.env
+!*.env.example
 *.local
 
 # --- Python (domain + middleware) ---

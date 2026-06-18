@@ -19,6 +19,18 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 - Docs: als-extensions/README, MIDDLEWARE_SETUP (post-generate step), REALTIME
   (producer points here), CLAUDE golden rule + component table.
 
+### Hide Kafka config — internal env files only
+- Hardened `.gitignore`: ignore `.env` + `*.env`, keep only `*.env.example`
+  placeholder templates (verified with `git check-ignore`). No real broker/secret
+  is committed (audited: only `localhost:9092` / `change-me` placeholders).
+- New `docs/REALTIME.md` → "Configuration & secrets": Kafka brokers/creds, the
+  consumer group, and the JWT secret live ONLY in server-side env files
+  (bridge `.env`, ALS project `.env`). **Clients never see Kafka** — they get only
+  the bridge WebSocket URL + a JWT (the bridge is the encapsulation boundary).
+- ALS producer config is env-driven (`KAFKA_CONNECT = os.getenv(...)`), not a
+  hardcoded/committed broker; ALS project `.env` should be gitignored
+  (als-extensions/README, MIDDLEWARE_SETUP updated).
+
 ### Desktop/HUD: realtime bridge WebSocket client → CommBus
 - New `RealtimeClient` (`portals/dispatcher-desktop/src/`): one **server-wide**
   Boost.Beast WebSocket client that consumes the realtime bridge and publishes

@@ -28,6 +28,27 @@ point coupling between apps.
   the app still works — just less instantly. The realtime layer is an
   *accelerator*, never a dependency.
 
+## Configuration & secrets (internal only)
+
+Kafka is an **internal** concern. Brokers, credentials, the consumer group, and
+the JWT secret live **only in server-side env files**, which are gitignored
+(`.env`, `*.env`); only `*.env.example` **placeholder** templates are committed.
+
+**Clients never see Kafka.** The mobile and desktop apps only ever know the
+**bridge WebSocket URL** and a **JWT** — never a broker address, topic list, or
+the signing secret. The bridge is the trust/encapsulation boundary.
+
+| Secret / setting | Lives in (internal, gitignored) | Who reads it |
+| --- | --- | --- |
+| Kafka brokers / creds | ALS project env · `realtime/.env` (`KAFKA_*`) | ALS producer · bridge consumer |
+| JWT signing secret | ALS project env · `realtime/.env` (`FLEET_JWT_SECRET`) | ALS (issues) · bridge (verifies) |
+| Bridge URL | client env (`VITE_REALTIME_URL` / `FLEET_REALTIME_URL`) | clients only |
+| Per-user / service JWT | issued at login / service env (`FLEET_REALTIME_TOKEN`) | clients → bridge |
+
+So a leaked client build exposes only a WebSocket URL and a (scoped, expiring)
+token — never the Kafka topology or the secret. Rotate secrets by editing the
+server-side env files; no client change needed.
+
 ## Topic strategy — single topic per row type + correlation id (NOT topic-per-channel)
 
 **Decision:** one Kafka topic **per row type** (`message`, `position`), with the
