@@ -86,6 +86,9 @@ export interface Load {
   loaded_miles: number;
   rate: number; // post-broker
   currency: string;
+  // Footprint for multi-load (shared-trailer) route optimization.
+  deck_feet?: number;
+  weight_lbs?: number;
   pickup_date?: string; // YYYY-MM-DD, within the dispatch week
   delivery_date?: string;
 }

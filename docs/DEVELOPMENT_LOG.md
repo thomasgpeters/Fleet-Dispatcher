@@ -19,6 +19,14 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 - Docs: als-extensions/README, MIDDLEWARE_SETUP (post-generate step), REALTIME
   (producer points here), CLAUDE golden rule + component table.
 
+### Route-optimization capacity foundation (engine deferred)
+- Per user: the AI route-optimization **engine choice is deferred** (researching
+  OR-Tools vs HERE Tour Planning vs LLM-as-caller) — recorded in TODO.
+- Laid the data foundation: capacity is **two dimensions, per tractor/trailer
+  config** — added `equipment.weight_capacity_lbs` (deck_length_ft already there)
+  and `load.deck_feet` + `load.weight_lbs`. Seeded realistic values; **verified**
+  schema+seed on PG16. Mobile `Load` type updated. (ALS regen needed to expose.)
+
 ### Mutable per-trip GPS route — driver waypoints
 - Stop types added: `lunch` (7) + `load_stop` (8) for multi-load stops (schema
   comment + seed; verified — 8 stop types). The `waypoint`/`route` tables already

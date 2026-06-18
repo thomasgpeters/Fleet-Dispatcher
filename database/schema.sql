@@ -123,7 +123,10 @@ CREATE TABLE equipment (
     power_unit_id   INTEGER NOT NULL REFERENCES power_unit(id),
     trailer_type_id INTEGER NOT NULL REFERENCES trailer_type(id),
     has_ramps       BOOLEAN NOT NULL DEFAULT FALSE,
+    -- Trailer capacity (per tractor/trailer configuration) for multi-load route
+    -- optimization: deck space (linear feet) + payload weight. Both dimensions.
     deck_length_ft  SMALLINT CHECK (deck_length_ft IS NULL OR deck_length_ft > 0),
+    weight_capacity_lbs INTEGER CHECK (weight_capacity_lbs IS NULL OR weight_capacity_lbs > 0),
     has_duals       BOOLEAN NOT NULL DEFAULT FALSE,
     in_service      BOOLEAN NOT NULL DEFAULT TRUE,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -194,6 +197,10 @@ CREATE TABLE load (
     deadhead_miles   NUMERIC(8,1) NOT NULL DEFAULT 0 CHECK (deadhead_miles >= 0),
     loaded_miles     NUMERIC(8,1) NOT NULL DEFAULT 0 CHECK (loaded_miles >= 0),
     rate             NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (rate >= 0),  -- post-broker
+    -- Load footprint for multi-load (shared-trailer) route optimization: linear
+    -- deck feet + weight. Checked against equipment capacity by the optimizer.
+    deck_feet        NUMERIC(5,1) CHECK (deck_feet IS NULL OR deck_feet >= 0),
+    weight_lbs       INTEGER CHECK (weight_lbs IS NULL OR weight_lbs >= 0),
     currency         TEXT NOT NULL DEFAULT 'USD',
     -- Scheduling within the dispatch week: drives the desktop board's
     -- Today (pickup_date = today) vs Week (placed by pickup_date) views.

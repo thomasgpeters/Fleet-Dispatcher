@@ -150,9 +150,15 @@ Powers the HUD's map. See "Planned" in `domain-model.md`.
 - [x] Mobile Trips: list, start trip; **mutable per-trip route** — trip overview
       drills into an Edit-waypoints page to add (fuel/lunch/load-stop/…) or remove
       stops; stop types `lunch`+`load_stop` added; waypoint edits stream live.
-- [~] Trips: start/stop lifecycle, turn-by-turn navigate, POIs, and route
-      recompute (geospatial recomputes polyline/distance when waypoints change)
-      pending
+- [~] Trips: start/stop lifecycle, turn-by-turn navigate, POIs pending
+- [ ] **AI route optimization** (single + multi pickup/drop-off, shared-trailer
+      capacity). DECISION DEFERRED (user researching the engine): OR-Tools VRP
+      (self-hosted, recommended) vs HERE Tour Planning (managed) vs LLM-as-caller.
+      FOUNDATION DONE: two capacity dimensions — `equipment.deck_length_ft` +
+      `equipment.weight_capacity_lbs` (per tractor/trailer config) and
+      `load.deck_feet` + `load.weight_lbs`. Optimizer will be a capacitated
+      pickup-and-delivery solve (pickup-before-dropoff, both dimensions) in
+      `geospatial/`, fed by a HERE/haversine travel matrix.
 - [x] `gis` bootstrap SQL (`database/gis_bootstrap.sql`): PostGIS into `gis` +
       derived geography views; **verified** `public` stays clean (ALS-safe).
       Full standup in [`DEPLOYMENT.md`](DEPLOYMENT.md).
