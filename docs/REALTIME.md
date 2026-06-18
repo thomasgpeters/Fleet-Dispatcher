@@ -12,6 +12,34 @@ point coupling between apps.
                                                                                             (fallback poll)
 ```
 
+## Two data planes
+
+The app deliberately splits its data into two planes:
+
+| Plane | Carries | How clients get it |
+| --- | --- | --- |
+| **Realtime** | **messages, fleet locations / map updates**, and live status changes (load/trip transitions, alerts) | **Live from the Kafka stream via the bridge** — applied directly from the event payload, no DB read-back |
+| **Request/response (ALS)** | everything else — CRUD, reference/lookups, detail & forms, settlements, and the **initial snapshot** of a realtime view | **JSON:API (ApiLogicServer)** — request/response |
+
+So: **writes** and **one-time snapshot loads** go through ALS; **ongoing live
+updates** for the realtime categories come from the stream — clients do **not**
+poll the DB through ALS to stay live. A view typically loads its snapshot once via
+ALS, then applies live deltas from the stream.
+
+## Kafka stream = public realtime plane; bridge = its public edge
+
+The Kafka **stream** is now first-class **public** infrastructure that every live
+client (mobile, desktop, HUD) integrates with — not just internal IAC. But clients
+integrate **through the bridge**, which is the stream's public, client-facing edge:
+
+- Clients get only the **bridge URL + a JWT** — never broker addresses, the
+  consumer config, or the signing secret (those stay internal; see
+  "Configuration & secrets"). The bridge is the trust boundary and the protocol
+  adapter (browsers/Capacitor can't speak Kafka's native protocol; they speak
+  WebSocket).
+- Behind it, the bridge is a Kafka **consumer** (pub/sub — see "Consumer model"),
+  so the public realtime plane is backed by the durable Kafka log.
+
 ## Why this shape (robust, not fragile)
 
 - **ALS → Kafka is the canonical event source.** ALS already produces domain
@@ -164,12 +192,13 @@ fields the clients use:
 
 ## Status / follow-ups
 
-- Mobile: **done** — live channel messages + unread, with reconcile fallback.
+- Mobile: **done** — live channel messages + unread applied **directly from the
+  stream** (no ALS read-back); initial snapshot via ALS.
 - Desktop: **done** — `RealtimeClient` (build with `-DFD_REALTIME_CLIENT=ON`)
-  connects to the bridge with a service token and publishes message events into
-  `CommBus`; `CommPanel` de-dups by message id so a desktop user's own send
-  (intra-CommBus + bridge echo) renders once. Set `FLEET_REALTIME_URL` and
-  `FLEET_REALTIME_TOKEN` (a bridge JWT). Positions → HUD/map is the next hook.
+  connects to the bridge with a service token and publishes events into in-process
+  buses: **messages → `CommBus`** (CommPanel, de-duped by id) and **positions →
+  `PositionBus`** (MapView + HUD apply live fleet locations / map updates;
+  60 s ALS reconcile as fallback). Set `FLEET_REALTIME_URL` + `FLEET_REALTIME_TOKEN`.
 - ALS: the producer logic lives in [`als-extensions/`](../als-extensions/) and is
   re-installed after each ALS generate with `make als-extensions` (ALS rebuilds
   preserve `logic/`, so it's a one-time step per fresh `create`). Enable the

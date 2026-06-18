@@ -1,5 +1,6 @@
 #include "MapView.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cstdio>
 
@@ -10,6 +11,8 @@
 #include <Wt/WText.h>
 #include <Wt/WTimer.h>
 #include <Wt/Json/Object.h>
+
+#include "PositionBus.h"
 
 namespace fd {
 
@@ -41,13 +44,35 @@ MapView::MapView(ApiClient* api) : api_(api) {
 
     tableBody_ = addNew<Wt::WContainerWidget>();
 
-    load();
+    load();  // initial snapshot (ALS)
 
-    // Live-ish refresh of telemetry (positions are device→DB; we read via API).
+    // Realtime fleet locations: apply position events straight from the Kafka
+    // stream (via the bridge → PositionBus). No DB read-back per fix.
+    posToken_ = PositionBus::instance().subscribe(
+        Wt::WApplication::instance()->sessionId(),
+        [this](const Position& p) {
+            applyLive(p);
+            if (auto* a = Wt::WApplication::instance()) a->triggerUpdate();
+        });
+
+    // Slow reconcile fallback (the stream is the primary live source).
     auto* timer = addChild(std::make_unique<Wt::WTimer>());
-    timer->setInterval(std::chrono::seconds(15));
+    timer->setInterval(std::chrono::seconds(60));
     timer->timeout().connect([this] { load(); });
     timer->start();
+}
+
+MapView::~MapView() { PositionBus::instance().unsubscribe(posToken_); }
+
+void MapView::applyLive(const Position& p) {
+    // Upsert latest fix for this rig, then re-render from the bounded set.
+    positions_.erase(
+        std::remove_if(positions_.begin(), positions_.end(),
+                       [&](const Position& x) { return x.equipment_id == p.equipment_id; }),
+        positions_.end());
+    positions_.push_back(p);
+    updateMap();
+    renderTable();
 }
 
 void MapView::load() {

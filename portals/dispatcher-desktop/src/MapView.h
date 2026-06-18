@@ -21,6 +21,7 @@ namespace fd {
 class MapView : public Wt::WContainerWidget {
 public:
     explicit MapView(ApiClient* api);
+    ~MapView() override;
 
 private:
     ApiClient* api_;
@@ -29,8 +30,10 @@ private:
     Wt::WContainerWidget* tableBody_ = nullptr;
     std::vector<Position> positions_;
     std::map<std::string, std::string> equipName_;  // equipment_id -> unit_number
+    std::string posToken_;  // PositionBus subscription
 
     void load();
+    void applyLive(const Position& p);  // realtime fleet location from the stream
     void updateMap();
     void renderTable();
 };

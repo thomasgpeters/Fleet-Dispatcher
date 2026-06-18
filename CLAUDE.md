@@ -19,7 +19,11 @@ is the orientation an agent needs first.
 | `geospatial/` | Spatial helpers | Python |
 | `docs/` | Domain model, architecture, per-feature docs | Markdown |
 
-All clients talk **only** to the JSON:API — never directly to PostgreSQL.
+Two data planes (see `docs/REALTIME.md`): **realtime** data (messages, fleet
+locations / map updates, live status) streams from **Kafka via the WebSocket
+bridge**; **everything else** (CRUD, lookups, snapshots, detail/forms, writes) is
+**ALS JSON:API** request/response. Clients never touch PostgreSQL directly, and
+never connect to Kafka brokers directly — only the bridge (URL + JWT).
 
 ## Golden rules (this project's conventions)
 

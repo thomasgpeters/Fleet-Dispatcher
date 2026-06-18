@@ -25,6 +25,7 @@ set(FD_SOURCES
     src/ProfileView.cpp
     src/CommPanel.cpp
     src/CommBus.cpp
+    src/PositionBus.cpp
     src/Toaster.cpp
     src/FleetView.cpp
     src/MapView.cpp

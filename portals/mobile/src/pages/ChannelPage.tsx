@@ -158,25 +158,29 @@ export function ChannelPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channelId]);
 
-  // Lightweight refresh of just the message list (used by realtime events).
-  const reloadMessages = async () => {
-    try {
-      const msgs = await api.messagesForChannel(channelId);
-      setMessages([...msgs].sort((a, b) => a.posted_at.localeCompare(b.posted_at)));
-    } catch {
-      /* keep the current list on a transient error */
-    }
-  };
-
-  // Realtime: subscribe to this channel; refresh on a pushed message event.
-  // (The bridge is an accelerator — the initial load + pull-to-refresh remain
-  // the fallback if it's unavailable.)
+  // Realtime: the live conversation comes from the Kafka stream (via the bridge),
+  // not by re-reading the DB through ALS. The initial `load()` is the snapshot;
+  // every new message is applied directly from the event payload (de-duped by id,
+  // which also absorbs our own optimistic append on send).
   useEffect(() => {
     subscribe([`channel:${channelId}`]);
     const off = addListener((evt) => {
-      if (evt.type === "message" && evt.channel_id === channelId) {
-        void reloadMessages();
-      }
+      if (evt.type !== "message" || evt.channel_id !== channelId) return;
+      const incoming: Message = {
+        id: String(evt.id),
+        channel_id: String(evt.channel_id),
+        author_id: String(evt.author_id),
+        body: String(evt.body ?? ""),
+        posted_at: String(evt.posted_at ?? new Date().toISOString()),
+        reply_to_id: evt.reply_to_id ? String(evt.reply_to_id) : undefined,
+      };
+      setMessages((prev) =>
+        prev.some((m) => m.id === incoming.id)
+          ? prev
+          : [...prev, incoming].sort((a, b) =>
+              a.posted_at.localeCompare(b.posted_at),
+            ),
+      );
     });
     return off;
     // eslint-disable-next-line react-hooks/exhaustive-deps

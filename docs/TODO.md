@@ -111,9 +111,10 @@ Pivot here after Phase 1. Talks to the same JSON:API; Bootstrap theme + Wt
       `als-extensions/` (`make als-extensions`); **desktop `RealtimeClient`**
       (Boost.Beast, opt-in `-DFD_REALTIME_CLIENT=ON`) → `CommBus` with id de-dup.
       config-driven multi-topic routing (`DEFAULT_ROUTES` / `KAFKA_TOPIC_ROUTES`)
-      so new purposes (loads/trips/alerts…) are config, not code. REMAINING:
-      enable `KAFKA_CONNECT` in the ALS project; wire position events to the
-      HUD/Map; build/verify the desktop client on Linux
+      so new purposes (loads/trips/alerts…) are config, not code. Realtime data
+      plane: mobile applies message events directly; desktop `PositionBus` drives
+      live HUD/Map fleet locations. REMAINING: enable `KAFKA_CONNECT` in ALS;
+      build/verify the desktop client on Linux
 - [ ] Wire left-panel filters + a right-panel selected-load inspector to data
 - [x] Load intake form (new load) + driver/equipment assignment (POST /Load)
 - [x] **HUD** surface (`/hud`) + `HudControlBus` (Wt server push): the console's

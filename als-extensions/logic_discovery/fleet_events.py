@@ -59,8 +59,10 @@ def _send_message_event(row, old_row, logic_row: LogicRow) -> None:
         "id": str(row.id),
         "channel_id": str(row.channel_id),
         "author_id": str(row.author_id),
+        "reply_to_id": str(row.reply_to_id) if row.reply_to_id else None,
         "posted_at": str(row.posted_at),
-        "body": (row.body or "")[:240],
+        # Full body: clients render live from the stream (no DB read-back).
+        "body": row.body or "",
     })
 
 
@@ -74,6 +76,7 @@ def _send_position_event(row, old_row, logic_row: LogicRow) -> None:
         "driver_id": str(row.driver_id) if row.driver_id else None,
         "lat": row.lat,
         "lng": row.lng,
+        "speed_mph": row.speed_mph,
         "recorded_at": str(row.recorded_at),
     })
 

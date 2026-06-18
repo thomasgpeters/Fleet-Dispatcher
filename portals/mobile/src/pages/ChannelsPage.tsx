@@ -72,15 +72,19 @@ export function ChannelsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  // Realtime: a message in any channel bumps unread live (poll-free).
+  // Realtime: bump unread straight from the Kafka stream (via the bridge) — no
+  // DB re-read through ALS. The initial counts come from the snapshot `load()`.
   useEffect(() => {
     subscribe(["messages"]);
     const off = addListener((evt) => {
-      if (evt.type === "message") void load();
+      if (evt.type !== "message") return;
+      if (user && evt.author_id === user.id) return; // our own message
+      const ch = String(evt.channel_id);
+      setUnread((prev) => ({ ...prev, [ch]: (prev[ch] ?? 0) + 1 }));
     });
     return off;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subscribe, addListener]);
+  }, [subscribe, addListener, user]);
 
   const refresh = async (e: RefresherCustomEvent) => {
     await load();

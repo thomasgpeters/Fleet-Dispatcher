@@ -14,6 +14,7 @@
 #include <Wt/Json/Value.h>
 
 #include "CommBus.h"
+#include "PositionBus.h"
 #include "models.h"
 
 // Boost.Beast WebSocket client (no TLS here — terminate wss at a proxy and point
@@ -59,6 +60,12 @@ std::string jstr(const Wt::Json::Object& o, const char* key) {
     auto it = o.find(key);
     if (it == o.end() || (*it).second.type() == Wt::Json::Type::Null) return {};
     return static_cast<std::string>((*it).second);
+}
+
+double jnum(const Wt::Json::Object& o, const char* key) {
+    auto it = o.find(key);
+    if (it == o.end() || (*it).second.type() == Wt::Json::Type::Null) return 0.0;
+    return static_cast<double>((*it).second);
 }
 
 using WsStream = websocket::stream<tcp::socket>;
@@ -155,17 +162,27 @@ void RealtimeClient::handleFrame(const std::string& text) {
         Wt::Json::parse(text, root);
         if (jstr(root, "type") != "event") return;
         const Wt::Json::Object& ev = root.get("event");
-        // Messages -> CommBus (positions are a future HUD/map hook).
-        if (jstr(ev, "type") != "message") return;
-        Message m;
-        m.id = jstr(ev, "id");
-        m.channel_id = jstr(ev, "channel_id");
-        m.author_id = jstr(ev, "author_id");
-        m.body = jstr(ev, "body");
-        m.posted_at = jstr(ev, "posted_at");
-        if (!m.id.empty()) {
-            // Thread-safe: CommBus::publish uses WServer::post per session.
-            CommBus::instance().publish(m);
+        const std::string etype = jstr(ev, "type");
+
+        // Both buses publish via WServer::post per session (thread-safe).
+        if (etype == "message") {
+            Message m;
+            m.id = jstr(ev, "id");
+            m.channel_id = jstr(ev, "channel_id");
+            m.author_id = jstr(ev, "author_id");
+            m.body = jstr(ev, "body");
+            m.posted_at = jstr(ev, "posted_at");
+            if (!m.id.empty()) CommBus::instance().publish(m);
+        } else if (etype == "position") {
+            Position p;
+            p.id = jstr(ev, "id");
+            p.equipment_id = jstr(ev, "equipment_id");
+            p.driver_id = jstr(ev, "driver_id");
+            p.recorded_at = jstr(ev, "recorded_at");
+            p.lat = jnum(ev, "lat");
+            p.lng = jnum(ev, "lng");
+            p.speed_mph = jnum(ev, "speed_mph");
+            if (!p.equipment_id.empty()) PositionBus::instance().publish(p);
         }
     } catch (const std::exception&) {
         // ignore malformed frames

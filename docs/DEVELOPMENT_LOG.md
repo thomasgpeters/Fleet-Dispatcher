@@ -19,6 +19,21 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 - Docs: als-extensions/README, MIDDLEWARE_SETUP (post-generate step), REALTIME
   (producer points here), CLAUDE golden rule + component table.
 
+### Realtime data plane: live data from the stream, not ALS reads
+- Defined two planes (docs/REALTIME.md + CLAUDE): **realtime** (messages, fleet
+  locations / map updates, live status) flows from the **Kafka stream via the
+  bridge**; **everything else** (CRUD, lookups, snapshots, detail/forms, writes)
+  stays **ALS JSON:API**. Kafka stream is now public infra — but clients integrate
+  **through the bridge** (URL + JWT); brokers stay internal.
+- Mobile: ChannelPage/ChannelsPage now **apply event payloads directly** from the
+  stream (append message / bump unread) instead of re-reading via ALS; initial
+  snapshot still via ALS. De-duped by id (absorbs the optimistic own-send).
+- Desktop: `RealtimeClient` now also relays **position** events into a new
+  `PositionBus`; `MapView` + `HudView` apply live fleet locations (upsert + render)
+  with a 60 s ALS reconcile fallback. ALS producer payloads enriched
+  (`reply_to_id` on message, `speed_mph` on position) so clients render live with
+  no read-back. Bridge + snippet syntax-checked; mobile build clean.
+
 ### Consumer model: true pub/sub (unique group per bridge instance)
 - Fixed the Kafka consumer-group semantics for fan-out: each bridge instance now
   uses a **unique** `group.id` by default (`KAFKA_GROUP_UNIQUE=true` → base +
