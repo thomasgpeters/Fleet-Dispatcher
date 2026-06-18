@@ -152,6 +152,7 @@ void CommPanel::renderMessages(const std::vector<Message>& msgs, bool notifyOnNe
     }
 
     messageList_->clear();
+    seenIds_.clear();
     const std::size_t maxShown = 30;
     const std::size_t start = msgs.size() > maxShown ? msgs.size() - maxShown : 0;
     for (std::size_t i = start; i < msgs.size(); ++i) renderOne(msgs[i]);
@@ -159,6 +160,7 @@ void CommPanel::renderMessages(const std::vector<Message>& msgs, bool notifyOnNe
 }
 
 void CommPanel::renderOne(const Message& m) {
+    seenIds_.insert(m.id);
     const bool mine = (m.author_id == user_.id);
     auto* row = messageList_->addNew<Wt::WContainerWidget>();
     row->addStyleClass(mine ? "fd-msg fd-msg-mine" : "fd-msg");
@@ -172,15 +174,17 @@ void CommPanel::renderOne(const Message& m) {
 }
 
 void CommPanel::onPushed(const Message& m) {
-    // Our own sends are rendered locally already; ignore the echo.
-    if (m.author_id == user_.id) return;
+    // De-dup: a message can arrive both intra-server (CommBus) and via the
+    // external bridge (ALS->Kafka->RealtimeClient->CommBus) — render it once.
+    if (!m.id.empty() && seenIds_.count(m.id)) return;
+
     if (m.channel_id == selectedChannelId_) {
-        renderOne(m);
+        renderOne(m);  // inserts into seenIds_
         lastLatestId_ = m.id;
-        if (toaster_)
+        if (toaster_ && m.author_id != user_.id)
             toaster_->notify("New message · #" + selectedChannelName_,
                              snippet(m.body), Toaster::Level::Info);
-    } else if (toaster_) {
+    } else if (toaster_ && m.author_id != user_.id) {
         toaster_->notify("New message · #" + channelName(m.channel_id),
                          snippet(m.body), Toaster::Level::Info);
     }

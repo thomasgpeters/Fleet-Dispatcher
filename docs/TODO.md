@@ -108,8 +108,10 @@ Pivot here after Phase 1. Talks to the same JSON:API; Bootstrap theme + Wt
       (Kafka consumer → WS, JWT, reconnect) + mobile client (live messages/unread,
       reconcile fallback); topic-per-type + channel_id correlation id (key for
       ordering); ALS producer snippet + post-generate install automation in
-      `als-extensions/` (`make als-extensions`). REMAINING: enable `KAFKA_CONNECT`
-      in the ALS project; desktop/HUD WS client → `CommBus`; telemetry → the map
+      `als-extensions/` (`make als-extensions`); **desktop `RealtimeClient`**
+      (Boost.Beast, opt-in `-DFD_REALTIME_CLIENT=ON`) → `CommBus` with id de-dup.
+      REMAINING: enable `KAFKA_CONNECT` in the ALS project; wire position events
+      to the HUD/Map; build/verify the desktop client on Linux
 - [ ] Wire left-panel filters + a right-panel selected-load inspector to data
 - [x] Load intake form (new load) + driver/equipment assignment (POST /Load)
 - [x] **HUD** surface (`/hud`) + `HudControlBus` (Wt server push): the console's

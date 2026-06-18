@@ -19,6 +19,22 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 - Docs: als-extensions/README, MIDDLEWARE_SETUP (post-generate step), REALTIME
   (producer points here), CLAUDE golden rule + component table.
 
+### Desktop/HUD: realtime bridge WebSocket client → CommBus
+- New `RealtimeClient` (`portals/dispatcher-desktop/src/`): one **server-wide**
+  Boost.Beast WebSocket client that consumes the realtime bridge and publishes
+  message events into `CommBus` (which already fans out to every session via Wt
+  server push). Sync read loop on a worker thread with exponential-backoff
+  reconnect; `stop()` closes the socket to unwind the blocking read.
+- **Opt-in** via CMake `-DFD_REALTIME_CLIENT=ON` (needs Boost.Beast). Default OFF
+  → Boost-less builds still work and the desktop falls back to intra-server
+  `CommBus` + the 30 s reconcile poll. Configured by `FLEET_REALTIME_URL` +
+  `FLEET_REALTIME_TOKEN` (a bridge service JWT); `main.cpp` uses start/wait/stop.
+- `CommPanel` now **de-dups by message id** (a `std::set`), so a desktop user's
+  own send (intra-`CommBus` + the bridge echo of the same row) renders once;
+  toasts only for others.
+- Not compiled in the sandbox; Beast client + cross-thread socket close are
+  flagged for Linux build/verify. Positions→HUD/map is the next hook.
+
 ### Realtime: WebSocket bridge over ALS → Kafka
 - New `realtime/` service (`docs/REALTIME.md`): a **confluent-kafka consumer →
   WebSocket relay**. ALS already produces domain events to Kafka

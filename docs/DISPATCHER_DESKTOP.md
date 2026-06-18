@@ -70,10 +70,14 @@ light/dark themes:
   (`WServer::post` → handler → `triggerUpdate`).
 - Push is delivered over **WebSockets** — enable them in `wt_config.xml`
   (`<web-sockets>true</web-sockets>`) and run with `-c wt_config.xml`.
-- A **slow reconcile poll** (30 s) bridges messages that originate **off-server**
-  (e.g. the mobile app). True cross-client realtime needs the middleware to emit
-  change events (SSE / WebSocket / broker) — a backend follow-up, since ALS is
-  generated outside this repo.
+- **Cross-app** (e.g. a mobile message): `RealtimeClient` — a server-wide
+  Boost.Beast WebSocket client (opt-in `cmake -DFD_REALTIME_CLIENT=ON`) — connects
+  to the realtime bridge (`FLEET_REALTIME_URL` + `FLEET_REALTIME_TOKEN`), consumes
+  ALS→Kafka events, and publishes them into `CommBus`, which pushes to every
+  session. `CommPanel` de-dups by message id so an own send (intra-`CommBus` +
+  bridge echo) renders once. See [`REALTIME.md`](REALTIME.md).
+- A **slow reconcile poll** (30 s) remains the fallback when the client is off or
+  the bridge/Kafka is unavailable — so comms are never fragile.
 
 The **Map** view reads telemetry (`PositionReport`) on a 15 s timer — positions
 flow device → DB, and the console reads them via the API; realtime telemetry push

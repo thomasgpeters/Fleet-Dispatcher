@@ -7,6 +7,7 @@
 // middleware emits change events. New messages from others raise a top-right toast.
 #pragma once
 
+#include <set>
 #include <string>
 #include <vector>
 
@@ -40,6 +41,7 @@ private:
     std::string selectedChannelName_;
     std::string lastLatestId_;  // newest message id seen (reconcile-poll dedupe)
     std::string busToken_;      // CommBus subscription
+    std::set<std::string> seenIds_;  // rendered message ids (de-dup intra/bridge)
 
     Wt::WContainerWidget* channelList_ = nullptr;
     Wt::WText* convoTitle_ = nullptr;

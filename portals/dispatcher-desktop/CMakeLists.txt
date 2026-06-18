@@ -7,7 +7,13 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Wt — the desktop/web UI framework. Provides Wt::Wt and Wt::HTTP.
 find_package(Wt REQUIRED COMPONENTS Wt HTTP)
 
-add_executable(fleet_dispatcher_desktop
+# Optional: outbound WebSocket client to the realtime bridge (needs Boost.Beast).
+# OFF by default so a Boost-less build still works; the desktop then relies on
+# intra-server CommBus + the reconcile poll. Enable with:
+#   cmake -S . -B build -DFD_REALTIME_CLIENT=ON
+option(FD_REALTIME_CLIENT "Build the realtime bridge WebSocket client (Boost.Beast)" OFF)
+
+set(FD_SOURCES
     src/main.cpp
     src/Shell.cpp
     src/BoardView.cpp
@@ -24,10 +30,24 @@ add_executable(fleet_dispatcher_desktop
     src/MapView.cpp
     src/SettingsView.cpp
 )
+if(FD_REALTIME_CLIENT)
+    list(APPEND FD_SOURCES src/RealtimeClient.cpp)
+endif()
+
+add_executable(fleet_dispatcher_desktop ${FD_SOURCES})
 
 target_link_libraries(fleet_dispatcher_desktop
     PRIVATE Wt::Wt Wt::HTTP
 )
+
+if(FD_REALTIME_CLIENT)
+    # Boost.Beast is header-only; Boost::system pulls in what asio needs.
+    find_package(Boost REQUIRED COMPONENTS system)
+    target_link_libraries(fleet_dispatcher_desktop PRIVATE Boost::system)
+    target_compile_definitions(fleet_dispatcher_desktop PRIVATE FD_REALTIME_CLIENT)
+    find_package(Threads REQUIRED)
+    target_link_libraries(fleet_dispatcher_desktop PRIVATE Threads::Threads)
+endif()
 
 # ---------------------------------------------------------------------------
 # Wt resources/ deployment

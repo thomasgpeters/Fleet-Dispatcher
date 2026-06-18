@@ -83,13 +83,16 @@ fields the clients use:
 | Producer | ALS project (outside repo) | our snippet in [`als-extensions/`](../als-extensions/) — `Rule.after_flush_row_event` + `send_kafka_message`, key = correlation id; installed via `make als-extensions` |
 | Bridge | [`realtime/`](../realtime/) | confluent-kafka consumer → WebSocket; JWT; auto-reconnect |
 | Mobile | `portals/mobile/src/realtime/` | `RealtimeClient` (backoff reconnect) + `RealtimeProvider`; wired into Channel/Channels |
-| Desktop/HUD | `portals/dispatcher-desktop/` | intra-server push today (`CommBus` + Wt WebSockets, `wt_config.xml`); joining the bridge via a WS client is the next step |
+| Desktop/HUD | `portals/dispatcher-desktop/` | `RealtimeClient` (server-wide Boost.Beast WS client, opt-in `-DFD_REALTIME_CLIENT=ON`) consumes the bridge → `CommBus` → all sessions via Wt push; intra-server `CommBus` + reconcile poll are the fallback |
 
 ## Status / follow-ups
 
 - Mobile: **done** — live channel messages + unread, with reconcile fallback.
-- Desktop: consumes its own sends instantly via `CommBus`; **joining the external
-  bridge** (a WS client → `CommBus`) is the remaining step for mobile→desktop.
+- Desktop: **done** — `RealtimeClient` (build with `-DFD_REALTIME_CLIENT=ON`)
+  connects to the bridge with a service token and publishes message events into
+  `CommBus`; `CommPanel` de-dups by message id so a desktop user's own send
+  (intra-CommBus + bridge echo) renders once. Set `FLEET_REALTIME_URL` and
+  `FLEET_REALTIME_TOKEN` (a bridge JWT). Positions → HUD/map is the next hook.
 - ALS: the producer logic lives in [`als-extensions/`](../als-extensions/) and is
   re-installed after each ALS generate with `make als-extensions` (ALS rebuilds
   preserve `logic/`, so it's a one-time step per fresh `create`). Enable the
