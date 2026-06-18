@@ -503,6 +503,11 @@ CREATE TABLE route (
 
 CREATE INDEX idx_route_trip ON route (trip_id);
 
+-- Realtime change events are produced by ApiLogicServer (ALS events → Kafka),
+-- not by DB triggers — see realtime/ (the WebSocket bridge consumes Kafka) and
+-- docs/REALTIME.md. The DB stays the source of truth; the bridge is a stateless
+-- fan-out and clients keep a slow reconcile poll as a fallback.
+
 COMMIT;
 
 -- Invariants for the middleware (LogicBank), enforced at the transaction boundary:

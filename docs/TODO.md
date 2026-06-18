@@ -103,8 +103,12 @@ Pivot here after Phase 1. Talks to the same JSON:API; Bootstrap theme + Wt
 - [x] **Comms push/WebSockets**: `CommBus` + Wt server push delivers sent
       messages instantly; `wt_config.xml` enables WebSockets; 30 s reconcile poll
       bridges off-server messages
-- [ ] Cross-client realtime (mobile→desktop) + realtime telemetry: needs the
-      middleware to emit change events (SSE / WebSocket / broker)
+- [~] **Cross-client realtime** via a **WebSocket bridge over ALS → Kafka**
+      (`realtime/`, [`REALTIME.md`](REALTIME.md)). DONE: bridge service
+      (Kafka consumer → WS, JWT, reconnect) + mobile client (live messages/unread,
+      reconcile fallback); topic-per-type + channel_id correlation id (key for
+      ordering). REMAINING: configure the ALS Kafka producer + per-type mappers;
+      desktop/HUD WS client → `CommBus`; telemetry (position) wired to the map
 - [ ] Wire left-panel filters + a right-panel selected-load inspector to data
 - [x] Load intake form (new load) + driver/equipment assignment (POST /Load)
 - [x] **HUD** surface (`/hud`) + `HudControlBus` (Wt server push): the console's

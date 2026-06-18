@@ -45,6 +45,7 @@ import {
 import { EmojiPicker } from "../components/EmojiPicker";
 import { api, PIN_SCOPE } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
+import { useRealtime } from "../realtime/RealtimeContext";
 import type {
   Channel,
   Document,
@@ -85,6 +86,7 @@ function fileToBase64(file: File): Promise<string> {
 export function ChannelPage() {
   const { channelId } = useParams<{ channelId: string }>();
   const { user } = useAuth();
+  const { subscribe, addListener } = useRealtime();
   const userId = user?.id ?? "";
   const [channel, setChannel] = useState<Channel | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -155,6 +157,30 @@ export function ChannelPage() {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channelId]);
+
+  // Lightweight refresh of just the message list (used by realtime events).
+  const reloadMessages = async () => {
+    try {
+      const msgs = await api.messagesForChannel(channelId);
+      setMessages([...msgs].sort((a, b) => a.posted_at.localeCompare(b.posted_at)));
+    } catch {
+      /* keep the current list on a transient error */
+    }
+  };
+
+  // Realtime: subscribe to this channel; refresh on a pushed message event.
+  // (The bridge is an accelerator — the initial load + pull-to-refresh remain
+  // the fallback if it's unavailable.)
+  useEffect(() => {
+    subscribe([`channel:${channelId}`]);
+    const off = addListener((evt) => {
+      if (evt.type === "message" && evt.channel_id === channelId) {
+        void reloadMessages();
+      }
+    });
+    return off;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [channelId, subscribe, addListener]);
 
   const send_ = async () => {
     if (!draft.trim()) return;

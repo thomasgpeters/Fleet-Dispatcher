@@ -1,0 +1,42 @@
+# Fleet Dispatcher — realtime WebSocket bridge (Kafka -> WebSocket) systemd unit.
+#
+# Fans out ALS Kafka events to connected clients over WebSocket (ws://<host>:8765).
+#
+# Install procedure (see realtime/README.md):
+#   sudo useradd --system --no-create-home --shell /usr/sbin/nologin fleet   # once (shared)
+#   sudo mkdir -p /opt/fleet-dispatcher/realtime
+#   sudo cp -r realtime/app /opt/fleet-dispatcher/realtime/
+#   sudo cp realtime/requirements.txt /opt/fleet-dispatcher/realtime/
+#   sudo python3 -m venv /opt/fleet-dispatcher/realtime/venv
+#   sudo /opt/fleet-dispatcher/realtime/venv/bin/pip install -r \
+#        /opt/fleet-dispatcher/realtime/requirements.txt
+#   sudo mkdir -p /etc/fleet-dispatcher
+#   sudo cp realtime/deploy/realtime.env.example /etc/fleet-dispatcher/realtime.env
+#   sudo chmod 600 /etc/fleet-dispatcher/realtime.env      # holds the JWT secret
+#   sudo $EDITOR /etc/fleet-dispatcher/realtime.env        # set Kafka + FLEET_JWT_SECRET
+#   sudo cp realtime/deploy/fleet-dispatcher-realtime.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now fleet-dispatcher-realtime
+#
+# Logs:   journalctl -u fleet-dispatcher-realtime -f
+
+[Unit]
+Description=Fleet Dispatcher — realtime WebSocket bridge (Kafka -> WS)
+# Needs the Kafka broker; start after it when co-located.
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=fleet
+Group=fleet
+
+WorkingDirectory=/opt/fleet-dispatcher/realtime
+EnvironmentFile=/etc/fleet-dispatcher/realtime.env
+ExecStart=/opt/fleet-dispatcher/realtime/venv/bin/python -m app.main
+
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

@@ -23,6 +23,7 @@ import { bookmarkOutline } from "ionicons/icons";
 import { api } from "../api/client";
 import type { Channel } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
+import { useRealtime } from "../realtime/RealtimeContext";
 
 /**
  * Message board — channel list with unread badges. Tapping a channel pushes its
@@ -34,6 +35,7 @@ import { useAuth } from "../auth/AuthContext";
  */
 export function ChannelsPage() {
   const { user } = useAuth();
+  const { subscribe, addListener } = useRealtime();
   const [channels, setChannels] = useState<Channel[]>([]);
   const [unread, setUnread] = useState<Record<string, number>>({});
   const [error, setError] = useState<string | null>(null);
@@ -69,6 +71,16 @@ export function ChannelsPage() {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
+
+  // Realtime: a message in any channel bumps unread live (poll-free).
+  useEffect(() => {
+    subscribe(["messages"]);
+    const off = addListener((evt) => {
+      if (evt.type === "message") void load();
+    });
+    return off;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subscribe, addListener]);
 
   const refresh = async (e: RefresherCustomEvent) => {
     await load();

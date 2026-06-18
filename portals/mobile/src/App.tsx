@@ -30,6 +30,7 @@ import { AssistantPage } from "./pages/AssistantPage";
 import { LoginPage } from "./pages/LoginPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { AuthProvider, useAuth } from "./auth/AuthContext";
+import { RealtimeProvider } from "./realtime/RealtimeContext";
 
 /* Ionic router add-on CSS. */
 import "@ionic/react/css/padding.css";
@@ -66,6 +67,7 @@ function Gate() {
 
 function AuthedApp() {
   return (
+    <RealtimeProvider>
     <IonReactRouter>
       <IonTabs>
         <IonRouterOutlet>
@@ -107,5 +109,6 @@ function AuthedApp() {
         </IonTabBar>
       </IonTabs>
     </IonReactRouter>
+    </RealtimeProvider>
   );
 }

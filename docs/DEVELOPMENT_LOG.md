@@ -5,6 +5,29 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-06-11
 
+### Realtime: WebSocket bridge over ALS → Kafka
+- New `realtime/` service (`docs/REALTIME.md`): a **confluent-kafka consumer →
+  WebSocket relay**. ALS already produces domain events to Kafka
+  (`Rule.after_flush_row_event` + mapper, per GenAI-Logic Sample-Integration);
+  the bridge fans them out to clients. Stateless, JWT-authed (shared ALS secret),
+  auto-reconnecting Kafka loop + WS heartbeats. Mirrors the `assistant/` layout
+  (app/, requirements, Dockerfile, deploy/ systemd).
+- **Topic strategy (decision):** one Kafka topic **per row type** (`message`,
+  `position`) with **`channel_id` as a correlation id in the payload** and the
+  Kafka **key = channel_id** for per-channel ordering — NOT a topic per channel
+  (channels are dynamic UUID objects → topic explosion). Per-channel fan-out is
+  done at the WebSocket layer (`channel:<id>` subscriptions).
+- Mobile: `RealtimeClient` (exponential-backoff reconnect, re-subscribe on
+  connect, status) + `RealtimeProvider`/`useRealtime`; wired into ChannelPage
+  (live messages) and ChannelsPage (live unread). Accelerator only — initial
+  load + pull-to-refresh remain the fallback. `npm run build` clean.
+- Considered Postgres LISTEN/NOTIFY as the source but **reverted** it: ALS→Kafka
+  is the canonical producer the team already uses; two sources = fragile.
+- Robustness: DB/JSON:API stays canonical; Kafka durable; clients degrade to a
+  reconcile poll if the bridge/Kafka is down.
+- Desktop: still uses intra-server push (`CommBus` + Wt WebSockets); joining the
+  external bridge via a WS client is the documented next step.
+
 ### Desktop: Fleet/Map/Settings views + comms WebSocket push
 - Menu now: Board · Fleet · Map · New Load · Communications · Settings. The
   center work panel has no hide/show toggle — it swaps the visible view per menu

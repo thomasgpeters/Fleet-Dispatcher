@@ -14,6 +14,7 @@ is the orientation an agent needs first.
 | `portals/mobile/` | Driver/dispatcher app | Ionic + React + TypeScript + Vite |
 | `portals/dispatcher-desktop/` | Dispatcher console + HUD | C++ / Wt |
 | `assistant/` | "Hey Dispatch" voice assistant service | Python |
+| `realtime/` | WebSocket bridge: ALS→Kafka events → clients | Python |
 | `geospatial/` | Spatial helpers | Python |
 | `docs/` | Domain model, architecture, per-feature docs | Markdown |
 
@@ -79,6 +80,7 @@ make publish-mobile
 - `docs/domain-model.md` — entities, aggregates, bounded contexts, lookups
 - `docs/architecture.md` — system architecture (+ `architecture.svg`)
 - `docs/DESIGN_SYSTEM.md` — shared palette/theme (mobile + desktop + HUD), layout
+- `docs/REALTIME.md` — realtime WebSocket bridge over ALS→Kafka (topic strategy)
 - `docs/AUTHENTICATION.md` — ALS JWT auth + profiles
 - `docs/MIDDLEWARE_SETUP.md` — generating/running ALS
 - `docs/DISPATCHER_DESKTOP.md` — the Wt console + HUD
