@@ -177,7 +177,11 @@ ApiLogicServer create --project_name=fleet-dispatcher-api \
     --db_url="$DATABASE_URL" --from_git ""   # see note on --schema below
 
 cd fleet-dispatcher-api
-ApiLogicServer run --port "${API_PORT:-5659}"
+# ALS defaults to 5656; Fleet Dispatcher expects 5659. Set it as a RUN setting —
+# don't regenerate for the port (a fresh create wipes logic/ + add-auth):
+python api_logic_server_run.py 0.0.0.0 5659      # positional host port
+# permanent: set the port in config/config.py (APILOGICSERVER_PORT / PORT = 5659)
+# or:        export APILOGICSERVER_PORT=5659 && python api_logic_server_run.py
 ```
 
 > ALS reflects the schema(s) on the connection's `search_path`; because the
