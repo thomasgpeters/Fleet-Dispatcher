@@ -27,10 +27,29 @@ ApiLogicServer create \
     --project_name=fleet-dispatcher-api \
     --db_url="$DATABASE_URL"
 
-# 3. Run it (serves JSON:API + Swagger on :5659)
+# 3. Run it. ALS defaults to port 5656; Fleet Dispatcher expects 5659.
+#    Easiest reliable way — pass host + port positionally to the run script:
 cd fleet-dispatcher-api
-ApiLogicServer run --port "${API_PORT:-5659}"
+python api_logic_server_run.py 0.0.0.0 5659
+#    (equivalently: export APILOGICSERVER_PORT=5659 && python api_logic_server_run.py)
 ```
+
+### Setting the API port (5659)
+
+ALS's default is **5656**; we serve on **5659**. The port is a *run* setting — it
+is **not** baked into the reflected model — so **don't regenerate just to change
+it** (a fresh `create` overwrites `logic/` and the `add-auth` setup). Pick one:
+
+1. **Permanent (recommended):** edit `fleet-dispatcher-api/config/config.py` and
+   set the port (the `APILOGICSERVER_PORT` / `PORT` setting) to `5659`. Survives
+   `rebuild`; plain `python api_logic_server_run.py` then uses it.
+2. **Per run:** `python api_logic_server_run.py 0.0.0.0 5659` (positional
+   `host port`).
+3. **Env:** `export APILOGICSERVER_PORT=5659` before running.
+
+> Note: our repo `.env`'s `API_PORT` is just a convention for *our* scripts/clients
+> (e.g. `VITE_API_BASE_URL`); ALS itself reads `APILOGICSERVER_PORT` / config /
+> argv, not `API_PORT`.
 
 Generated project layout (after step 2):
 

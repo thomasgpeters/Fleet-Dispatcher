@@ -19,6 +19,16 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 - Docs: als-extensions/README, MIDDLEWARE_SETUP (post-generate step), REALTIME
   (producer points here), CLAUDE golden rule + component table.
 
+### Docs: ALS run port (5659) clarified; db-setup heredoc fix
+- `scripts/db-setup.sh`: removed backticks in a SQL comment that an unquoted
+  heredoc treated as a command substitution (`fleet: command not found` during
+  role/db creation). Verified end-to-end (40 fleet tables).
+- MIDDLEWARE_SETUP + DEPLOYMENT: clarified the API port — ALS defaults to **5656**,
+  Fleet Dispatcher serves **5659**; it's a *run* setting (config.py /
+  `APILOGICSERVER_PORT` / positional `host port`), **not** a reason to regenerate
+  (a fresh `create` wipes `logic/` + `add-auth`). Noted that our `.env` `API_PORT`
+  is a convention for our scripts/clients, not read by ALS.
+
 ### Interim nearest-neighbor optimizer (no API key)
 - `geospatial/optimize.py`: nearest-neighbor stop ordering (origin first / dest
   last, distance-greedy) — a no-key default so "auto-optimize" / unlock actually
