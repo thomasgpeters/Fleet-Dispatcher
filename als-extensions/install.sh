@@ -31,8 +31,35 @@ DEST="$ALS_PROJECT/logic/logic_discovery"
 mkdir -p "$DEST"
 cp -v "$HERE/logic_discovery/"*.py "$DEST/"
 
+# Security customizations — only if `ApiLogicServer add-auth` has been run (it
+# creates security/). Overwrites the generated defaults so auth uses app_user
+# (werkzeug hashes) and grants are in place. See docs/AUTHENTICATION.md.
+if [[ -d "$ALS_PROJECT/security" ]]; then
+    mkdir -p "$ALS_PROJECT/security/authentication_provider/sql"
+    cp -v "$HERE/security/authentication_provider/sql/auth_provider.py" \
+          "$ALS_PROJECT/security/authentication_provider/sql/auth_provider.py"
+    cp -v "$HERE/security/declare_security.py" \
+          "$ALS_PROJECT/security/declare_security.py"
+    security_installed=1
+else
+    echo "note: no $ALS_PROJECT/security — run 'ApiLogicServer add-auth --provider-type=sql'"
+    echo "      first, then re-run this script to install the auth provider + grants."
+    security_installed=0
+fi
+
 echo
-echo "Installed ALS extensions into: $DEST"
-echo "Reminder — enable the Kafka producer in the ALS project config, e.g.:"
+echo "Installed ALS extensions into: $ALS_PROJECT"
+echo "  - logic/logic_discovery/  (Kafka event producers)"
+if [[ "${security_installed}" -eq 1 ]]; then
+    echo "  - security/  (app_user auth provider + role grants)"
+fi
+echo
+echo "Then run ALS with security on (and a real secret):"
+echo "  export SECURITY_ENABLED=true"
+echo "  export SECRET_KEY=<your-jwt-secret>          # also used by realtime/ bridge"
+echo "  python api_logic_server_run.py 0.0.0.0 5659"
+echo
+echo "For realtime, also enable the Kafka producer in the ALS config:"
 echo "  KAFKA_CONNECT = '{\"bootstrap.servers\": \"localhost:9092\"}'   (older ALS: KAFKA_PRODUCER)"
-echo "Then (re)start ALS. Events flow: ALS -> Kafka -> realtime/ bridge -> clients."
+echo "Events flow: ALS -> Kafka -> realtime/ bridge -> clients."
+

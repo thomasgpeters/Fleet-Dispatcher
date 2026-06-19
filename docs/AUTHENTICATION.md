@@ -32,33 +32,44 @@ the signed-in user's `Driver` (and assigned equipment) for the driver-only tabs.
 
 After creating the project (see [`MIDDLEWARE_SETUP.md`](MIDDLEWARE_SETUP.md)):
 
+**The auth customization is versioned + reinstallable** (so a from-scratch build
+is reproducible). The working `auth_provider.py` (authenticates against `app_user`
++ werkzeug hashes) and `declare_security.py` (role grants) live in
+[`../als-extensions/security/`](../als-extensions/security/) and are installed by
+`make als-extensions` **after** `add-auth`:
+
 ```bash
+# 1. enable JWT auth (registers POST /api/auth/login; creates security/)
+cd fleet-dispatcher-api && ApiLogicServer add-auth --provider-type=sql && cd -
+
+# 2. install our app_user provider + grants (+ Kafka producers)
+make als-extensions ALS_PROJECT=./fleet-dispatcher-api
+
+# 3. run with security ON (defaults OFF) + a real secret
 cd fleet-dispatcher-api
-ApiLogicServer add-auth --provider-type=sql --db_url=auth   # JWT auth, SQL provider
+export SECURITY_ENABLED=true          # config.py defaults this to False!
+export SECRET_KEY=<your-jwt-secret>   # share with the realtime/ bridge; keep out of git
+python api_logic_server_run.py 0.0.0.0 5659
 ```
 
-Then point the auth provider at `app_user` and verify the werkzeug hash. In the
-generated `security/authentication_provider/sql/auth_provider.py`, the lookup +
-check look like:
+What the installed `auth_provider.py` does (lookup + werkzeug check):
 
 ```python
 from werkzeug.security import check_password_hash
-from database.models import AppUser            # reflected from the fleet schema
-
-class Authentication_Provider(Abstract_Authentication_Provider):
-    @staticmethod
-    def get_user(username: str, password: str) -> AppUser:
-        user = session.query(AppUser).filter(AppUser.username == username).one_or_none()
-        if user and user.active and user.password_hash \
-           and check_password_hash(user.password_hash, password):
-            return user
-        return None
+from database import models
+user = session.query(models.AppUser).filter(models.AppUser.username == id).one_or_none()
+# get_user returns a DotMapX (id, name, email, password_hash, UserRoleList[role_name])
+# check_password: check_password_hash(user.password_hash, password)
 ```
 
-- **JWT secret:** set `SECRET_KEY` (ALS reads it from config/env) — keep it out of
-  the repo. Tokens are signed with it; rotating it invalidates issued tokens.
-- **Roles:** map `app_role` to ALS grants if you want row/column-level security per
-  role. Not required for login itself.
+Gotchas (each cost us a round during first standup):
+- **`SECURITY_ENABLED` defaults to `False`** — you must `export SECURITY_ENABLED=true`,
+  else the login endpoint 405s/500s.
+- The **default** sql provider uses a separate sqlite auth DB + **plaintext**
+  passwords — that's why we replace it with the `app_user`/werkzeug version.
+- **"No Grants Yet"** → authenticated reads return empty/denied until
+  `declare_security.py` has grants (our installed file grants all roles read).
+
 - **Login endpoint:** `POST /api/auth/login` with `{"username", "password"}`
   returns `{"access_token": "<jwt>"}`. Authenticated requests send
   `Authorization: Bearer <jwt>`.

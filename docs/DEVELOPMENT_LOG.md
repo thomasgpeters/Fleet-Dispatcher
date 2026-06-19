@@ -19,6 +19,15 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 - Docs: als-extensions/README, MIDDLEWARE_SETUP (post-generate step), REALTIME
   (producer points here), CLAUDE golden rule + component table.
 
+### Security customizations versioned in als-extensions (reproducible builds)
+- Captured the working ALS auth into `als-extensions/security/`: `auth_provider.py`
+  (authenticates against `app_user` + werkzeug hashes) and `declare_security.py`
+  (role grants). `install.sh`/`make als-extensions` now copies them into the ALS
+  project's `security/` after `add-auth`, so a from-scratch build is reproducible.
+  Root causes captured in docs: `SECURITY_ENABLED` defaults False; default sql
+  provider uses a separate sqlite/plaintext auth DB; "No Grants Yet" blocks reads.
+  Tested installer (with/without security/); files syntax-checked.
+
 ### Docs: ALS run port (5659) clarified; db-setup heredoc fix
 - `scripts/db-setup.sh`: removed backticks in a SQL comment that an unquoted
   heredoc treated as a command substitution (`fleet: command not found` during

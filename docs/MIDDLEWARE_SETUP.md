@@ -64,21 +64,30 @@ fleet-dispatcher-api/
 
 ## After generating: install ALS extensions
 
-The repo keeps the customizations ALS doesn't generate (currently the **Kafka
-event producers** that feed the realtime bridge) in
-[`../als-extensions/`](../als-extensions/). Install them after a fresh
-`ApiLogicServer create`:
+The repo keeps the customizations ALS doesn't generate in
+[`../als-extensions/`](../als-extensions/): the **Kafka event producers** (feed
+the realtime bridge) and the **security customizations** (auth against `app_user`
++ role grants). Reinstall them on every fresh build — this is the reproducible
+from-scratch sequence:
 
 ```bash
-make als-extensions ALS_PROJECT=./fleet-dispatcher-api
-# or chain it onto the generate step:
-ApiLogicServer create --project_name=fleet-dispatcher-api ... \
-  && make als-extensions ALS_PROJECT=./fleet-dispatcher-api
+ApiLogicServer create --project_name=fleet-dispatcher-api --db_url="$DATABASE_URL"
+# enable JWT auth FIRST (creates security/ so the installer can drop our files in):
+cd fleet-dispatcher-api && ApiLogicServer add-auth --provider-type=sql && cd -
+make als-extensions ALS_PROJECT=./fleet-dispatcher-api      # logic + security
+
+# run with security ON (defaults OFF!) + a real JWT secret:
+cd fleet-dispatcher-api
+export SECURITY_ENABLED=true
+export SECRET_KEY=<your-jwt-secret>        # share with the realtime/ bridge
+python api_logic_server_run.py 0.0.0.0 5659
 ```
 
-They land in `logic/logic_discovery/`, which ALS auto-discovers and a `rebuild`
-preserves — so it's a one-time step per fresh generate. See
-[`REALTIME.md`](REALTIME.md) and `als-extensions/README.md`.
+Installs land in `logic/logic_discovery/` (auto-discovered) and `security/`
+(`auth_provider.py` + `declare_security.py`). An ALS `rebuild` preserves
+`logic/`; a fresh `create` wipes both, so re-run `make als-extensions` (and
+`add-auth` first). Full detail: [`AUTHENTICATION.md`](AUTHENTICATION.md),
+[`REALTIME.md`](REALTIME.md), and `als-extensions/README.md`.
 
 Enable the Kafka producer from the **environment** (keep brokers/creds out of
 committed config — the ALS project's `.env` should be gitignored):
