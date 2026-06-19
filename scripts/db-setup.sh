@@ -17,12 +17,15 @@
 #
 # Flags:
 #   --no-create   skip role/database creation (DB already exists)
+#   --reset       DROP SCHEMA fleet CASCADE before applying (re-apply cleanly;
+#                 DESTROYS fleet data — schema.sql is a full create, not migrations)
 #   --no-seed     skip seed_data.sql
 #   --no-gis      skip gis_bootstrap.sql (no PostGIS)
 #
 # Usage:
 #   scripts/db-setup.sh
 #   scripts/db-setup.sh --no-create --no-gis
+#   scripts/db-setup.sh --no-create --reset      # re-apply schema + seed cleanly
 
 set -euo pipefail
 
@@ -45,10 +48,11 @@ DB_PASSWORD="${DB_PASSWORD:-fleet}"
 DATABASE_URL="${DATABASE_URL:-postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}}"
 FLEET_ADMIN_PSQL="${FLEET_ADMIN_PSQL:-sudo -u postgres psql}"
 
-do_create=1 do_seed=1 do_gis=1
+do_create=1 do_seed=1 do_gis=1 do_reset=0
 for arg in "$@"; do
     case "$arg" in
         --no-create) do_create=0 ;;
+        --reset)     do_reset=1 ;;
         --no-seed)   do_seed=0 ;;
         --no-gis)    do_gis=0 ;;
         *) echo "unknown flag: $arg" >&2; exit 2 ;;
@@ -76,6 +80,11 @@ ALTER ROLE "${DB_USER}" SET search_path = fleet, public;
 SQL
 else
     echo "==> [1/4] Skipping role/database creation (--no-create)"
+fi
+
+if [ "$do_reset" -eq 1 ]; then
+    echo "==> Reset: DROP SCHEMA fleet CASCADE (destroys existing fleet data)"
+    psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "DROP SCHEMA IF EXISTS fleet CASCADE;"
 fi
 
 echo "==> [2/4] Applying schema.sql"

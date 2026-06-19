@@ -162,6 +162,10 @@ SET search_path = gis, fleet, public;   -- then <-> etc. resolve
 ALS does **not** need this (it never runs spatial operators), which is the whole
 point — keep `gis` off the ALS connection's path.
 
+> Re-applying after schema changes: `schema.sql` is a full create (not
+> migrations), so re-run cleanly with `scripts/db-setup.sh --no-create --reset`
+> (drops & rebuilds the `fleet` schema, then re-seeds — destroys fleet data).
+
 ## 5. ApiLogicServer (reflects `fleet`, never `gis`)
 
 The `fleet` role's `search_path` is set to `fleet, public` (by `db-setup.sh`), so
