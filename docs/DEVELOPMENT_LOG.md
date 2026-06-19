@@ -5,6 +5,12 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-06-11
 
+### Fix: week board overlap (grid forced onto a <table>)
+- `.fd-week-board` set `display:grid` (7 cols) on the Wt WTable (8 logical cols:
+  Driver + 7 days) → driver-name cells overlapped the day columns. Switched to
+  proper table styling (`table-layout: fixed`, top-aligned cells, fixed Driver
+  column). Day headers now render weekday + short MM-DD (no full-date wrapping).
+
 ### systemd units for all services + architecture SVG
 - Added systemd units (run as `fleet`, EnvironmentFile=/etc/fleet-dispatcher/*.env,
   Restart=on-failure) for the components that lacked them: **ALS**

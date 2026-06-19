@@ -142,7 +142,11 @@ void BoardView::renderWeek() {
     static const char* dow[7] = {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"};
     for (int c = 0; c < 7; ++c) {
         auto* h = table->elementAt(0, c + 1);
-        h->addNew<Wt::WText>(Wt::WString::fromUTF8(std::string(dow[c]) + " " + days[c]));
+        // Weekday on top, short MM-DD beneath (avoids the full date wrapping).
+        const std::string mmdd = days[c].size() >= 10 ? days[c].substr(5) : days[c];
+        h->addNew<Wt::WText>(Wt::WString::fromUTF8(
+            "<div class=\"fw-semibold\">" + std::string(dow[c]) + "</div>"
+            "<div class=\"small text-muted\">" + mmdd + "</div>"));
     }
 
     int row = 0;

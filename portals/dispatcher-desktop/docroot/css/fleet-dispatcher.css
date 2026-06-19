@@ -221,9 +221,18 @@ body {
  * Board + HUD
  * ======================================================================== */
 .fd-week-board {
-    display: grid;
-    grid-template-columns: repeat(7, minmax(0, 1fr));
-    gap: var(--fd-board-gap);
+    width: 100%;
+    table-layout: fixed;   /* equal day columns; it's a <table>, NOT a CSS grid */
+}
+.fd-week-board th,
+.fd-week-board td {
+    vertical-align: top;
+    overflow-wrap: anywhere;
+}
+.fd-week-board th:first-child,
+.fd-week-board td:first-child {
+    width: 8.5rem;         /* the Driver column */
+    white-space: nowrap;
 }
 .fd-load-card {
     border-left: 4px solid var(--fd-accent);  /* orange accent bar */
