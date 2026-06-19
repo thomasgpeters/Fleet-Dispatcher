@@ -40,13 +40,23 @@ framework defaults.
   face that packs well on laptop screens. Stack falls back to Inter / Segoe UI /
   system. Loaded from Google Fonts (`@import` in the desktop CSS; `<link>` in the
   mobile `index.html`); self-host for offline. Base size 15px, dense-but-legible.
-- **Panels:** bright **white** (`#ffffff`), **rounded** (`--fd-radius: 12px`), on
-  the **light-grey page** — separated by spacing, **not** borders or shadows.
-  House rules: **no shadows** (inner or outer); **no borders** unless ≤ 0.25px
-  hairline; **generous padding**. Accent *bars* (load card, toast status) are
-  status indicators, not panel borders. On mobile the same look is achieved the
-  Ionic way (white `ion-card`/`ion-item`, shadow removed, rounded) while keeping
-  list-separator hairlines, which are a mobile convention.
+- **Panels:** **rounded** (`--fd-radius: 12px`) surfaces on the **light-grey
+  page** — separated by spacing, **not** borders or shadows. Surfaces are bright
+  **white** in the **light** theme only; in **dark** they use the dark surface
+  token (never force white). House rules: **no shadows** (inner or outer); **no
+  borders** unless ≤ 0.25px hairline; **generous padding**. Accent *bars* (load
+  card, toast status) are status indicators, not panel borders. On mobile the
+  same look is achieved the Ionic way (`ion-card`/`ion-item` background bound to
+  the theme-aware `--ion-card-background`/`--ion-item-background`, shadow removed,
+  rounded) while keeping list-separator hairlines, a mobile convention.
+- **Data tables** live inside a rounded surface container (desktop:
+  `.fd-tablecard`; the container carries the background + radius, `overflow:hidden`
+  clips rows to the corners). No cell borders; header band on surface-2; faint
+  zebra rows.
+- **Buttons:** **pill** shape (`border-radius: 999px`). **Active** toggle =
+  filled bright **blue** (`--fd-primary`); **warning** = filled **orange**
+  (`--fd-accent`), not framework yellow. Mobile mirrors this (`ion-button`
+  pill radius; `--ion-color-warning` remapped to the orange accent).
 
 ## Theming mechanism
 
