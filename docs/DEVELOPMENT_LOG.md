@@ -5,6 +5,20 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-06-11
 
+### Styling pass: pro compressed font + bright-white rounded panels
+- Font: **Barlow Semi Condensed** (professional, slightly compressed) across
+  desktop (@import + --fd-font) and mobile (index.html link + --ion-font-family);
+  base 15px for laptop density.
+- Panels: **light-grey page** (#eceef2) with **bright-white rounded** cards
+  (radius 12px). Per request: **no shadows** (removed work/card/toast shadows +
+  the nav inset underline), **no borders** (removed 1px borders on cards, side
+  panels, comm chips, message bubbles, footer; separation via gap), **more
+  padding**. Body now lays out three white panels (left menu / work / comms) on
+  grey with a 1rem gap. Left menu item styles unchanged (kept as-is).
+- Mobile mirrors it the Ionic way (white ion-card/ion-item, shadow off, rounded)
+  while keeping list-separator hairlines (mobile convention). mobile build clean.
+- Docs: DESIGN_SYSTEM (typography + panel rules + grey palette).
+
 ### Fix: week board overlap (grid forced onto a <table>)
 - `.fd-week-board` set `display:grid` (7 cols) on the Wt WTable (8 logical cols:
   Driver + 7 days) → driver-name cells overlapped the day columns. Switched to
