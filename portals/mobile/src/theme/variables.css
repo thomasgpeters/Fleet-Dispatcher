@@ -150,13 +150,28 @@
   --ion-color-step-950: #f7f9fb;
 }
 
-/* Panels: bright white, rounded, no shadow — matches the desktop console.
+/* Panels: bright white in light theme, surface in dark — matches the desktop
+   console. Theme-aware: --ion-card-background / --ion-item-background already
+   flip white↔dark with the active theme, so don't hardcode white here.
    Ionic list-item separators (hairlines) stay: that's a mobile convention. */
 ion-card {
-  --background: #ffffff;
+  --background: var(--ion-card-background);
   box-shadow: none;
   border-radius: 12px;
 }
 ion-item {
-  --background: #ffffff;
+  --background: var(--ion-item-background);
+}
+
+/* Pill buttons; warning = orange accent (matches the desktop console). */
+ion-button {
+  --border-radius: 999px;
+}
+:root {
+  --ion-color-warning: #e8833a;
+  --ion-color-warning-rgb: 232, 131, 58;
+  --ion-color-warning-contrast: #2a1a0c;
+  --ion-color-warning-contrast-rgb: 42, 26, 12;
+  --ion-color-warning-shade: #cc7333;
+  --ion-color-warning-tint: #ea8f4e;
 }

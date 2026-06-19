@@ -109,8 +109,10 @@ void BoardView::renderToday() {
     std::map<std::string, std::string> name;
     for (const auto& d : drivers_) name[d.id] = d.name;
 
-    auto* table = body_->addNew<Wt::WTable>();
-    table->addStyleClass("table table-sm table-striped");
+    auto* box = body_->addNew<Wt::WContainerWidget>();
+    box->addStyleClass("fd-tablecard");
+    auto* table = box->addNew<Wt::WTable>();
+    table->addStyleClass("fd-data-table");
     table->setHeaderCount(1);
     table->elementAt(0, 0)->addNew<Wt::WText>("Driver");
     table->elementAt(0, 1)->addNew<Wt::WText>("Status");
@@ -134,8 +136,10 @@ void BoardView::renderToday() {
 void BoardView::renderWeek() {
     const auto days = currentWeekDays();
 
-    auto* table = body_->addNew<Wt::WTable>();
-    table->addStyleClass("table table-sm table-bordered fd-week-board");
+    auto* box = body_->addNew<Wt::WContainerWidget>();
+    box->addStyleClass("fd-tablecard");
+    auto* table = box->addNew<Wt::WTable>();
+    table->addStyleClass("fd-week-board");
     table->setHeaderCount(1);                            // header row
     table->setHeaderCount(1, Wt::Orientation::Vertical); // header column
     table->elementAt(0, 0)->addNew<Wt::WText>("Driver");
