@@ -1,0 +1,40 @@
+# Fleet Dispatcher — Mobile web app (built SPA) systemd unit.
+#
+# Serves the production build (portals/mobile/dist) over HTTP on :5173 using
+# `vite preview` (handles SPA fallback). For a hardened deployment, prefer nginx
+# serving dist/ with `try_files $uri /index.html;` — see deploy/README.md.
+#
+# Build first (VITE_* baked at build time → set the API/realtime URLs in
+# mobile.env BEFORE building, or via `npm run build`):
+#   cd portals/mobile && npm ci && npm run build
+#
+# Install:
+#   sudo mkdir -p /opt/fleet-dispatcher/mobile
+#   sudo cp -r portals/mobile/dist portals/mobile/package.json \
+#              portals/mobile/node_modules /opt/fleet-dispatcher/mobile/
+#   sudo cp portals/mobile/deploy/mobile.env.example /etc/fleet-dispatcher/mobile.env
+#   sudo cp portals/mobile/deploy/fleet-dispatcher-mobile.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now fleet-dispatcher-mobile
+#
+# Logs:   journalctl -u fleet-dispatcher-mobile -f
+
+[Unit]
+Description=Fleet Dispatcher — Mobile web app (SPA)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=fleet
+Group=fleet
+
+WorkingDirectory=/opt/fleet-dispatcher/mobile
+EnvironmentFile=-/etc/fleet-dispatcher/mobile.env
+ExecStart=/opt/fleet-dispatcher/mobile/node_modules/.bin/vite preview \
+    --host 0.0.0.0 --port 5173 --strictPort --outDir dist
+
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

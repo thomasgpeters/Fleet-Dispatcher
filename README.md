@@ -121,6 +121,8 @@ The remaining components are **not** VCP-built (they aren't C++/TS):
   (palette, light/dark themes, desktop layout) across mobile, desktop, and HUD.
 - [`docs/REALTIME.md`](docs/REALTIME.md) — cross-client realtime: the WebSocket
   bridge over ALS → Kafka, the topic strategy, and the event contract.
+- [`deploy/README.md`](deploy/README.md) — systemd units for every server
+  component (+ [`docs/architecture.svg`](docs/architecture.svg)).
 - [`docs/TODO.md`](docs/TODO.md) — sequenced plan of approach (checklist).
 - [`docs/DEVELOPMENT_LOG.md`](docs/DEVELOPMENT_LOG.md) — dated record of changes.
 - [`CLAUDE.md`](CLAUDE.md) — agent brief: conventions and workflow that load at

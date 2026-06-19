@@ -3,6 +3,11 @@
 Fleet Dispatcher is a **three-tier** system. Two (or more) portals share a
 single middleware and a single backend.
 
+![Fleet Dispatcher architecture](architecture.svg)
+
+> Deployment: every server component ships a systemd unit — see
+> [`../deploy/README.md`](../deploy/README.md).
+
 ## Tiers
 
 ### 1. Clients (presentation)
