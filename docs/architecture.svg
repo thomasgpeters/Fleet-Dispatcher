@@ -1,91 +1,123 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1060 820" font-family="'Segoe UI', Helvetica, Arial, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 860" font-family="'Segoe UI', Helvetica, Arial, sans-serif">
   <defs>
-    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
-      <path d="M0,0 L8,3 L0,6 Z" fill="#334155"/>
+    <marker id="aBlue" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#1f4e79"/>
     </marker>
-    <marker id="arrowUp" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
-      <path d="M0,0 L8,3 L0,6 Z" fill="#64748b"/>
+    <marker id="aOrange" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#cf6f2c"/>
     </marker>
   </defs>
 
-  <rect x="0" y="0" width="1060" height="820" fill="#f8fafc"/>
+  <rect x="0" y="0" width="1180" height="860" fill="#f4f7fb"/>
+  <text x="40" y="48" font-size="26" font-weight="700" fill="#18222e">Fleet Dispatcher — Architecture</text>
+  <text x="40" y="74" font-size="14" fill="#5b6b7b">Schema-driven · ApiLogicServer JSON:API · Kafka realtime stream · multiple clients</text>
 
-  <!-- Title -->
-  <text x="530" y="38" text-anchor="middle" font-size="25" font-weight="700" fill="#0f172a">Fleet Dispatcher — System Architecture</text>
-  <text x="530" y="60" text-anchor="middle" font-size="13" fill="#64748b">Three runtime tiers over one schema · two portals share one middleware and one backend</text>
-
-  <!-- VCP deployment boundary -->
-  <rect x="40" y="80" width="980" height="560" rx="16" fill="#fffbeb" stroke="#d97706" stroke-width="2" stroke-dasharray="9 6"/>
-  <text x="60" y="106" font-size="14" font-weight="700" fill="#b45309">VCP-managed deployment</text>
-  <text x="60" y="124" font-size="11.5" fill="#b45309">no-code · builds container images from C++ / TS source · runs on local Docker · Kind · vanilla k8s · Azure</text>
-
-  <!-- ===== Client tier ===== -->
-  <!-- Desktop -->
-  <rect x="95" y="150" width="385" height="135" rx="12" fill="#dbeafe" stroke="#1d4ed8" stroke-width="2"/>
-  <text x="287" y="180" text-anchor="middle" font-size="17" font-weight="700" fill="#1e3a8a">Dispatcher Portal</text>
-  <text x="287" y="204" text-anchor="middle" font-size="13.5" fill="#1e40af">Desktop client · C++ / Wt</text>
-  <text x="287" y="226" text-anchor="middle" font-size="12" fill="#334155">Bootstrap theme + deployed Wt resources/</text>
-  <text x="287" y="248" text-anchor="middle" font-size="12" fill="#334155">Weekly board · load intake · assignment</text>
-  <text x="287" y="270" text-anchor="middle" font-size="11" fill="#64748b" font-style="italic">portals/dispatcher-desktop · role: Dispatcher</text>
+  <!-- legend -->
+  <g font-size="12" fill="#5b6b7b">
+    <rect x="828" y="28" width="314" height="64" rx="8" fill="#ffffff" stroke="#d8e1ec"/>
+    <line x1="846" y1="50" x2="892" y2="50" stroke="#1f4e79" stroke-width="2.5" marker-end="url(#aBlue)"/>
+    <text x="900" y="54">Request / response — ALS JSON:API</text>
+    <line x1="846" y1="76" x2="892" y2="76" stroke="#cf6f2c" stroke-width="2.5" stroke-dasharray="6 4" marker-end="url(#aOrange)"/>
+    <text x="900" y="80">Realtime stream — Kafka → WebSocket</text>
+  </g>
 
   <!-- Mobile -->
-  <rect x="580" y="150" width="385" height="135" rx="12" fill="#cffafe" stroke="#0e7490" stroke-width="2"/>
-  <text x="772" y="180" text-anchor="middle" font-size="17" font-weight="700" fill="#155e75">Driver &amp; Updater Portal</text>
-  <text x="772" y="204" text-anchor="middle" font-size="13.5" fill="#0e7490">Mobile client · React 18 / Ionic 8</text>
-  <text x="772" y="226" text-anchor="middle" font-size="12" fill="#334155">Capacitor 6 · TypeScript 5.5 · Vite 5</text>
-  <text x="772" y="248" text-anchor="middle" font-size="12" fill="#334155">Loads · schedule · post-trip · fuel/DEF log</text>
-  <text x="772" y="270" text-anchor="middle" font-size="11" fill="#64748b" font-style="italic">repo: Fleet-Dispatcher-Mobile · roles: Driver, Updater</text>
+  <rect x="60" y="110" width="250" height="96" rx="10" fill="#ffffff" stroke="#2c6fb3" stroke-width="2"/>
+  <text x="78" y="140" font-size="16" font-weight="700" fill="#1f4e79">Mobile app</text>
+  <text x="78" y="162" font-size="12" fill="#5b6b7b">Ionic + React + TypeScript</text>
+  <text x="78" y="180" font-size="12" fill="#5b6b7b">driver &amp; dispatcher · login · trips</text>
+  <text x="78" y="198" font-size="12" fill="#e8833a">:5173 (web build)</text>
 
-  <!-- client -> middleware arrows -->
-  <line x1="287" y1="285" x2="287" y2="352" stroke="#334155" stroke-width="2" marker-end="url(#arrow)"/>
-  <line x1="772" y1="285" x2="772" y2="352" stroke="#334155" stroke-width="2" marker-end="url(#arrow)"/>
-  <text x="300" y="312" font-size="11.5" fill="#334155">JSON:API</text>
-  <text x="300" y="328" font-size="11.5" fill="#334155">(SAFRS) · HTTP</text>
-  <text x="785" y="312" font-size="11.5" fill="#334155">JSON:API</text>
-  <text x="785" y="328" font-size="11.5" fill="#334155">(SAFRS) · HTTP</text>
+  <!-- Desktop -->
+  <rect x="860" y="110" width="260" height="110" rx="10" fill="#ffffff" stroke="#2c6fb3" stroke-width="2"/>
+  <text x="878" y="140" font-size="16" font-weight="700" fill="#1f4e79">Dispatcher Desktop</text>
+  <text x="878" y="162" font-size="12" fill="#5b6b7b">C++ / Wt — console + HUD</text>
+  <text x="878" y="180" font-size="12" fill="#5b6b7b">board · comms rail · live map</text>
+  <text x="878" y="206" font-size="12" fill="#e8833a">:8089  ( / and /hud )</text>
 
-  <!-- ===== Middleware tier (Python = ApiLogicServer) ===== -->
-  <rect x="95" y="355" width="870" height="130" rx="12" fill="#dcfce7" stroke="#15803d" stroke-width="2.5"/>
-  <text x="530" y="386" text-anchor="middle" font-size="18" font-weight="700" fill="#14532d">ApiLogicServer  —  the Python layer  (middleware / application tier)</text>
-  <text x="530" y="412" text-anchor="middle" font-size="13.5" fill="#166534">JSON:API / SAFRS endpoints  ·  LogicBank business rules  ·  SQLAlchemy ORM  ·  admin app</text>
-  <text x="530" y="436" text-anchor="middle" font-size="12.5" fill="#334155">Generated from the schema by  <tspan font-family="monospace" font-weight="700">ApiLogicServer create</tspan>  — no hand-written middleware code</text>
-  <text x="530" y="460" text-anchor="middle" font-size="11.5" fill="#64748b" font-style="italic">enforces invariants: weekly load cap · driver_pay = rate × % · % &amp; cost-responsibility from driver_type</text>
-  <rect x="876" y="365" width="78" height="26" rx="13" fill="#15803d"/>
-  <text x="915" y="383" text-anchor="middle" font-size="13" font-weight="700" fill="#ffffff">: 5659</text>
+  <!-- ApiLogicServer -->
+  <rect x="300" y="300" width="320" height="116" rx="10" fill="#eef3f9" stroke="#1f4e79" stroke-width="2"/>
+  <text x="320" y="332" font-size="17" font-weight="700" fill="#1f4e79">ApiLogicServer (ALS)</text>
+  <text x="320" y="356" font-size="12" fill="#5b6b7b">JSON:API + JWT auth (SAFRS / LogicBank)</text>
+  <text x="320" y="374" font-size="12" fill="#5b6b7b">reflects the fleet schema · add-auth → app_user</text>
+  <text x="320" y="392" font-size="12" fill="#5b6b7b">als-extensions: Kafka event producers</text>
+  <text x="320" y="410" font-size="12" fill="#e8833a">:5659</text>
 
-  <!-- middleware <-> backend arrows -->
-  <line x1="470" y1="485" x2="470" y2="532" stroke="#334155" stroke-width="2" marker-end="url(#arrow)"/>
-  <text x="482" y="513" font-size="11.5" fill="#334155">SQLAlchemy (runtime reads/writes)</text>
+  <!-- Realtime bridge -->
+  <rect x="840" y="300" width="280" height="116" rx="10" fill="#eef3f9" stroke="#1f4e79" stroke-width="2"/>
+  <text x="860" y="332" font-size="17" font-weight="700" fill="#1f4e79">Realtime bridge</text>
+  <text x="860" y="356" font-size="12" fill="#5b6b7b">Kafka consumer → WebSocket</text>
+  <text x="860" y="374" font-size="12" fill="#5b6b7b">JWT-authed · pub/sub fan-out</text>
+  <text x="860" y="392" font-size="12" fill="#5b6b7b">topic routing + correlation ids</text>
+  <text x="860" y="410" font-size="12" fill="#e8833a">:8765 (ws)</text>
 
-  <line x1="430" y1="532" x2="430" y2="485" stroke="#64748b" stroke-width="1.6" stroke-dasharray="6 4" marker-end="url(#arrowUp)"/>
-  <text x="120" y="513" font-size="11.5" fill="#64748b" font-style="italic">reflects schema → models (create-time)</text>
+  <!-- Kafka -->
+  <rect x="300" y="500" width="540" height="96" rx="10" fill="#fdf1e6" stroke="#cf6f2c" stroke-width="2"/>
+  <text x="320" y="532" font-size="17" font-weight="700" fill="#b4611f">Apache Kafka</text>
+  <text x="320" y="556" font-size="12" fill="#7a5a3a">durable event log · ALS produces, services consume</text>
+  <text x="320" y="576" font-size="12" fill="#7a5a3a">topics: message · position · load · trip · waypoint · alert</text>
+  <text x="790" y="532" font-size="12" fill="#e8833a">:9092</text>
 
-  <!-- ===== Backend tier ===== -->
-  <rect x="95" y="535" width="870" height="95" rx="12" fill="#e0e7ff" stroke="#4338ca" stroke-width="2"/>
-  <text x="530" y="568" text-anchor="middle" font-size="17" font-weight="700" fill="#312e81">PostgreSQL  —  backend data store</text>
-  <text x="530" y="592" text-anchor="middle" font-size="13" fill="#3730a3">Domain objects (UUID keys) + lookup tables (integer keys) · FK relationships drive the JSON:API</text>
-  <text x="530" y="614" text-anchor="middle" font-size="12" fill="#334155" font-family="monospace" font-weight="700">database/schema.sql  +  database/seed_data.sql</text>
-  <rect x="876" y="545" width="78" height="26" rx="13" fill="#4338ca"/>
-  <text x="915" y="563" text-anchor="middle" font-size="13" font-weight="700" fill="#ffffff">: 5432</text>
+  <!-- Geospatial -->
+  <rect x="60" y="660" width="320" height="120" rx="10" fill="#ffffff" stroke="#2c6fb3" stroke-width="2"/>
+  <text x="78" y="690" font-size="16" font-weight="700" fill="#1f4e79">Geospatial service</text>
+  <text x="78" y="712" font-size="12" fill="#5b6b7b">PostGIS nearest-POI / spatial queries</text>
+  <text x="78" y="730" font-size="12" fill="#5b6b7b">auto route recompute (waypoint/trip)</text>
+  <text x="78" y="748" font-size="12" fill="#5b6b7b">nearest-neighbor optimizer (HERE pluggable)</text>
+  <text x="78" y="768" font-size="12" fill="#e8833a">:5701</text>
 
-  <!-- ===== Design-time reference (outside the deployed boundary) ===== -->
-  <rect x="120" y="690" width="500" height="100" rx="12" fill="#f1f5f9" stroke="#475569" stroke-width="1.8" stroke-dasharray="7 5"/>
-  <text x="370" y="722" text-anchor="middle" font-size="14.5" font-weight="700" fill="#334155">Shared domain language  (design-time · not deployed)</text>
-  <text x="370" y="744" text-anchor="middle" font-size="12" fill="#475569">docs/ — ubiquitous language · bounded contexts · invariants</text>
-  <text x="370" y="766" text-anchor="middle" font-size="12" fill="#475569">a consistent vocabulary for us &amp; the spec; shapes the schema</text>
-  <text x="370" y="785" text-anchor="middle" font-size="11" fill="#64748b" font-style="italic">ALS generates the running app from the schema — not from this</text>
+  <!-- Assistant -->
+  <rect x="860" y="660" width="260" height="110" rx="10" fill="#ffffff" stroke="#2c6fb3" stroke-width="2"/>
+  <text x="878" y="690" font-size="16" font-weight="700" fill="#1f4e79">Hey Dispatch assistant</text>
+  <text x="878" y="712" font-size="12" fill="#5b6b7b">voice — LLM tool-use</text>
+  <text x="878" y="730" font-size="12" fill="#5b6b7b">mobile mic → assistant → ALS</text>
+  <text x="878" y="756" font-size="12" fill="#e8833a">:5710</text>
 
-  <!-- design-time -> schema -->
-  <line x1="430" y1="690" x2="430" y2="632" stroke="#64748b" stroke-width="1.6" stroke-dasharray="6 4" marker-end="url(#arrowUp)"/>
-  <text x="442" y="668" font-size="11" fill="#64748b" font-style="italic">informs schema.sql</text>
+  <!-- PostgreSQL -->
+  <rect x="450" y="660" width="300" height="120" rx="10" fill="#eef3f9" stroke="#1f4e79" stroke-width="2"/>
+  <text x="470" y="690" font-size="16" font-weight="700" fill="#1f4e79">PostgreSQL 16</text>
+  <text x="470" y="712" font-size="12" fill="#5b6b7b">source of truth — fleet schema (40 tables)</text>
+  <text x="470" y="730" font-size="12" fill="#5b6b7b">gis schema · PostGIS (isolated from ALS)</text>
+  <text x="470" y="748" font-size="12" fill="#5b6b7b">app_user (JWT) · loads · trips · messages</text>
+  <text x="470" y="768" font-size="12" fill="#e8833a">:5432</text>
 
-  <!-- ===== Legend ===== -->
-  <rect x="700" y="690" width="240" height="100" rx="10" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
-  <text x="716" y="713" font-size="12.5" font-weight="700" fill="#0f172a">Legend</text>
-  <line x1="716" y1="732" x2="752" y2="732" stroke="#334155" stroke-width="2" marker-end="url(#arrow)"/>
-  <text x="760" y="736" font-size="11.5" fill="#334155">runtime (HTTP / SQL)</text>
-  <line x1="716" y1="756" x2="752" y2="756" stroke="#64748b" stroke-width="1.6" stroke-dasharray="6 4" marker-end="url(#arrowUp)"/>
-  <text x="760" y="760" font-size="11.5" fill="#334155">build-time / design input</text>
-  <rect x="716" y="772" width="16" height="11" rx="3" fill="#fffbeb" stroke="#d97706" stroke-width="1.5" stroke-dasharray="4 3"/>
-  <text x="760" y="782" font-size="11.5" fill="#334155">VCP deployment boundary</text>
+  <!-- flows: clients -> ALS -->
+  <line x1="240" y1="206" x2="380" y2="300" stroke="#1f4e79" stroke-width="2.2" marker-end="url(#aBlue)"/>
+  <text x="246" y="262" font-size="11" fill="#1f4e79">writes + snapshots</text>
+  <line x1="905" y1="220" x2="600" y2="322" stroke="#1f4e79" stroke-width="2.2" marker-end="url(#aBlue)"/>
+  <text x="700" y="258" font-size="11" fill="#1f4e79">JSON:API</text>
+
+  <!-- ALS -> Postgres -->
+  <line x1="360" y1="416" x2="520" y2="660" stroke="#1f4e79" stroke-width="2.2" marker-end="url(#aBlue)"/>
+  <text x="372" y="544" font-size="11" fill="#1f4e79">SQLAlchemy</text>
+
+  <!-- ALS -> Kafka -->
+  <line x1="470" y1="416" x2="470" y2="500" stroke="#cf6f2c" stroke-width="2.4" stroke-dasharray="6 4" marker-end="url(#aOrange)"/>
+  <text x="482" y="462" font-size="11" fill="#b4611f">events (after_flush)</text>
+
+  <!-- Kafka -> bridge -->
+  <line x1="820" y1="500" x2="950" y2="416" stroke="#cf6f2c" stroke-width="2.4" stroke-dasharray="6 4" marker-end="url(#aOrange)"/>
+  <text x="836" y="472" font-size="11" fill="#b4611f">consume (pub/sub)</text>
+
+  <!-- bridge -> desktop -->
+  <line x1="980" y1="300" x2="980" y2="220" stroke="#cf6f2c" stroke-width="2.4" stroke-dasharray="6 4" marker-end="url(#aOrange)"/>
+  <text x="992" y="266" font-size="11" fill="#b4611f">WS → CommBus</text>
+
+  <!-- bridge -> mobile (long) -->
+  <path d="M840,350 C560,350 470,250 312,178" fill="none" stroke="#cf6f2c" stroke-width="2.4" stroke-dasharray="6 4" marker-end="url(#aOrange)"/>
+  <text x="430" y="330" font-size="11" fill="#b4611f">WebSocket (live: messages, positions)</text>
+
+  <!-- Kafka -> geospatial -->
+  <line x1="340" y1="596" x2="250" y2="660" stroke="#cf6f2c" stroke-width="2.4" stroke-dasharray="6 4" marker-end="url(#aOrange)"/>
+  <text x="96" y="634" font-size="11" fill="#b4611f">waypoint/trip → recompute</text>
+
+  <!-- geospatial -> postgres -->
+  <line x1="380" y1="712" x2="450" y2="712" stroke="#1f4e79" stroke-width="2.2" marker-end="url(#aBlue)"/>
+  <text x="372" y="704" font-size="11" fill="#1f4e79">gis · upsert route</text>
+
+  <!-- assistant -> ALS -->
+  <path d="M900,660 C720,560 640,470 600,416" fill="none" stroke="#1f4e79" stroke-width="2" marker-end="url(#aBlue)"/>
+  <text x="706" y="556" font-size="11" fill="#1f4e79">tools (JSON:API)</text>
+
+  <text x="40" y="828" font-size="12" fill="#5b6b7b">Two planes: realtime data (messages, fleet locations, map updates) streams via Kafka → bridge; everything else is ALS request/response. Clients never touch PostgreSQL or Kafka brokers directly.</text>
 </svg>

@@ -1,0 +1,42 @@
+# Fleet Dispatcher — ApiLogicServer (JSON:API) systemd unit.
+#
+# The middleware: reflects the `fleet` schema → JSON:API + JWT auth on :5659.
+# The ALS project is generated OUTSIDE this repo (e.g. /opt/fleet-dispatcher/api);
+# our customizations are installed with `make als-extensions` (see
+# als-extensions/README.md and docs/AUTHENTICATION.md).
+#
+# Install:
+#   sudo useradd --system --no-create-home --shell /usr/sbin/nologin fleet   # once (shared)
+#   # place the generated ALS project at /opt/fleet-dispatcher/api with a venv:
+#   sudo python3 -m venv /opt/fleet-dispatcher/api/venv
+#   sudo /opt/fleet-dispatcher/api/venv/bin/pip install ApiLogicServer
+#   #   ... ApiLogicServer create/add-auth + `make als-extensions ALS_PROJECT=/opt/fleet-dispatcher/api`
+#   sudo mkdir -p /etc/fleet-dispatcher
+#   sudo cp deploy/api.env.example /etc/fleet-dispatcher/api.env
+#   sudo chmod 600 /etc/fleet-dispatcher/api.env       # holds SECRET_KEY + DB URL
+#   sudo $EDITOR /etc/fleet-dispatcher/api.env
+#   sudo cp deploy/fleet-dispatcher-api.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now fleet-dispatcher-api
+#
+# Logs:   journalctl -u fleet-dispatcher-api -f
+
+[Unit]
+Description=Fleet Dispatcher — ApiLogicServer (JSON:API)
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=fleet
+Group=fleet
+
+WorkingDirectory=/opt/fleet-dispatcher/api
+EnvironmentFile=-/etc/fleet-dispatcher/api.env
+# Positional host port (ALS default is 5656; we serve 5659).
+ExecStart=/opt/fleet-dispatcher/api/venv/bin/python api_logic_server_run.py 0.0.0.0 5659
+
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

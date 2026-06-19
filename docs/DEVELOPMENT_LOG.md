@@ -5,6 +5,24 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-06-11
 
+### Fix: week board overlap (grid forced onto a <table>)
+- `.fd-week-board` set `display:grid` (7 cols) on the Wt WTable (8 logical cols:
+  Driver + 7 days) → driver-name cells overlapped the day columns. Switched to
+  proper table styling (`table-layout: fixed`, top-aligned cells, fixed Driver
+  column). Day headers now render weekday + short MM-DD (no full-date wrapping).
+
+### systemd units for all services + architecture SVG
+- Added systemd units (run as `fleet`, EnvironmentFile=/etc/fleet-dispatcher/*.env,
+  Restart=on-failure) for the components that lacked them: **ALS**
+  (`deploy/fleet-dispatcher-api.service`, :5659), **geospatial**
+  (`geospatial/deploy/`, :5701), **mobile** (`portals/mobile/deploy/`, :5173 via
+  vite preview; nginx documented as the prod option). Desktop/realtime/assistant
+  units already existed. New `deploy/README.md` ties them together (install order,
+  shared SECRET_KEY=FLEET_JWT_SECRET, Postgres/Kafka as external units).
+- Replaced `docs/architecture.svg` with a full current diagram (clients, ALS,
+  Kafka + topics, realtime bridge, geospatial, assistant, PostgreSQL/PostGIS),
+  showing the two planes (req/resp vs realtime stream). Embedded in architecture.md.
+
 ### ALS Kafka producer snippet + post-generate install automation
 - New `als-extensions/`: customizations to layer onto the generated ALS project.
   `logic_discovery/fleet_events.py` emits a Kafka event per Message/PositionReport
