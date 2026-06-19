@@ -7,18 +7,37 @@ monorepo, so they're versioned and re-installable after ALS is (re)generated.
 
 ## What's here
 
-- `logic_discovery/fleet_events.py` — emits a **Kafka event** on every
-  `Message` / `PositionReport` insert, so the realtime bridge (`../realtime/`)
-  can fan changes out to clients. See [`../docs/REALTIME.md`](../docs/REALTIME.md).
-- `install.sh` — copies the above into `<ALS_PROJECT>/logic/logic_discovery/`.
+- `logic_discovery/fleet_events.py` — emits **Kafka events** on Message /
+  PositionReport / Load / Trip / Waypoint changes, so the realtime bridge
+  (`../realtime/`) can fan changes out to clients. See
+  [`../docs/REALTIME.md`](../docs/REALTIME.md).
+- `security/authentication_provider/sql/auth_provider.py` — ALS SQL auth provider
+  that authenticates against our **`app_user`** table and verifies werkzeug
+  password hashes (the default uses a separate sqlite auth DB + plaintext).
+- `security/declare_security.py` — role grants so authenticated users can read
+  data (dev-permissive baseline; tighten for prod). See
+  [`../docs/AUTHENTICATION.md`](../docs/AUTHENTICATION.md).
+- `install.sh` — copies all of the above into the ALS project.
 
-## Install (after generating ALS)
+## Install — from-scratch sequence
 
 ```bash
-# one command (defaults ALS_PROJECT=../fleet-dispatcher-api):
-make als-extensions
-# or explicitly:
-als-extensions/install.sh /path/to/fleet-dispatcher-api
+ApiLogicServer create --project_name=fleet-dispatcher-api --db_url="$DATABASE_URL"
+cd fleet-dispatcher-api && ApiLogicServer add-auth --provider-type=sql && cd -
+make als-extensions ALS_PROJECT=./fleet-dispatcher-api    # installs logic + security
+```
+
+`make als-extensions` (or `als-extensions/install.sh /path/to/fleet-dispatcher-api`)
+copies the Kafka producers into `logic/logic_discovery/` and — **if `add-auth`
+has been run** (so `security/` exists) — overwrites `auth_provider.py` +
+`declare_security.py`. If `security/` isn't there yet, it installs the producers
+and reminds you to run `add-auth`, then re-run.
+
+Run ALS with security on:
+```bash
+export SECURITY_ENABLED=true
+export SECRET_KEY=<your-jwt-secret>      # share this with the realtime/ bridge
+python api_logic_server_run.py 0.0.0.0 5659
 ```
 
 Then enable the producer in the ALS project and (re)start ALS — read the broker
