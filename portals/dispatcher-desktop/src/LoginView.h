@@ -7,6 +7,7 @@
 
 #include <Wt/WContainerWidget.h>
 #include <Wt/WLineEdit.h>
+#include <Wt/WPasswordEdit.h>
 #include <Wt/WPushButton.h>
 #include <Wt/WText.h>
 
@@ -26,7 +27,7 @@ private:
     std::function<void(AppUser)> onAuthenticated_;
 
     Wt::WLineEdit* username_ = nullptr;
-    Wt::WLineEdit* password_ = nullptr;
+    Wt::WPasswordEdit* password_ = nullptr;   // WPasswordEdit: masked, non-deprecated
     Wt::WPushButton* submit_ = nullptr;
     Wt::WText* error_ = nullptr;
 

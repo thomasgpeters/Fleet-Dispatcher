@@ -32,9 +32,8 @@ LoginView::LoginView(ApiClient* api, std::function<void(AppUser)> onAuthenticate
     auto* passGroup = body->addNew<Wt::WContainerWidget>();
     passGroup->addStyleClass("mb-3");
     passGroup->addNew<Wt::WText>("<label class=\"form-label\">Password</label>");
-    password_ = passGroup->addNew<Wt::WLineEdit>();
+    password_ = passGroup->addNew<Wt::WPasswordEdit>();  // masked by default
     password_->addStyleClass("form-control");
-    password_->setEchoMode(Wt::EchoMode::Password);
     // Enter in the password field submits.
     password_->enterPressed().connect(this, &LoginView::submit);
 
