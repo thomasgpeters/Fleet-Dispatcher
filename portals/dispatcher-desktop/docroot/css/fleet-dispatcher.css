@@ -1,9 +1,13 @@
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600;700&display=swap');
 /* Fleet Dispatcher — desktop + HUD app styles.
  *
  * Loaded on top of the Wt Bootstrap 5 theme (see src/main.cpp). Implements the
  * shared design system (docs/DESIGN_SYSTEM.md): subtle blues, sparse orange
- * accents, white/light standard theme + a complementary dark theme. Served from
- * the docroot at runtime (CMake copies docroot/ next to the executable).
+ * accents, light-grey page with rounded surface panels, and a professional,
+ * slightly-compressed UI font (Barlow Semi Condensed). Served from the docroot
+ * at runtime (CMake copies docroot/ next to the executable).
+ *
+ * Offline deploy: self-host the font and drop the @import above.
  */
 
 /* ===========================================================================
@@ -12,12 +16,13 @@
  * dark (see HudView).
  * ======================================================================== */
 :root {
-    --fd-bg: #f4f7fb;
+    /* Neutral light-grey page so white rounded panels read as cards. */
+    --fd-bg: #eceef2;
     --fd-surface: #ffffff;
-    --fd-surface-2: #eef3f9;
-    --fd-text: #18222e;
-    --fd-text-muted: #5b6b7b;
-    --fd-border: #d8e1ec;
+    --fd-surface-2: #f3f4f6;
+    --fd-text: #1b2430;
+    --fd-text-muted: #5f6a78;
+    --fd-border: #dcdfe5;
     --fd-primary: #2c6fb3;
     --fd-primary-strong: #1f4e79;
     --fd-primary-contrast: #ffffff;
@@ -26,10 +31,15 @@
     --fd-header-bg: #1f4e79;
     --fd-header-text: #eaf1f8;
     --fd-header-border: #18405f;
-    --fd-footer-bg: #eef3f9;
-    --fd-footer-text: #5b6b7b;
+    --fd-footer-bg: #f3f4f6;
+    --fd-footer-text: #5f6a78;
     --fd-link: #2c6fb3;
-    --fd-shadow: rgba(20, 40, 70, 0.08);
+    --fd-shadow: rgba(20, 30, 50, 0.10);
+
+    /* Professional, slightly-compressed UI font (fits laptop screens). */
+    --fd-font: "Barlow Semi Condensed", "Inter", "Segoe UI", system-ui,
+        -apple-system, Roboto, Helvetica, Arial, sans-serif;
+    --fd-radius: 12px;          /* rounded panels */
 
     --fd-board-gap: 0.75rem;
     --fd-panel-w: 260px;
@@ -87,7 +97,12 @@ body {
     margin: 0;
     background-color: var(--fd-bg);
     color: var(--fd-text);
+    font-family: var(--fd-font);
+    font-size: 15px;                 /* compact, dense-but-legible */
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
 }
+h1, h2, h3, h4, h5, .h4, .h5 { font-family: var(--fd-font); letter-spacing: 0.1px; }
 
 /* Align the Bootstrap theme + common components with the palette. */
 .btn-primary {
@@ -110,8 +125,9 @@ body {
 .text-accent { color: var(--fd-accent); }
 .bg-accent { background-color: var(--fd-accent); color: var(--fd-accent-contrast); }
 .card {
-    background-color: var(--fd-surface);
-    border: 1px solid var(--fd-border);
+    background-color: #ffffff;
+    border: none;
+    border-radius: var(--fd-radius);
     color: var(--fd-text);
 }
 
@@ -145,8 +161,9 @@ body {
 }
 .fd-nav .btn:hover { background-color: rgba(255, 255, 255, 0.12); color: var(--fd-header-text); }
 .fd-nav .btn.fd-active {
-    background-color: rgba(255, 255, 255, 0.16);
-    box-shadow: inset 0 -2px 0 var(--fd-accent);  /* sparse orange highlight */
+    background-color: rgba(255, 255, 255, 0.18);
+    color: #ffffff;
+    font-weight: 600;   /* active = filled chip + weight (no shadow/underline) */
 }
 .fd-header-spacer { flex: 1 1 auto; }
 .fd-header-tools { display: flex; align-items: center; gap: 0.4rem; }
@@ -159,26 +176,43 @@ body {
 }
 .fd-header .btn-icon:hover { background-color: rgba(255, 255, 255, 0.12); }
 
-/* Three-column body */
-.fd-body { display: flex; flex: 1 1 auto; align-items: stretch; min-height: 0; }
+/* Three-column body — each region is a bright-white rounded card floating on the
+ * grey page. Separation is the gap (no borders, no shadows). */
+.fd-body {
+    display: flex;
+    flex: 1 1 auto;
+    align-items: stretch;
+    min-height: 0;
+    gap: 1rem;
+    padding: 1rem;
+}
 .fd-panel {
     width: var(--fd-panel-w);
     flex: 0 0 var(--fd-panel-w);
-    padding: 1rem;
+    padding: 1.25rem;
     overflow: auto;
-    background-color: var(--fd-surface-2);
-    border-right: 1px solid var(--fd-border);
+    background-color: #ffffff;
+    border-radius: var(--fd-radius);
     transition: width 0.18s ease, flex-basis 0.18s ease, padding 0.18s ease;
 }
-.fd-panel-right { border-right: none; border-left: 1px solid var(--fd-border); }
 .fd-panel.fd-collapsed {
     width: 0;
     flex-basis: 0;
     padding: 0;
     overflow: hidden;
-    border-width: 0;
 }
-.fd-center { flex: 1 1 auto; min-width: 0; padding: 1rem 1.25rem; overflow: auto; }
+.fd-center { flex: 1 1 auto; min-width: 0; display: flex; }
+/* The active view: a bright-white rounded card, generous padding, no border/shadow. */
+.fd-work {
+    flex: 1 1 auto;
+    overflow: auto;
+    background-color: #ffffff;
+    border-radius: var(--fd-radius);
+    padding: 1.5rem 1.75rem;
+}
+/* Nested .card renders flat (no double panel). */
+.fd-work > .card,
+.fd-work .card { border: none; background: transparent; }
 .fd-panel-title {
     margin: 0 0 0.5rem;
     font-size: 0.74rem;
@@ -192,7 +226,6 @@ body {
 .fd-footer {
     background-color: var(--fd-footer-bg);
     color: var(--fd-footer-text);
-    border-top: 1px solid var(--fd-border);
 }
 .fd-footer-inner {
     display: flex;
@@ -211,8 +244,6 @@ body {
     .fd-panel, .fd-panel-right {
         width: auto;
         flex-basis: auto;
-        border: none;
-        border-bottom: 1px solid var(--fd-border);
     }
     .fd-panel.fd-collapsed { display: none; }
 }
@@ -296,9 +327,9 @@ body {
 .fd-comm { display: flex; flex-direction: column; height: 100%; min-height: 0; }
 .fd-comm-channels { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-bottom: 0.5rem; }
 .fd-comm-channel {
-    background: transparent;
+    background: var(--fd-surface-2);
     color: var(--fd-text);
-    border: 1px solid var(--fd-border);
+    border: none;
 }
 .fd-comm-channel.fd-active {
     background-color: var(--fd-primary);
@@ -315,10 +346,9 @@ body {
     padding-right: 0.25rem;
 }
 .fd-msg {
-    background: var(--fd-surface);
-    border: 1px solid var(--fd-border);
-    border-radius: 8px;
-    padding: 0.35rem 0.5rem;
+    background: var(--fd-surface-2);
+    border-radius: 10px;
+    padding: 0.4rem 0.6rem;
     max-width: 90%;
     align-self: flex-start;
 }
@@ -326,7 +356,6 @@ body {
     align-self: flex-end;
     background-color: var(--fd-primary);
     color: var(--fd-primary-contrast);
-    border-color: var(--fd-primary);
 }
 .fd-msg-body { font-size: 0.9rem; }
 .fd-msg-meta { font-size: 0.7rem; color: var(--fd-text-muted); margin-top: 0.1rem; }
@@ -348,13 +377,11 @@ body {
     max-width: 320px;
 }
 .fd-toast {
-    background: var(--fd-surface);
+    background: #ffffff;
     color: var(--fd-text);
-    border: 1px solid var(--fd-border);
-    border-left: 4px solid var(--fd-primary);
-    border-radius: 6px;
-    box-shadow: 0 6px 20px var(--fd-shadow);
-    padding: 0.5rem 0.65rem;
+    border-left: 4px solid var(--fd-primary);  /* status accent (not a panel border) */
+    border-radius: 10px;
+    padding: 0.6rem 0.8rem;
     animation: fd-toast-in 0.18s ease;
 }
 .fd-toast-info { border-left-color: var(--fd-primary); }

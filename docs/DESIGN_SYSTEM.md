@@ -18,22 +18,35 @@ mirrors every token.
 
 | Token (role) | Light | Dark |
 | --- | --- | --- |
-| Page background | `#f4f7fb` | `#0f1722` |
-| Surface (cards/panels) | `#ffffff` | `#16212e` |
-| Surface 2 (side panels) | `#eef3f9` | `#1b2937` |
-| Text | `#18222e` | `#e6edf4` |
-| Muted text | `#5b6b7b` | `#9fb1c2` |
-| Border | `#d8e1ec` | `#29384a` |
+| Page background (light grey) | `#eceef2` | `#0f1722` |
+| Surface / panel (bright white) | `#ffffff` | `#16212e` |
+| Surface 2 (chips, bubbles) | `#f3f4f6` | `#1b2937` |
+| Text | `#1b2430` | `#e6edf4` |
+| Muted text | `#5f6a78` | `#9fb1c2` |
+| Border (rarely used) | `#dcdfe5` | `#29384a` |
 | **Primary blue** | `#2c6fb3` | `#4a90d9` |
 | Primary strong | `#1f4e79` | `#6aa6e0` |
 | **Accent orange** | `#e8833a` | `#f0954e` |
 | Header (nav) bg | `#1f4e79` | `#0d1925` |
-| Footer bg | `#eef3f9` | `#0d1925` |
 | Link | `#2c6fb3` | `#6aa6e0` |
 
-Use orange only for highlights: active-nav underline, the load-card accent bar,
+Use orange only for highlights: the load-card accent bar, toast status bars,
 small status/CTA emphasis. Keep semantic colors (success/danger/warning) at their
 framework defaults.
+
+## Typography & panels
+
+- **Font:** **Barlow Semi Condensed** — a professional, slightly-compressed UI
+  face that packs well on laptop screens. Stack falls back to Inter / Segoe UI /
+  system. Loaded from Google Fonts (`@import` in the desktop CSS; `<link>` in the
+  mobile `index.html`); self-host for offline. Base size 15px, dense-but-legible.
+- **Panels:** bright **white** (`#ffffff`), **rounded** (`--fd-radius: 12px`), on
+  the **light-grey page** — separated by spacing, **not** borders or shadows.
+  House rules: **no shadows** (inner or outer); **no borders** unless ≤ 0.25px
+  hairline; **generous padding**. Accent *bars* (load card, toast status) are
+  status indicators, not panel borders. On mobile the same look is achieved the
+  Ionic way (white `ion-card`/`ion-item`, shadow removed, rounded) while keeping
+  list-separator hairlines, which are a mobile convention.
 
 ## Theming mechanism
 

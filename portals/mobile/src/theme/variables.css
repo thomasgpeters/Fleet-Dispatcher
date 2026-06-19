@@ -32,12 +32,17 @@
   --ion-color-tertiary-shade: #cc7333;
   --ion-color-tertiary-tint: #ea8f4e;
 
-  /* Neutrals / surfaces (light). */
-  --ion-background-color: #f4f7fb;
-  --ion-background-color-rgb: 244, 247, 251;
-  --ion-text-color: #18222e;
-  --ion-text-color-rgb: 24, 34, 46;
-  --ion-border-color: #d8e1ec;
+  /* Professional, slightly-compressed UI font — matches the desktop console. */
+  --ion-font-family: "Barlow Semi Condensed", "Inter", -apple-system,
+    "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
+  /* Neutrals / surfaces (light) — light grey page, white cards (Ionic cards
+     are already rounded, so this matches the desktop look the mobile way). */
+  --ion-background-color: #eceef2;
+  --ion-background-color-rgb: 236, 238, 242;
+  --ion-text-color: #1b2430;
+  --ion-text-color-rgb: 27, 36, 48;
+  --ion-border-color: #dcdfe5;
   --ion-item-background: #ffffff;
   --ion-card-background: #ffffff;
 
@@ -143,4 +148,15 @@
   --ion-color-step-850: #e3e9f0;
   --ion-color-step-900: #eef2f6;
   --ion-color-step-950: #f7f9fb;
+}
+
+/* Panels: bright white, rounded, no shadow — matches the desktop console.
+   Ionic list-item separators (hairlines) stay: that's a mobile convention. */
+ion-card {
+  --background: #ffffff;
+  box-shadow: none;
+  border-radius: 12px;
+}
+ion-item {
+  --background: #ffffff;
 }
