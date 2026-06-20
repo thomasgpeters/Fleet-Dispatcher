@@ -11,6 +11,10 @@ monorepo, so they're versioned and re-installable after ALS is (re)generated.
   PositionReport / Load / Trip / Waypoint changes, so the realtime bridge
   (`../realtime/`) can fan changes out to clients. See
   [`../docs/REALTIME.md`](../docs/REALTIME.md).
+- `logic_discovery/comms_governance.py` — **LogicBank constraints** for the
+  team-comms model (TODO Feature 4): broadcast channels are owner/admin-post-only,
+  and muted/banned members can't post (with `restricted_until` expiry). Requires
+  the P1–P3 schema, so regenerate ALS from the updated schema before installing.
 - `security/authentication_provider/sql/auth_provider.py` — ALS SQL auth provider
   that authenticates against our **`app_user`** table and verifies werkzeug
   password hashes (the default uses a separate sqlite auth DB + plaintext).

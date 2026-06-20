@@ -149,7 +149,13 @@ INSERT INTO channel_type (id, code, name) VALUES
 
 INSERT INTO channel_member_role (id, code, name) VALUES
   (1, 'owner',  'Owner'),
-  (2, 'member', 'Member');
+  (2, 'member', 'Member'),
+  (3, 'admin',  'Admin');
+
+INSERT INTO channel_member_status (id, code, name) VALUES
+  (1, 'active', 'Active'),
+  (2, 'muted',  'Muted'),
+  (3, 'banned', 'Banned');
 
 INSERT INTO document_type (id, code, name) VALUES
   (1, 'document',         'Document'),
@@ -165,24 +171,46 @@ INSERT INTO pin_scope (id, code, name) VALUES
   (2, 'channel',  'Everyone in the channel'),
   (3, 'everyone', 'Everyone');
 
-SELECT setval(pg_get_serial_sequence('channel_type', 'id'),        (SELECT max(id) FROM channel_type));
-SELECT setval(pg_get_serial_sequence('channel_member_role', 'id'), (SELECT max(id) FROM channel_member_role));
-SELECT setval(pg_get_serial_sequence('document_type', 'id'),       (SELECT max(id) FROM document_type));
-SELECT setval(pg_get_serial_sequence('pin_scope', 'id'),           (SELECT max(id) FROM pin_scope));
+SELECT setval(pg_get_serial_sequence('channel_type', 'id'),          (SELECT max(id) FROM channel_type));
+SELECT setval(pg_get_serial_sequence('channel_member_role', 'id'),   (SELECT max(id) FROM channel_member_role));
+SELECT setval(pg_get_serial_sequence('channel_member_status', 'id'), (SELECT max(id) FROM channel_member_status));
+SELECT setval(pg_get_serial_sequence('document_type', 'id'),         (SELECT max(id) FROM document_type));
+SELECT setval(pg_get_serial_sequence('pin_scope', 'id'),             (SELECT max(id) FROM pin_scope));
 
 -- A group channel for the week's dispatch chatter.
 INSERT INTO channel (id, name, channel_type_id, created_by) VALUES
   ('c4a11e10-0000-0000-0000-000000000001', 'Week of 2026-06-01 Dispatch', 2,
    '11111111-1111-1111-1111-111111111111');  -- created by Dana (dispatcher)
 
+-- A broadcast channel: only owner/admins post; members read (enforced by the
+-- LogicBank rule in als-extensions/). Models a fleet-wide announcement board.
+INSERT INTO channel (id, name, channel_type_id, created_by) VALUES
+  ('c4a11e10-0000-0000-0000-000000000002', 'Fleet Announcements', 3,
+   '11111111-1111-1111-1111-111111111111');  -- created by Dana (dispatcher)
+
 INSERT INTO channel_member (id, channel_id, user_id, member_role_id) VALUES
   ('c4e3b001-0000-0000-0000-000000000001', 'c4a11e10-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111', 1),  -- Dana owner
   ('c4e3b001-0000-0000-0000-000000000002', 'c4a11e10-0000-0000-0000-000000000001', '22222222-2222-2222-2222-222222222222', 2),  -- Pat (driver)
-  ('c4e3b001-0000-0000-0000-000000000003', 'c4a11e10-0000-0000-0000-000000000001', '33333333-3333-3333-3333-333333333333', 2);  -- Uma (updater)
+  ('c4e3b001-0000-0000-0000-000000000003', 'c4a11e10-0000-0000-0000-000000000001', '33333333-3333-3333-3333-333333333333', 2),  -- Uma (updater)
+  -- Broadcast channel: Dana owns/posts; Pat & Uma are read-only members.
+  ('c4e3b001-0000-0000-0000-000000000004', 'c4a11e10-0000-0000-0000-000000000002', '11111111-1111-1111-1111-111111111111', 1),  -- Dana owner
+  ('c4e3b001-0000-0000-0000-000000000005', 'c4a11e10-0000-0000-0000-000000000002', '22222222-2222-2222-2222-222222222222', 2),  -- Pat (driver)
+  ('c4e3b001-0000-0000-0000-000000000006', 'c4a11e10-0000-0000-0000-000000000002', '33333333-3333-3333-3333-333333333333', 2);  -- Uma (updater)
 
+-- A forum topic in the group channel (focused thread for one lane).
+INSERT INTO channel_topic (id, channel_id, name, created_by) VALUES
+  ('70b1c000-0000-0000-0000-000000000001', 'c4a11e10-0000-0000-0000-000000000001',
+   'Lubbock -> Denver', '11111111-1111-1111-1111-111111111111');
+
+-- Group-channel messages: the two below sit inside the lane topic; topic_id NULL
+-- would place a message in the channel's General stream.
+INSERT INTO message (id, channel_id, topic_id, author_id, body) VALUES
+  ('5e55a6e0-0000-0000-0000-000000000001', 'c4a11e10-0000-0000-0000-000000000001', '70b1c000-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111', 'Pat, your Lubbock -> Denver load is dispatched. BOL attached.'),
+  ('5e55a6e0-0000-0000-0000-000000000002', 'c4a11e10-0000-0000-0000-000000000001', '70b1c000-0000-0000-0000-000000000001', '22222222-2222-2222-2222-222222222222', 'Got it, rolling out Monday AM.');
+
+-- A broadcast announcement (posted by the owner).
 INSERT INTO message (id, channel_id, author_id, body) VALUES
-  ('5e55a6e0-0000-0000-0000-000000000001', 'c4a11e10-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111', 'Pat, your Lubbock -> Denver load is dispatched. BOL attached.'),
-  ('5e55a6e0-0000-0000-0000-000000000002', 'c4a11e10-0000-0000-0000-000000000001', '22222222-2222-2222-2222-222222222222', 'Got it, rolling out Monday AM.');
+  ('5e55a6e0-0000-0000-0000-000000000003', 'c4a11e10-0000-0000-0000-000000000002', '11111111-1111-1111-1111-111111111111', 'Reminder: ELD logs are due by 18:00 daily. Drive safe out there.');
 
 -- A CMS document (a tiny text artifact stands in for a scanned BOL).
 INSERT INTO document (id, title, document_type_id, filename, content_type, byte_size, checksum, data, uploaded_by) VALUES

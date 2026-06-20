@@ -5,6 +5,26 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-06-20
 
+### Comms Feature 4 — P1–P3 foundation (admin role · status · topics)
+Schema-first (golden rules); verified on a throwaway PG16 (**42 tables** in
+`fleet`, `public` = 0). ALS regen + `make als-extensions` needed on the Linux
+box to activate the rule; client UI is the next slice.
+- **P1 admin role + broadcast lock** — `channel_member_role` gains `admin`
+  (owner/admin/member). New LogicBank rule
+  `als-extensions/logic_discovery/comms_governance.py`: in `broadcast` channels
+  only owner/admins may post. Seed adds a "Fleet Announcements" broadcast channel.
+- **P2 member status/restriction** — `channel_member_status` lookup
+  (active/muted/banned) + `channel_member.member_status_id` (default active) +
+  `restricted_until`; the same rule blocks posting while a mute/ban is active
+  (NULL = indefinite, past = expired).
+- **P3 topics** — `channel_topic` (channel_id, name, created_by, is_closed) +
+  `message.topic_id` (NULL = General stream) + indexes; seed adds a
+  "Lubbock → Denver" topic.
+- Docs: domain-model (roles/status/topics + broadcast policy), TODO (P1–P3 →
+  `[~]`; captured clarified board-robustness items: mentions, stats/unread, user
+  online status, comms backup/restore, archive-hidden-with-admin-revive),
+  als-extensions README.
+
 ### Desktop: full Communications view (Channels/Groups) + HUD map fix
 - **HUD/Map white screen** — Wt ≥ 4.7 makes `WLeafletMap` read its Leaflet
   sources from the `leafletJSURL`/`leafletCSSURL` **config properties** and

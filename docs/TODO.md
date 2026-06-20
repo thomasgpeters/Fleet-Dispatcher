@@ -219,22 +219,24 @@ Clients (mobile + desktop `CommPanel` directory/roles) follow.
 
 Priority order (P1 = do first; small→large, value-weighted):
 
-- [ ] **P1 — Admin role + broadcast posting lock** *(smallest, highest value)*.
-      Add `admin` to `channel_member_role` (owner → admin → member). LogicBank
-      rule: in `broadcast` channels only owner/admins may post; members
-      read/react. UI: role badges in the Channels (Groups) directory; hide the
-      composer for non-posters. This is the "dispatcher announces, drivers read"
-      pattern fleets use Telegram for.
-- [ ] **P2 — Member status & restriction**. Add `status`
-      (active/muted/banned) + `until` (expiry) to `channel_member` (or a
-      `channel_member_status` lookup). Lets a driver who leaves a load/company be
-      removed or temporarily muted without deleting history. LogicBank enforces
-      post rights by status; UI exposes mute/remove for admins.
-- [ ] **P3 — Topics (forum threads)**. New `channel_topic` (channel_id, name,
-      created_by, is_closed) + `message.topic_id` (nullable; General = null).
-      Splits a "Week-of Dispatch" group into a topic per load/lane/region — the
-      biggest organizational win and a natural fit for the dispatch domain.
-      Mobile + desktop: topic list within a channel; compose into a topic.
+- [~] **P1 — Admin role + broadcast posting lock** *(smallest, highest value)*.
+      DONE: `admin` added to `channel_member_role` (owner/admin/member); LogicBank
+      rule `als-extensions/logic_discovery/comms_governance.py` blocks non-owner/
+      admin posts in `broadcast` channels; seed has a "Fleet Announcements"
+      broadcast channel. Verified on PG16. REMAINING: client UI — role badges in
+      the Channels (Groups) directory + hide composer for read-only members
+      (desktop + mobile); ALS regen on the Linux box to activate the rule.
+- [~] **P2 — Member status & restriction**. DONE: `channel_member_status` lookup
+      (active/muted/banned) + `channel_member.member_status_id` (default active) +
+      `restricted_until` (expiry); LogicBank rule blocks posting while a mute/ban
+      is active (NULL until = indefinite; past = expired). Verified on PG16.
+      REMAINING: admin UI to mute/ban/remove members; surface standing in the
+      directory.
+- [~] **P3 — Topics (forum threads)**. DONE: `channel_topic` (channel_id, name,
+      created_by, is_closed) + `message.topic_id` (nullable; General = NULL) +
+      indexes; seed has a "Lubbock -> Denver" topic. Verified on PG16. REMAINING:
+      client UI — topic list within a channel + compose-into-topic (desktop
+      `CommPanel` + mobile message board).
 - [ ] **P4 — Invite links + join requests**. `channel_invite` (token, created_by,
       member_cap, expires_at, requires_approval, revoked) + a pending-join state
       on `channel_member` (or `channel_join_request`). Onboards carriers/drivers
@@ -256,6 +258,30 @@ Priority order (P1 = do first; small→large, value-weighted):
 > core broadcast/governance behavior; P3 is the headline organizational feature;
 > P4 enables external onboarding; P5–P8 are independent enhancements layerable in
 > any order once the role/topic foundation exists.
+
+### Message-board robustness (clarified 2026-06-20)
+
+Additional requirements for a robust board. Decisions captured from the user:
+
+- [ ] **Tag/mention users** (`@mention` in a group/board/channel). `message_mention`
+      (message_id, mentioned_user_id) written on send; composer autocomplete from
+      channel members; highlight + notification/toast + unread bump for the
+      mentioned user.
+- [ ] **Board stats + unread** in the comms toolbar. Per-channel + overall unread
+      (from `channel_member.last_read_at`), message/member counts, most-active
+      channels; server-side `unread_count` via LogicBank (replaces client compute).
+- [ ] **User online status** (toolbar switch). DECIDED: it's the **user's online
+      status** (presence/duty), not channel state. Add `app_user.user_status_id`
+      (lookup: online/away/driving/off-duty) shown beside the user in comms +
+      fleet view; live via the realtime plane.
+- [ ] **Backup & restore of comms data**. DECIDED: back up **messages, members,
+      and related message data**. DB-level `pg_dump`/restore of the comms tables
+      (+ runbook/timer) and/or an in-app per-board export (JSON) + restore.
+- [ ] **Archive / revive channels**. DECIDED: an **archived channel is no longer
+      visible to users**; **admins can revive** (unarchive) it. Wire up the
+      existing `channel.is_archived`: filter archived channels out of normal
+      client queries; admin-only "Archived" view with unarchive. Enforce
+      visibility server-side (LogicBank/ALS grants), not just client filtering.
 
 ## Cross-cutting
 
