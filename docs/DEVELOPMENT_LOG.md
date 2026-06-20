@@ -5,6 +5,14 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-06-20
 
+### Comms P1/P2 desktop: role/status-aware composer
+- `CommPanel` fetches the selected channel's `ChannelMember`s
+  (`ApiClient::fetchChannelMembers`) and gates the composer via
+  `updatePostPermission`: hidden with a reason for read-only members of a
+  broadcast channel, or while muted/banned (respects `restricted_until` expiry).
+  Optimistic (composer on) until members load; server LogicBank rule remains the
+  authority. Models: `ChannelMember`, `Topic`; `Message` gains `topic_id`.
+
 ### Comms: in-app per-board export + shared header toolbar
 - **Per-board export** (desktop console): an **Export** action bundles a board's
   channel meta + topics + members + messages (raw JSON:API documents, high page

@@ -223,15 +223,18 @@ Priority order (P1 = do first; small→large, value-weighted):
       DONE: `admin` added to `channel_member_role` (owner/admin/member); LogicBank
       rule `als-extensions/logic_discovery/comms_governance.py` blocks non-owner/
       admin posts in `broadcast` channels; seed has a "Fleet Announcements"
-      broadcast channel. Verified on PG16. REMAINING: client UI — role badges in
-      the Channels (Groups) directory + hide composer for read-only members
-      (desktop + mobile); ALS regen on the Linux box to activate the rule.
+      broadcast channel. Verified on PG16. Desktop: composer is **hidden with a
+      reason** for read-only members of a broadcast channel (`CommPanel`
+      fetches `ChannelMember`, gates via `updatePostPermission`). REMAINING:
+      role badges in the directory; mobile composer gating; ALS regen on the
+      Linux box to activate the server rule.
 - [~] **P2 — Member status & restriction**. DONE: `channel_member_status` lookup
       (active/muted/banned) + `channel_member.member_status_id` (default active) +
       `restricted_until` (expiry); LogicBank rule blocks posting while a mute/ban
       is active (NULL until = indefinite; past = expired). Verified on PG16.
-      REMAINING: admin UI to mute/ban/remove members; surface standing in the
-      directory.
+      Desktop: composer also respects standing — hidden with "You are muted/
+      banned" while a restriction is active. REMAINING: admin UI to mute/ban/
+      remove members; surface standing in the directory; mobile.
 - [~] **P3 — Topics (forum threads)**. DONE: `channel_topic` (channel_id, name,
       created_by, is_closed) + `message.topic_id` (nullable; General = NULL) +
       indexes; seed has a "Lubbock -> Denver" topic. Verified on PG16. REMAINING:

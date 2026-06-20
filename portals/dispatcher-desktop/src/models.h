@@ -29,12 +29,31 @@ struct Driver {
 struct Channel {
     std::string id;
     std::string name;
-    int channel_type_id = 0;
+    int channel_type_id = 0;   // 1=direct, 2=group, 3=broadcast
+};
+
+// A forum topic (thread) within a channel (Feature 4 P3).
+struct Topic {
+    std::string id;
+    std::string channel_id;
+    std::string name;
+    bool is_closed = false;
+};
+
+// A user's membership in a channel: role + standing (Feature 4 P1/P2).
+struct ChannelMember {
+    std::string id;
+    std::string channel_id;
+    std::string user_id;
+    int member_role_id = 0;     // 1=owner, 2=member, 3=admin
+    int member_status_id = 1;   // 1=active, 2=muted, 3=banned
+    std::string restricted_until;  // ISO8601 mute/ban expiry (empty = none/indefinite)
 };
 
 struct Message {
     std::string id;
     std::string channel_id;
+    std::string topic_id;    // empty = General stream
     std::string author_id;
     std::string body;
     std::string posted_at;   // ISO8601

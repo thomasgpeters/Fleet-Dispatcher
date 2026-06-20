@@ -59,6 +59,7 @@ public:
     using ChannelsCallback = std::function<void(std::vector<Channel>)>;
     using MessagesCallback = std::function<void(std::vector<Message>)>;
     using MessageCallback = std::function<void(Message)>;
+    using ChannelMembersCallback = std::function<void(std::vector<ChannelMember>)>;
     using RawCallback = std::function<void(std::string)>;  // raw JSON:API doc text
     using TokenCallback = std::function<void(std::string)>;
     using UserCallback = std::function<void(AppUser)>;
@@ -93,6 +94,9 @@ public:
     void fetchChannels(ChannelsCallback onOk, ErrorCallback onErr);
     void fetchMessages(const std::string& channelId, MessagesCallback onOk,
                        ErrorCallback onErr);
+    // Members of a channel (role + standing) — drives composer gating (P1/P2).
+    void fetchChannelMembers(const std::string& channelId,
+                             ChannelMembersCallback onOk, ErrorCallback onErr);
     void createMessage(const std::string& channelId, const std::string& authorId,
                        const std::string& body, MessageCallback onOk,
                        ErrorCallback onErr);

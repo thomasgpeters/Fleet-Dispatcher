@@ -433,6 +433,15 @@ h1, h2, h3, h4, h5, .h4, .h5 { font-family: var(--fd-font); letter-spacing: 0.1p
 .fd-msg-mine .fd-msg-meta { color: rgba(255, 255, 255, 0.8); }
 .fd-comm-composer { display: flex; gap: 0.35rem; margin-top: 0.5rem; }
 .fd-comm-composer .form-control { flex: 1 1 auto; }
+/* Shown instead of the composer when the user can't post (P1/P2 governance). */
+.fd-comm-post-notice {
+    margin-top: 0.5rem;
+    padding: 0.5rem 0.6rem;
+    font-size: 0.85rem;
+    background: var(--fd-surface-2);
+    border-radius: 8px;
+    text-align: center;
+}
 
 /* Full-screen comms (Communications menu item): a Channels (Groups) directory
  * on the left + the conversation on the right. Animates in when it takes over

@@ -335,9 +335,22 @@ fd::Message parseMessage(const Wt::Json::Object& res) {
     Message m;
     m.id = jstr(res, "id");
     m.channel_id = jstr(a, "channel_id");
+    m.topic_id = jstr(a, "topic_id");
     m.author_id = jstr(a, "author_id");
     m.body = jstr(a, "body");
     m.posted_at = jstr(a, "posted_at");
+    return m;
+}
+
+fd::ChannelMember parseChannelMember(const Wt::Json::Object& res) {
+    const Wt::Json::Object& a = res.get("attributes");
+    ChannelMember m;
+    m.id = jstr(res, "id");
+    m.channel_id = jstr(a, "channel_id");
+    m.user_id = jstr(a, "user_id");
+    m.member_role_id = jint(a, "member_role_id");
+    m.member_status_id = jint(a, "member_status_id");
+    m.restricted_until = jstr(a, "restricted_until");
     return m;
 }
 
@@ -402,6 +415,20 @@ void ApiClient::fetchMessages(const std::string& channelId, MessagesCallback onO
         [onOk](const Wt::Json::Array& data) {
             std::vector<Message> out;
             for (const Wt::Json::Value& v : data) out.push_back(parseMessage(v));
+            onOk(std::move(out));
+        },
+        std::move(onErr));
+}
+
+void ApiClient::fetchChannelMembers(const std::string& channelId,
+                                    ChannelMembersCallback onOk,
+                                    ErrorCallback onErr) {
+    getCollection(
+        baseUrl_ + "/ChannelMember?filter%5Bchannel_id%5D=" + urlEncode(channelId),
+        authToken_,
+        [onOk](const Wt::Json::Array& data) {
+            std::vector<ChannelMember> out;
+            for (const Wt::Json::Value& v : data) out.push_back(parseChannelMember(v));
             onOk(std::move(out));
         },
         std::move(onErr));

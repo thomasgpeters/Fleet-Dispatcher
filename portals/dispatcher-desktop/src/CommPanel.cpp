@@ -179,13 +179,19 @@ void CommPanel::buildConvoHead(Wt::WContainerWidget* parent, bool full) {
 }
 
 void CommPanel::buildComposer(Wt::WContainerWidget* parent) {
-    auto* composerRow = parent->addNew<Wt::WContainerWidget>();
-    composerRow->addStyleClass("fd-comm-composer");
-    composer_ = composerRow->addNew<Wt::WLineEdit>();
+    // A read-only notice shown in place of the composer when the user can't post
+    // (broadcast member, or muted/banned). Hidden by default.
+    postNotice_ = parent->addNew<Wt::WText>();
+    postNotice_->addStyleClass("fd-comm-post-notice fd-muted");
+    postNotice_->hide();
+
+    composerRow_ = parent->addNew<Wt::WContainerWidget>();
+    composerRow_->addStyleClass("fd-comm-composer");
+    composer_ = composerRow_->addNew<Wt::WLineEdit>();
     composer_->addStyleClass("form-control form-control-sm");
     composer_->setPlaceholderText("Message…");
     composer_->enterPressed().connect(this, &CommPanel::send);
-    auto* sendBtn = composerRow->addNew<Wt::WPushButton>("Send");
+    auto* sendBtn = composerRow_->addNew<Wt::WPushButton>("Send");
     sendBtn->addStyleClass("btn btn-sm btn-primary");
     sendBtn->clicked().connect(this, &CommPanel::send);
 }
@@ -262,6 +268,61 @@ void CommPanel::selectChannel(const Channel& c) {
     convoTitle_->setText(Wt::WString::fromUTF8("#" + c.name));
     renderChannels();
     refreshMessages(/*notifyOnNew=*/false);
+
+    // Gate the composer by this user's role + standing in the channel (P1/P2).
+    members_.clear();
+    updatePostPermission();  // optimistic (composer on) until members arrive
+    const std::string forChannel = selectedChannelId_;
+    api_->fetchChannelMembers(
+        forChannel,
+        [this, forChannel](std::vector<ChannelMember> ms) {
+            if (forChannel != selectedChannelId_) return;  // switched away
+            members_ = std::move(ms);
+            updatePostPermission();
+            if (auto* a = Wt::WApplication::instance()) a->triggerUpdate();
+        },
+        [](std::string) { /* leave composer enabled on a transient error */ });
+}
+
+void CommPanel::updatePostPermission() {
+    if (!composerRow_ || !postNotice_) return;
+
+    // Lookup ids — must match database/seed_data.sql.
+    constexpr int CHANNEL_BROADCAST = 3;
+    constexpr int ROLE_OWNER = 1, ROLE_ADMIN = 3;
+    constexpr int STATUS_MUTED = 2, STATUS_BANNED = 3;
+
+    int channelType = 0;
+    for (const Channel& c : channels_)
+        if (c.id == selectedChannelId_) channelType = c.channel_type_id;
+
+    const ChannelMember* me = nullptr;
+    for (const ChannelMember& m : members_)
+        if (m.user_id == user_.id) { me = &m; break; }
+
+    std::string reason;
+    if (me) {
+        const bool restricted =
+            (me->member_status_id == STATUS_MUTED || me->member_status_id == STATUS_BANNED) &&
+            (me->restricted_until.empty() || me->restricted_until > isoUtcNow());
+        if (me->member_status_id == STATUS_BANNED && restricted)
+            reason = "You are banned from this channel.";
+        else if (restricted)
+            reason = "You are muted in this channel.";
+        else if (channelType == CHANNEL_BROADCAST &&
+                 me->member_role_id != ROLE_OWNER && me->member_role_id != ROLE_ADMIN)
+            reason = "Only admins can post in this broadcast channel.";
+    }
+    // members_ empty (not yet loaded / error): stay optimistic, no reason.
+
+    if (reason.empty()) {
+        composerRow_->show();
+        postNotice_->hide();
+    } else {
+        composerRow_->hide();
+        postNotice_->setText(Wt::WString::fromUTF8("🔒 " + reason));
+        postNotice_->show();
+    }
 }
 
 void CommPanel::refreshMessages(bool notifyOnNew) {
