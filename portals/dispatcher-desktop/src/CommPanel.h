@@ -28,13 +28,20 @@ class Toaster;
 
 class CommPanel : public Wt::WContainerWidget {
 public:
-    CommPanel(ApiClient* api, AppUser user, Toaster* toaster);
+    // Rail: the compact right-rail surface (horizontal channel chips).
+    // Full:  the take-over view — a vertical Channels (Groups) directory on the
+    //        left + the conversation on the right.
+    enum class Layout { Rail, Full };
+
+    CommPanel(ApiClient* api, AppUser user, Toaster* toaster,
+              Layout layout = Layout::Rail);
     ~CommPanel() override;
 
 private:
     ApiClient* api_;
     AppUser user_;
     Toaster* toaster_;
+    Layout layout_;
 
     std::vector<Channel> channels_;
     std::string selectedChannelId_;
@@ -49,8 +56,12 @@ private:
     Wt::WLineEdit* composer_ = nullptr;
     Wt::WTimer* poll_ = nullptr;
 
+    void buildRail();          // compact right-rail layout
+    void buildFull();          // directory + conversation take-over layout
+    void buildComposer(Wt::WContainerWidget* parent);
     void loadChannels();
     void renderChannels();
+    void renderDirectory();    // grouped vertical channel list (Full layout)
     void selectChannel(const Channel& c);
     void refreshMessages(bool notifyOnNew);
     void renderMessages(const std::vector<Message>& msgs, bool notifyOnNew);

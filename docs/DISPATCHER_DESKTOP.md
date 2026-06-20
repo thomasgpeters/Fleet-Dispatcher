@@ -48,9 +48,15 @@ light/dark themes:
     - **Map** — `MapView`: **geo-positioning** of fleet locations on a Leaflet
       map (latest position per rig) + a detail table, refreshed on a timer.
     - **New Load** — the load intake form.
-    - **Communications** — comms take over the **full work area** (`CommPanel`).
+    - **Communications** — comms take over the **full work area**
+      (`CommPanel` in `Layout::Full`): a **Channels (Groups) directory** on the
+      left (channels listed in sections by type — Groups / Direct messages /
+      Broadcast) + the conversation on the right. The view **animates in**
+      (`fd-comms-in`) and the redundant right rail is **auto-hidden** while it's
+      active (and restored when you leave, unless you'd collapsed it yourself).
     - **Settings** — `SettingsView`: appearance (theme) + account/connection info.
-  - **Right panel** — **Communications** rail (`CommPanel`), collapsible.
+  - **Right panel** — **Communications** rail (`CommPanel` in `Layout::Rail` —
+    compact horizontal channel chips), collapsible.
   - Panels hide/show via `.fd-collapsed` and stack under the center on narrow
     viewports.
 - **Full-width footer** — copyright + links (HUD, Docs, Support).

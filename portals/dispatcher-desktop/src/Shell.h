@@ -55,6 +55,8 @@ private:
     bool leftCollapsed_ = false;
     bool rightCollapsed_ = false;
     bool compact_ = false;
+    bool commsMode_ = false;        // full comms view active (rail hidden)
+    bool rightWasCollapsed_ = false;  // rail state to restore on leaving comms
 
     void buildHeader();
     void buildBody();
@@ -74,6 +76,8 @@ private:
     void setActiveMenu(Wt::WPushButton* active);
     void toggleLeft();
     void toggleRight();
+    void enterCommsMode();  // hide the right rail (comms takes the full work area)
+    void exitCommsMode();   // restore the rail when leaving comms
     void toggleTheme();
     void toggleCompact();
 };

@@ -35,30 +35,15 @@ std::string esc(const std::string& s) {
 }
 }  // namespace
 
-CommPanel::CommPanel(ApiClient* api, AppUser user, Toaster* toaster)
-    : api_(api), user_(std::move(user)), toaster_(toaster) {
+CommPanel::CommPanel(ApiClient* api, AppUser user, Toaster* toaster, Layout layout)
+    : api_(api), user_(std::move(user)), toaster_(toaster), layout_(layout) {
     addStyleClass("fd-comm");
-
-    addNew<Wt::WText>("<div class=\"fd-panel-title\">Communications</div>");
-
-    channelList_ = addNew<Wt::WContainerWidget>();
-    channelList_->addStyleClass("fd-comm-channels");
-
-    convoTitle_ = addNew<Wt::WText>();
-    convoTitle_->addStyleClass("fd-comm-convo-title");
-
-    messageList_ = addNew<Wt::WContainerWidget>();
-    messageList_->addStyleClass("fd-comm-messages");
-
-    auto* composerRow = addNew<Wt::WContainerWidget>();
-    composerRow->addStyleClass("fd-comm-composer");
-    composer_ = composerRow->addNew<Wt::WLineEdit>();
-    composer_->addStyleClass("form-control form-control-sm");
-    composer_->setPlaceholderText("Message…");
-    composer_->enterPressed().connect(this, &CommPanel::send);
-    auto* sendBtn = composerRow->addNew<Wt::WPushButton>("Send");
-    sendBtn->addStyleClass("btn btn-sm btn-primary");
-    sendBtn->clicked().connect(this, &CommPanel::send);
+    if (layout_ == Layout::Full) {
+        addStyleClass("fd-comm-full");
+        buildFull();
+    } else {
+        buildRail();
+    }
 
     loadChannels();
 
@@ -81,6 +66,51 @@ CommPanel::CommPanel(ApiClient* api, AppUser user, Toaster* toaster)
 
 CommPanel::~CommPanel() {
     CommBus::instance().unsubscribe(busToken_);
+}
+
+void CommPanel::buildRail() {
+    addNew<Wt::WText>("<div class=\"fd-panel-title\">Communications</div>");
+
+    channelList_ = addNew<Wt::WContainerWidget>();
+    channelList_->addStyleClass("fd-comm-channels");  // horizontal chips
+
+    convoTitle_ = addNew<Wt::WText>();
+    convoTitle_->addStyleClass("fd-comm-convo-title");
+
+    messageList_ = addNew<Wt::WContainerWidget>();
+    messageList_->addStyleClass("fd-comm-messages");
+
+    buildComposer(this);
+}
+
+void CommPanel::buildFull() {
+    // Left: the Channels (Groups) directory — a vertical list grouped by type.
+    auto* directory = addNew<Wt::WContainerWidget>();
+    directory->addStyleClass("fd-comm-directory");
+    directory->addNew<Wt::WText>("<div class=\"fd-panel-title\">Channels</div>");
+    channelList_ = directory->addNew<Wt::WContainerWidget>();
+    channelList_->addStyleClass("fd-comm-groups");
+
+    // Right: the conversation (title · messages · composer).
+    auto* convo = addNew<Wt::WContainerWidget>();
+    convo->addStyleClass("fd-comm-convo");
+    convoTitle_ = convo->addNew<Wt::WText>();
+    convoTitle_->addStyleClass("fd-comm-convo-title");
+    messageList_ = convo->addNew<Wt::WContainerWidget>();
+    messageList_->addStyleClass("fd-comm-messages");
+    buildComposer(convo);
+}
+
+void CommPanel::buildComposer(Wt::WContainerWidget* parent) {
+    auto* composerRow = parent->addNew<Wt::WContainerWidget>();
+    composerRow->addStyleClass("fd-comm-composer");
+    composer_ = composerRow->addNew<Wt::WLineEdit>();
+    composer_->addStyleClass("form-control form-control-sm");
+    composer_->setPlaceholderText("Message…");
+    composer_->enterPressed().connect(this, &CommPanel::send);
+    auto* sendBtn = composerRow->addNew<Wt::WPushButton>("Send");
+    sendBtn->addStyleClass("btn btn-sm btn-primary");
+    sendBtn->clicked().connect(this, &CommPanel::send);
 }
 
 std::string CommPanel::channelName(const std::string& id) const {
@@ -106,12 +136,45 @@ void CommPanel::loadChannels() {
 
 void CommPanel::renderChannels() {
     channelList_->clear();
+    if (layout_ == Layout::Full) { renderDirectory(); return; }
+    // Rail: a flat horizontal strip of channel chips.
     for (const Channel& c : channels_) {
         auto* btn = channelList_->addNew<Wt::WPushButton>(Wt::WString::fromUTF8(c.name));
         btn->addStyleClass("fd-comm-channel btn btn-sm");
         if (c.id == selectedChannelId_) btn->addStyleClass("fd-active");
         Channel copy = c;
         btn->clicked().connect([this, copy] { selectChannel(copy); });
+    }
+}
+
+void CommPanel::renderDirectory() {
+    // Channels (Groups) view: list channels in sections by type
+    // (channel_type_id: 1=direct, 2=group, 3=broadcast — see seed_data.sql).
+    struct Section { int type; const char* label; };
+    static const Section sections[] = {
+        {2, "Groups"}, {1, "Direct messages"}, {3, "Broadcast"}};
+
+    bool any = false;
+    for (const Section& s : sections) {
+        std::vector<const Channel*> in;
+        for (const Channel& c : channels_)
+            if (c.channel_type_id == s.type) in.push_back(&c);
+        if (in.empty()) continue;
+        any = true;
+        channelList_->addNew<Wt::WText>(Wt::WString::fromUTF8(
+            std::string("<div class=\"fd-comm-group-label\">") + s.label + "</div>"));
+        for (const Channel* c : in) {
+            auto* btn =
+                channelList_->addNew<Wt::WPushButton>(Wt::WString::fromUTF8(c->name));
+            btn->addStyleClass("fd-comm-group-item btn btn-sm");
+            if (c->id == selectedChannelId_) btn->addStyleClass("fd-active");
+            Channel copy = *c;
+            btn->clicked().connect([this, copy] { selectChannel(copy); });
+        }
+    }
+    if (!any) {
+        channelList_->addNew<Wt::WText>(
+            "<div class=\"fd-muted\">No channels yet.</div>");
     }
 }
 

@@ -244,12 +244,14 @@ void Shell::refreshModeButtons() {
 }
 
 void Shell::showBoard() {
+    exitCommsMode();
     refreshModeButtons();
     content_->clear();
     board_ = content_->addNew<BoardView>(api_, mode_);
 }
 
 void Shell::showLoadForm() {
+    exitCommsMode();
     board_ = nullptr;
     content_->clear();
     content_->addNew<LoadForm>(api_, [this] {
@@ -260,6 +262,7 @@ void Shell::showLoadForm() {
 }
 
 void Shell::showProfile() {
+    exitCommsMode();
     board_ = nullptr;
     content_->clear();
     content_->addNew<ProfileView>(api_, user_, [this](AppUser updated) {
@@ -271,30 +274,60 @@ void Shell::showProfile() {
 void Shell::showComms() {
     board_ = nullptr;
     content_->clear();
-    // Comms take over the full work area. Pass a null toaster so only the
-    // always-on right rail raises new-message toasts (avoids duplicates).
-    content_->addNew<CommPanel>(api_, user_, /*toaster=*/nullptr);
+    // Comms take over the full work area, so hide the (redundant) right rail.
+    // Pass a null toaster so only the always-on rail raises new-message toasts
+    // — but the rail is collapsed here, so toasts come from the rail instance
+    // that still lives in rightPanel_ (just not shown). Avoids duplicates.
+    enterCommsMode();
+    content_->addNew<CommPanel>(api_, user_, /*toaster=*/nullptr,
+                                CommPanel::Layout::Full);
+}
+
+void Shell::enterCommsMode() {
+    if (commsMode_) return;
+    commsMode_ = true;
+    rightWasCollapsed_ = rightCollapsed_;
+    if (!rightCollapsed_) {
+        rightPanel_->addStyleClass("fd-collapsed");  // CSS transitions the width
+        rightCollapsed_ = true;
+        rightToggleBtn_->setText(Wt::WString::fromUTF8("◀"));
+    }
+}
+
+void Shell::exitCommsMode() {
+    if (!commsMode_) return;
+    commsMode_ = false;
+    // Only re-open the rail if the user hadn't already collapsed it themselves.
+    if (!rightWasCollapsed_ && rightCollapsed_) {
+        rightPanel_->removeStyleClass("fd-collapsed");
+        rightCollapsed_ = false;
+        rightToggleBtn_->setText(Wt::WString::fromUTF8("▼"));
+    }
 }
 
 void Shell::showFleet() {
+    exitCommsMode();
     board_ = nullptr;
     content_->clear();
     content_->addNew<FleetView>(api_);
 }
 
 void Shell::showMap() {
+    exitCommsMode();
     board_ = nullptr;
     content_->clear();
     content_->addNew<MapView>(api_);
 }
 
 void Shell::showSettings() {
+    exitCommsMode();
     board_ = nullptr;
     content_->clear();
     content_->addNew<SettingsView>(api_, user_);
 }
 
 void Shell::showPlaceholder(const std::string& title) {
+    exitCommsMode();
     board_ = nullptr;
     content_->clear();
     content_->addNew<Wt::WText>(Wt::WString::fromUTF8(

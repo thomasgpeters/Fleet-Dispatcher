@@ -3,6 +3,22 @@
 Newest first. One entry per meaningful change set; pair with the checklist in
 [`TODO.md`](TODO.md).
 
+## 2026-06-20
+
+### Desktop: full Communications view (Channels/Groups) + HUD map fix
+- **HUD/Map white screen** — Wt ≥ 4.7 makes `WLeafletMap` read its Leaflet
+  sources from the `leafletJSURL`/`leafletCSSURL` **config properties** and
+  throws fatally if unset (blanked the HUD). Added the properties to
+  `wt_config.xml`, made `run.sh` actually load it (`-c`), and dropped the now
+  double-loading in-code `useStyleSheet`/`require` in `HudView`/`MapView`.
+- **Communications take-over view** — `CommPanel` gained a `Layout` (Rail/Full).
+  The Communications menu item now opens **Full**: a left **Channels (Groups)
+  directory** (sections by type: Groups / Direct / Broadcast) + the conversation
+  on the right. Reuses all the existing push/poll/send logic (DRY).
+- **Auto-hide right rail** — entering comms collapses the redundant rail (CSS
+  width transition); leaving restores it unless the user had collapsed it.
+- **Animation** — the full view animates in (`fd-comms-in`).
+
 ## 2026-06-11
 
 ### Styling pass: pro compressed font + bright-white rounded panels
