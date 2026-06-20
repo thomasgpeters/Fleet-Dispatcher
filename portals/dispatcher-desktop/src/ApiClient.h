@@ -59,6 +59,7 @@ public:
     using ChannelsCallback = std::function<void(std::vector<Channel>)>;
     using MessagesCallback = std::function<void(std::vector<Message>)>;
     using MessageCallback = std::function<void(Message)>;
+    using RawCallback = std::function<void(std::string)>;  // raw JSON:API doc text
     using TokenCallback = std::function<void(std::string)>;
     using UserCallback = std::function<void(AppUser)>;
     using ErrorCallback = std::function<void(std::string)>;
@@ -99,6 +100,11 @@ public:
     // Generic option fetch for form combos: GET /resource, label from labelAttr.
     void fetchOptions(const std::string& resource, const std::string& labelAttr,
                       OptionsCallback onOk, ErrorCallback onErr);
+
+    // Raw GET of a JSON:API path (e.g. "Message?filter%5Bchannel_id%5D=<id>");
+    // delivers the response body verbatim. Used by the per-board export, which
+    // bundles the unparsed documents for restore fidelity.
+    void fetchRaw(const std::string& path, RawCallback onOk, ErrorCallback onErr);
 
     // Create a load (POST /Load) and return the created resource.
     void createLoad(const LoadDraft& draft, LoadCallback onOk, ErrorCallback onErr);

@@ -274,9 +274,15 @@ Additional requirements for a robust board. Decisions captured from the user:
       status** (presence/duty), not channel state. Add `app_user.user_status_id`
       (lookup: online/away/driving/off-duty) shown beside the user in comms +
       fleet view; live via the realtime plane.
-- [ ] **Backup & restore of comms data**. DECIDED: back up **messages, members,
-      and related message data**. DB-level `pg_dump`/restore of the comms tables
-      (+ runbook/timer) and/or an in-app per-board export (JSON) + restore.
+- [~] **Backup & restore of comms data**. DECIDED: back up **messages, members,
+      and related message data**. DONE: in-app **per-board export** on the desktop
+      console — the comm-panel header (present in both the rail [reduced/icon] and
+      the full take-over view [full/labeled]) has an **Export** action that bundles
+      the board's channel meta + topics + members + messages (raw JSON:API docs)
+      and downloads a `board-<name>-<date>.json` via a Blob URL
+      (`ApiClient::fetchRaw`). REMAINING: **restore** (import a bundle), mobile
+      export, and the DB-level `pg_dump`/restore + runbook/timer path for very
+      large boards.
 - [ ] **Archive / revive channels**. DECIDED: an **archived channel is no longer
       visible to users**; **admins can revive** (unarchive) it. Wire up the
       existing `channel.is_archived`: filter archived channels out of normal

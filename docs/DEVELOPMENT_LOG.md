@@ -5,6 +5,17 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-06-20
 
+### Comms: in-app per-board export + shared header toolbar
+- **Per-board export** (desktop console): an **Export** action bundles a board's
+  channel meta + topics + members + messages (raw JSON:API documents, high page
+  limit) into `board-<name>-<date>.json`, downloaded client-side via a Blob URL.
+  New `ApiClient::fetchRaw` (returns the JSON:API body verbatim); export logic in
+  `CommPanel` (chained fetches → assemble → JS download).
+- **Shared comm-panel header**: factored into `buildConvoHead(parent, full)`, now
+  present in **both** layouts — a reduced (icon) action set in the right rail and
+  the full (labeled) set in the take-over view. Future actions (stats, status,
+  archive) slot in here, gated on `full`.
+
 ### Comms Feature 4 — P1–P3 foundation (admin role · status · topics)
 Schema-first (golden rules); verified on a throwaway PG16 (**42 tables** in
 `fleet`, `public` = 0). ALS regen + `make als-extensions` needed on the Linux

@@ -89,6 +89,35 @@ void getCollection(
     }
 }
 
+// Like getCollection, but hands back the raw response body (the whole JSON:API
+// document) without parsing into typed structs — used by the export bundler.
+void getRawDoc(
+    const std::string& url,
+    const std::string& bearer,
+    std::function<void(std::string)> onBody,
+    ApiClient::ErrorCallback onErr) {
+    auto client = std::make_shared<Wt::Http::Client>();
+    client->setTimeout(std::chrono::seconds(20));
+    client->done().connect(
+        [client, onBody, onErr](Wt::AsioWrapper::error_code err,
+                                const Wt::Http::Message& response) {
+            if (err) {
+                onErr(err.message());
+            } else if (response.status() != 200) {
+                onErr("HTTP " + std::to_string(response.status()));
+            } else {
+                onBody(response.body());
+            }
+            if (auto* app = Wt::WApplication::instance()) app->triggerUpdate();
+        });
+    std::vector<Wt::Http::Message::Header> headers{
+        {"Accept", "application/vnd.api+json"}};
+    if (!bearer.empty()) headers.push_back({"Authorization", "Bearer " + bearer});
+    if (!client->get(url, headers)) {
+        onErr("could not start request to " + url);
+    }
+}
+
 fd::Driver parseDriver(const Wt::Json::Object& res) {
     const Wt::Json::Object& a = res.get("attributes");
     Driver d;
@@ -390,6 +419,11 @@ void ApiClient::createMessage(const std::string& channelId,
         baseUrl_ + "/Message", payload, authToken_,
         [onOk](const Wt::Json::Object& obj) { onOk(parseMessage(obj)); },
         std::move(onErr));
+}
+
+void ApiClient::fetchRaw(const std::string& path, RawCallback onOk,
+                         ErrorCallback onErr) {
+    getRawDoc(baseUrl_ + "/" + path, authToken_, std::move(onOk), std::move(onErr));
 }
 
 void ApiClient::fetchOptions(const std::string& resource,

@@ -60,6 +60,12 @@ light/dark themes:
     - **Settings** — `SettingsView`: appearance (theme) + account/connection info.
   - **Right panel** — **Communications** rail (`CommPanel` in `Layout::Rail` —
     compact horizontal channel chips), collapsible.
+  - **Comm-panel header** (`buildConvoHead`) shows in **both** layouts: the
+    conversation title + a board-action toolbar — a **reduced** (icon) set in the
+    rail and the **full** (labeled) set in the take-over view. The first action is
+    **Export**: bundles the board's channel meta + topics + members + messages
+    (raw JSON:API docs) into `board-<name>-<date>.json`, downloaded via a Blob URL
+    (`ApiClient::fetchRaw`). Future actions (stats, status, archive) slot in here.
   - Panels hide/show via `.fd-collapsed` and stack under the center on narrow
     viewports.
 - **Full-width footer** — copyright + links (HUD, Docs, Support).

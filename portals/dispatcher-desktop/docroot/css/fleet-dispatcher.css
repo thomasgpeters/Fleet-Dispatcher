@@ -462,6 +462,19 @@ h1, h2, h3, h4, h5, .h4, .h5 { font-family: var(--fd-font); letter-spacing: 0.1p
     flex-direction: column;
     min-height: 0;
 }
+/* Conversation toolbar: title (left) + board actions (right). */
+.fd-comm-convo-head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.35rem;
+}
+.fd-comm-head-spacer { flex: 1 1 auto; }
+.fd-comm-export-status { font-size: 0.78rem; white-space: nowrap; }
+.fd-comm-convo-head .fd-comm-convo-title { margin: 0; }
+/* Rail header: tighter, with a compact icon-only action set. */
+.fd-comm-head-rail { gap: 0.35rem; }
+.fd-comm-head-rail .fd-comm-export { padding: 0.1rem 0.5rem; }
 .fd-comm-groups { display: flex; flex-direction: column; gap: 0.15rem; }
 .fd-comm-group-label {
     margin: 0.75rem 0 0.2rem;

@@ -52,12 +52,14 @@ private:
 
     Wt::WContainerWidget* channelList_ = nullptr;
     Wt::WText* convoTitle_ = nullptr;
+    Wt::WText* exportStatus_ = nullptr;  // Full layout only (export feedback)
     Wt::WContainerWidget* messageList_ = nullptr;
     Wt::WLineEdit* composer_ = nullptr;
     Wt::WTimer* poll_ = nullptr;
 
     void buildRail();          // compact right-rail layout
     void buildFull();          // directory + conversation take-over layout
+    void buildConvoHead(Wt::WContainerWidget* parent, bool full);  // title + actions
     void buildComposer(Wt::WContainerWidget* parent);
     void loadChannels();
     void renderChannels();
@@ -69,6 +71,9 @@ private:
     void onPushed(const Message& m);           // CommBus delivery (server push)
     std::string channelName(const std::string& id) const;
     void send();
+    void exportBoard();                        // Full layout: download a board bundle
+    void finishExport(const std::string& messages, const std::string& members,
+                      const std::string& topics);
 };
 
 }  // namespace fd
