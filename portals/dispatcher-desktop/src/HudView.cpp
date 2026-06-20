@@ -7,7 +7,6 @@
 #include <memory>
 
 #include <Wt/WApplication.h>
-#include <Wt/WLink.h>
 #include <Wt/WString.h>
 #include <Wt/WTable.h>
 #include <Wt/WTableCell.h>
@@ -43,12 +42,12 @@ HudView::HudView(ApiClient* api) : api_(api) {
     modeLabel_->setText("WEEK");
 
     // --- Truck-locations map -------------------------------------------------
-    // WLeafletMap (Wt >= 4.5) renders Leaflet. Leaflet's JS/CSS are loaded from
-    // a CDN here; for an offline/self-contained deploy, host them locally or set
-    // the leaflet URLs in wt_config.xml and drop these two lines.
+    // VERSION-SENSITIVE: Wt >= 4.7 loads Leaflet itself from the leafletJSURL /
+    // leafletCSSURL config properties (see wt_config.xml) and throws fatally if
+    // they're unset. Don't useStyleSheet/require Leaflet here too — that would
+    // double-load it. For an offline deploy, point those properties at a copy
+    // hosted under the docroot.
     auto* app = Wt::WApplication::instance();
-    app->useStyleSheet(Wt::WLink("https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"));
-    app->require("https://unpkg.com/leaflet@1.9.4/dist/leaflet.js");
 
     addNew<Wt::WText>("<h2 class=\"h5\">Truck locations</h2>");
     auto map = std::make_unique<Wt::WLeafletMap>();

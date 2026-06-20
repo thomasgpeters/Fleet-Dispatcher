@@ -69,7 +69,17 @@ light/dark themes:
   newly-sent message to every subscribed session via **Wt server push**
   (`WServer::post` → handler → `triggerUpdate`).
 - Push is delivered over **WebSockets** — enable them in `wt_config.xml`
-  (`<web-sockets>true</web-sockets>`) and run with `-c wt_config.xml`.
+  (`<web-sockets>true</web-sockets>`) and run with `-c wt_config.xml`. `run.sh`
+  passes the config automatically.
+
+> **Leaflet map config (version-sensitive).** Wt ≥ 4.7 loads Leaflet itself from
+> the `leafletJSURL` / `leafletCSSURL` **config properties** (set in
+> `wt_config.xml`) and throws a *fatal* error at `WLeafletMap` construction if
+> they're unset — which blanks the page (this is what made the HUD a white
+> screen). Don't also `useStyleSheet`/`require` Leaflet in code (double-load).
+> The config must be loaded (`-c wt_config.xml`, which `run.sh` does). For an
+> offline deploy, host `leaflet.js`/`leaflet.css` under the docroot and point the
+> two properties at the local paths.
 - **Cross-app** (e.g. a mobile message): `RealtimeClient` — a server-wide
   Boost.Beast WebSocket client (opt-in `cmake -DFD_REALTIME_CLIENT=ON`) — connects
   to the realtime bridge (`FLEET_REALTIME_URL` + `FLEET_REALTIME_TOKEN`), consumes

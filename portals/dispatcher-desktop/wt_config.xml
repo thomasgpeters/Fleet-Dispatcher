@@ -25,5 +25,16 @@
 
     <!-- Keep idle pushy sessions around long enough for the socket. -->
     <session-timeout>600</session-timeout>
+
+    <!-- Leaflet sources for WLeafletMap (console Map view + HUD).
+         VERSION-SENSITIVE: Wt >= 4.7 requires these as config properties and
+         throws fatally at WLeafletMap construction if unset (the older in-code
+         useStyleSheet/require approach no longer suffices). For an offline /
+         self-contained deploy, host leaflet.js/leaflet.css under the docroot and
+         point these at the local paths. -->
+    <properties>
+      <property name="leafletJSURL">https://unpkg.com/leaflet@1.9.4/dist/leaflet.js</property>
+      <property name="leafletCSSURL">https://unpkg.com/leaflet@1.9.4/dist/leaflet.css</property>
+    </properties>
   </application-settings>
 </server>
