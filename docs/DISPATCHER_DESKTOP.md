@@ -34,7 +34,10 @@ light/dark themes:
 
 - **Full-width header** — **logo branding (top-left)**; **profile (name) + the
   logged-in role + Sign out (top-right)**, plus a **theme toggle** (light/dark,
-  persisted) and the panel show/hide toggles. The toggles use the disclosure
+  persisted).
+- **Panel toggle bar** — a slim bar **directly above the body**; the left/right
+  panel show/hide toggles are anchored to opposite edges (above their panels)
+  and fixed-width, so they never shift when clicked. They use the disclosure
   aesthetic: **▼ when open**, a pointing arrow when closed (**▶** left panel,
   **◀** right panel).
 - **Three-column body**:

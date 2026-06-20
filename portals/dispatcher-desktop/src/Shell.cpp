@@ -41,6 +41,7 @@ Shell::Shell(ApiClient* api, AppUser user, std::function<void()> onLogout)
     toaster_ = addNew<Toaster>();
 
     buildHeader();
+    buildToggleBar();
     buildBody();
     buildFooter();
 
@@ -75,12 +76,8 @@ void Shell::buildHeader() {
         b->clicked().connect(this, slot);
         return b;
     };
-    // Panel toggles use the disclosure aesthetic: ▼ when open, a pointing arrow
-    // when closed (▶ for the left panel, ◀ for the right).
-    leftToggleBtn_ =
-        iconBtn(Wt::WString::fromUTF8("▼"), "Hide / show left panel", &Shell::toggleLeft);
-    rightToggleBtn_ =
-        iconBtn(Wt::WString::fromUTF8("▼"), "Hide / show right panel", &Shell::toggleRight);
+    // Panel hide/show toggles live in their own bar above the body (see
+    // buildToggleBar) — anchored to the panel edges so they don't shift.
     iconBtn(Wt::WString::fromUTF8("◐"), "Toggle light / dark theme",
             &Shell::toggleTheme);
 
@@ -101,6 +98,25 @@ void Shell::buildHeader() {
         api_->clearAuthToken();
         if (onLogout_) onLogout_();
     });
+}
+
+void Shell::buildToggleBar() {
+    // A slim full-width bar directly above the body. The left toggle floats to
+    // the left edge (above the left panel), the right toggle to the right edge
+    // (above the right panel). Each is fixed-width and anchored to its own edge,
+    // so the disclosure glyph swap (▼ open / ▶ ◀ closed) never shifts anything.
+    auto* bar = addNew<Wt::WContainerWidget>();
+    bar->addStyleClass("fd-toggle-bar");
+
+    leftToggleBtn_ = bar->addNew<Wt::WPushButton>(Wt::WString::fromUTF8("▼"));
+    leftToggleBtn_->addStyleClass("btn btn-sm fd-panel-toggle");
+    leftToggleBtn_->setToolTip("Hide / show left panel");
+    leftToggleBtn_->clicked().connect(this, &Shell::toggleLeft);
+
+    rightToggleBtn_ = bar->addNew<Wt::WPushButton>(Wt::WString::fromUTF8("▼"));
+    rightToggleBtn_->addStyleClass("btn btn-sm fd-panel-toggle");
+    rightToggleBtn_->setToolTip("Hide / show right panel");
+    rightToggleBtn_->clicked().connect(this, &Shell::toggleRight);
 }
 
 void Shell::buildBody() {

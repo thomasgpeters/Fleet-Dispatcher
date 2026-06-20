@@ -237,6 +237,30 @@ h1, h2, h3, h4, h5, .h4, .h5 { font-family: var(--fd-font); letter-spacing: 0.1p
 }
 .fd-muted { color: var(--fd-text-muted); }
 
+/* Panel hide/show toggle bar — sits directly above the three-column body. The
+ * two toggles anchor to opposite edges (aligned to the panel outer edges via
+ * the same 1rem inset as .fd-body) and are fixed-width, so the disclosure glyph
+ * swap (▼ open / ▶ ◀ closed) never shifts neighbouring controls. */
+.fd-toggle-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 1rem 0;   /* match .fd-body horizontal inset */
+}
+.fd-panel-toggle {
+    width: 2rem;
+    min-width: 2rem;
+    padding: 0.15rem 0;
+    text-align: center;
+    background-color: var(--fd-surface);
+    color: var(--fd-text-muted);
+    border: none;
+}
+.fd-panel-toggle:hover {
+    background-color: var(--fd-surface-2);
+    color: var(--fd-text);
+}
+
 /* Full-width footer */
 .fd-footer {
     background-color: var(--fd-footer-bg);

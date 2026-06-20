@@ -59,6 +59,7 @@ private:
     bool rightWasCollapsed_ = false;  // rail state to restore on leaving comms
 
     void buildHeader();
+    void buildToggleBar();  // panel hide/show toggles, anchored above the body
     void buildBody();
     void buildFooter();
     void buildLeftMenu();
