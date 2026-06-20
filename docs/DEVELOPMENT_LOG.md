@@ -18,6 +18,12 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 - **Auto-hide right rail** — entering comms collapses the redundant rail (CSS
   width transition); leaving restores it unless the user had collapsed it.
 - **Animation** — the full view animates in (`fd-comms-in`).
+- **Panel toggles** moved out of the header into an anchored bar directly above
+  the body (left/right toggles float to their panel edges, fixed-width, so the
+  ▼/▶/◀ glyph swap never shifts neighbours).
+- **Roadmap** — researched Telegram's channels/groups/members model and captured
+  a priority-ordered **Feature 4 — Telegram-style team communications** in
+  `TODO.md` (P1 admin role + broadcast lock → P8 polish).
 
 ## 2026-06-11
 

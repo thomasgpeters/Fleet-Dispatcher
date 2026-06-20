@@ -203,6 +203,60 @@ AI provider is admin-selectable (Anthropic default / OpenAI / Ollama).
 - [ ] Per-driver truck profile (height/weight) feeding route tools — needs auth
 - [ ] Live end-to-end test against a configured provider + HERE key
 
+## Feature 4 — Telegram-style team communications (channels · groups · members)
+
+Evolve the messaging core (Feature 1) toward the professional team-comms model
+fleet operators already use on Telegram. Researched 2026-06-20 (channels vs
+groups vs supergroups; granular admin rights; member permissions/restrictions;
+topics/forums; invite links + join requests; reactions). Our `channel_type`
+(direct/group/broadcast) already mirrors Telegram's three containers; the gaps
+are roles, enforcement, organization, and onboarding.
+
+Standing constraint: each item is a **schema change** → edit
+`database/schema.sql` + `seed_data.sql`, run **`/verify-db`** on throwaway PG16,
+then **regenerate ALS** (+ `make als-extensions`); update `docs/domain-model.md`.
+Clients (mobile + desktop `CommPanel` directory/roles) follow.
+
+Priority order (P1 = do first; small→large, value-weighted):
+
+- [ ] **P1 — Admin role + broadcast posting lock** *(smallest, highest value)*.
+      Add `admin` to `channel_member_role` (owner → admin → member). LogicBank
+      rule: in `broadcast` channels only owner/admins may post; members
+      read/react. UI: role badges in the Channels (Groups) directory; hide the
+      composer for non-posters. This is the "dispatcher announces, drivers read"
+      pattern fleets use Telegram for.
+- [ ] **P2 — Member status & restriction**. Add `status`
+      (active/muted/banned) + `until` (expiry) to `channel_member` (or a
+      `channel_member_status` lookup). Lets a driver who leaves a load/company be
+      removed or temporarily muted without deleting history. LogicBank enforces
+      post rights by status; UI exposes mute/remove for admins.
+- [ ] **P3 — Topics (forum threads)**. New `channel_topic` (channel_id, name,
+      created_by, is_closed) + `message.topic_id` (nullable; General = null).
+      Splits a "Week-of Dispatch" group into a topic per load/lane/region — the
+      biggest organizational win and a natural fit for the dispatch domain.
+      Mobile + desktop: topic list within a channel; compose into a topic.
+- [ ] **P4 — Invite links + join requests**. `channel_invite` (token, created_by,
+      member_cap, expires_at, requires_approval, revoked) + a pending-join state
+      on `channel_member` (or `channel_join_request`). Onboards carriers/drivers
+      via a shareable link with optional admin approval. Needs auth/identity.
+- [ ] **P5 — Reactions (acks)**. `message_reaction` (message_id, user_id, emoji,
+      unique per (message,user,emoji)). 👍/✅ "got it" acks are genuinely useful
+      for dispatch confirmation. Realtime via the existing Kafka `message` plane.
+- [ ] **P6 — Read receipts / richer presence**. Surface per-member read state
+      (we already track `channel_member.last_read_at`): "seen by N" in small
+      groups; server-side `unread_count` (LogicBank) replacing client compute.
+- [ ] **P7 — Channel ↔ discussion link (comments)**. Link a `broadcast` channel
+      to a `group` channel so a broadcast post opens a comment thread (Telegram's
+      channel-comments). Add `channel.linked_channel_id` (self-FK, nullable).
+- [ ] **P8 — Polish**: slow mode (per-channel min seconds between posts),
+      broadcast **view counts**, new-member **history visibility** toggle, channel
+      **statistics**, author **signature** on broadcast posts. Each self-contained.
+
+> Sequencing rationale: P1–P2 are one small, safe schema bump that unlocks the
+> core broadcast/governance behavior; P3 is the headline organizational feature;
+> P4 enables external onboarding; P5–P8 are independent enhancements layerable in
+> any order once the role/topic foundation exists.
+
 ## Cross-cutting
 
 - [x] **DB schema separation (DECIDED + done):** shared instance with
