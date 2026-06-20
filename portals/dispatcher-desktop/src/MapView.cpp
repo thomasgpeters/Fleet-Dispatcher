@@ -5,7 +5,6 @@
 #include <cstdio>
 
 #include <Wt/WApplication.h>
-#include <Wt/WLink.h>
 #include <Wt/WString.h>
 #include <Wt/WTable.h>
 #include <Wt/WText.h>
@@ -28,11 +27,10 @@ MapView::MapView(ApiClient* api) : api_(api) {
     addStyleClass("fd-map");
     addNew<Wt::WText>("<h2 class=\"h5\">Fleet locations</h2>");
 
-    // Leaflet JS/CSS from CDN (host locally for an offline deploy; see HudView).
-    auto* app = Wt::WApplication::instance();
-    app->useStyleSheet(Wt::WLink("https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"));
-    app->require("https://unpkg.com/leaflet@1.9.4/dist/leaflet.js");
-
+    // VERSION-SENSITIVE: Wt >= 4.7 loads Leaflet from the leafletJSURL /
+    // leafletCSSURL config properties (wt_config.xml) and throws fatally at
+    // WLeafletMap construction if they're unset. Don't useStyleSheet/require it
+    // here (that double-loads). Offline deploy: point those props at a local copy.
     auto map = std::make_unique<Wt::WLeafletMap>();
     map->setHeight(460);
     Wt::Json::Object tileOptions;

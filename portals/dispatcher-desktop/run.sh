@@ -27,6 +27,9 @@ BIN="${BIN:-$BUILD_DIR/fleet_dispatcher_desktop}"
 DOCROOT="${DOCROOT:-$BUILD_DIR}"
 HTTP_ADDRESS="${HTTP_ADDRESS:-0.0.0.0}"
 HTTP_PORT="${HTTP_PORT:-8089}"
+# Wt config: websockets/server-push AND the WLeafletMap leaflet*URL properties
+# live here, so it must be passed explicitly (Wt won't find it otherwise).
+WT_CONFIG="${WT_CONFIG:-$HERE/wt_config.xml}"
 export FLEET_API_BASE_URL="${FLEET_API_BASE_URL:-http://localhost:5659/api}"
 
 if [ ! -x "$BIN" ]; then
@@ -43,10 +46,20 @@ echo "Dispatcher console : http://${HTTP_ADDRESS}:${HTTP_PORT}/"
 echo "Fleet HUD          : http://${HTTP_ADDRESS}:${HTTP_PORT}/hud"
 echo "JSON:API           : ${FLEET_API_BASE_URL}"
 echo "docroot            : ${DOCROOT}"
+echo "config             : ${WT_CONFIG}"
 echo
+
+# -c loads wt_config.xml only if it exists (a missing file would abort startup).
+CONFIG_ARG=()
+if [ -f "$WT_CONFIG" ]; then
+    CONFIG_ARG=(-c "$WT_CONFIG")
+else
+    echo "warning: $WT_CONFIG not found — websockets + Leaflet map may not work." >&2
+fi
 
 exec "$BIN" \
     --docroot "$DOCROOT" \
     --http-address "$HTTP_ADDRESS" \
     --http-port "$HTTP_PORT" \
+    "${CONFIG_ARG[@]}" \
     "$@"
