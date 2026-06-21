@@ -41,6 +41,13 @@
         -apple-system, Roboto, Helvetica, Arial, sans-serif;
     --fd-radius: 12px;          /* rounded panels */
 
+    /* Motion system — consistent durations + easing across all transitions and
+     * keyframes. Honor prefers-reduced-motion (see the guard near the bottom). */
+    --fd-dur-fast: 120ms;
+    --fd-dur: 200ms;
+    --fd-dur-slow: 320ms;
+    --fd-ease: cubic-bezier(0.2, 0.7, 0.2, 1);   /* gentle ease-out */
+
     --fd-board-gap: 0.75rem;
     --fd-panel-w: 260px;
 }
@@ -105,7 +112,19 @@ body {
 h1, h2, h3, h4, h5, .h4, .h5 { font-family: var(--fd-font); letter-spacing: 0.1px; }
 
 /* Align the Bootstrap theme + common components with the palette. */
-.btn { border-radius: 999px; }   /* pill buttons */
+.btn {
+    border-radius: 999px;        /* pill buttons */
+    transition: background-color var(--fd-dur-fast) var(--fd-ease),
+                border-color var(--fd-dur-fast) var(--fd-ease),
+                color var(--fd-dur-fast) var(--fd-ease),
+                transform var(--fd-dur-fast) var(--fd-ease),
+                box-shadow var(--fd-dur-fast) var(--fd-ease);
+}
+.btn:active { transform: translateY(1px); }   /* tactile press feedback */
+.btn:focus-visible {                            /* keyboard focus ring */
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(44, 111, 179, 0.35);
+}
 .btn-primary {
     background-color: var(--fd-primary);
     border-color: var(--fd-primary);
@@ -225,6 +244,9 @@ h1, h2, h3, h4, h5, .h4, .h5 { font-family: var(--fd-font); letter-spacing: 0.1p
     border-radius: var(--fd-radius);
     padding: 1.5rem 1.75rem;
 }
+/* Every view animates in when the center work panel swaps (menu navigation).
+ * Targets the view root Shell inserts; comms overrides flex but reuses the anim. */
+.fd-work > * { animation: fd-rise-in var(--fd-dur) var(--fd-ease) both; }
 /* Nested .card renders flat (no double panel). */
 .fd-work > .card,
 .fd-work .card { border: none; background: transparent; }
@@ -318,6 +340,13 @@ h1, h2, h3, h4, h5, .h4, .h5 { font-family: var(--fd-font); letter-spacing: 0.1p
 .fd-work table tbody tr:nth-child(odd) td {
     background-color: rgba(20, 30, 50, 0.025);   /* faint zebra */
 }
+/* Interactive row hover — feedback that rows are live/selectable. */
+.fd-tablecard tbody tr td,
+.fd-work table tbody tr td { transition: background-color var(--fd-dur-fast) var(--fd-ease); }
+.fd-tablecard tbody tr:hover td,
+.fd-work table tbody tr:hover td {
+    background-color: rgba(44, 111, 179, 0.08);
+}
 
 /* ===========================================================================
  * Board + HUD
@@ -378,8 +407,15 @@ h1, h2, h3, h4, h5, .h4, .h5 { font-family: var(--fd-font); letter-spacing: 0.1p
     background: transparent;
     color: var(--fd-text);
     border: 1px solid transparent;
+    transition: background-color var(--fd-dur-fast) var(--fd-ease),
+                color var(--fd-dur-fast) var(--fd-ease),
+                padding-left var(--fd-dur-fast) var(--fd-ease);
 }
-.fd-menu-item:hover { background-color: rgba(44, 111, 179, 0.10); color: var(--fd-text); }
+.fd-menu-item:hover {
+    background-color: rgba(44, 111, 179, 0.10);
+    color: var(--fd-text);
+    padding-left: 1rem;   /* subtle slide toward the content it opens */
+}
 .fd-menu-item.fd-active {
     background-color: rgba(44, 111, 179, 0.14);
     border-left: 3px solid var(--fd-accent);  /* orange active marker */
@@ -401,6 +437,8 @@ h1, h2, h3, h4, h5, .h4, .h5 { font-family: var(--fd-font); letter-spacing: 0.1p
     background: var(--fd-surface-2);
     color: var(--fd-text);
     border: none;
+    transition: background-color var(--fd-dur-fast) var(--fd-ease),
+                color var(--fd-dur-fast) var(--fd-ease);
 }
 .fd-comm-channel.fd-active {
     background-color: var(--fd-primary);
@@ -450,11 +488,7 @@ h1, h2, h3, h4, h5, .h4, .h5 { font-family: var(--fd-font); letter-spacing: 0.1p
     flex-direction: row;
     gap: 1rem;
     height: 100%;
-    animation: fd-comms-in 0.22s ease both;
-}
-@keyframes fd-comms-in {
-    from { opacity: 0; transform: translateY(8px); }
-    to { opacity: 1; transform: none; }
+    animation: fd-rise-in var(--fd-dur-slow) var(--fd-ease) both;  /* shared keyframe */
 }
 .fd-comm-directory {
     flex: 0 0 240px;
@@ -549,4 +583,33 @@ h1, h2, h3, h4, h5, .h4, .h5 { font-family: var(--fd-font); letter-spacing: 0.1p
 @keyframes fd-toast-in {
     from { opacity: 0; transform: translateX(12px); }
     to { opacity: 1; transform: none; }
+}
+
+/* ===========================================================================
+ * Motion system — shared keyframes + the accessibility guard.
+ * Keep all entrance animations referencing these so timing/easing stay uniform.
+ * ======================================================================== */
+@keyframes fd-rise-in {            /* view swaps + comms take-over */
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: none; }
+}
+@keyframes fd-fade-in {            /* gentle fade, no movement */
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+@keyframes fd-pop-in {             /* badges / chips drawing attention */
+    from { opacity: 0; transform: scale(0.94); }
+    to   { opacity: 1; transform: none; }
+}
+
+/* Accessibility: respect the OS "reduce motion" setting — neutralize animations
+ * and transitions so nothing moves for users who opt out (and avoids vestibular
+ * discomfort). One guard covers the whole stylesheet. */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+        scroll-behavior: auto !important;
+    }
 }

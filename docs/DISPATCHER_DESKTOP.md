@@ -55,7 +55,7 @@ light/dark themes:
       (`CommPanel` in `Layout::Full`): a **Channels (Groups) directory** on the
       left (channels listed in sections by type — Groups / Direct messages /
       Broadcast) + the conversation on the right. The view **animates in**
-      (`fd-comms-in`) and the redundant right rail is **auto-hidden** while it's
+      (`fd-rise-in`) and the redundant right rail is **auto-hidden** while it's
       active (and restored when you leave, unless you'd collapsed it yourself).
     - **Settings** — `SettingsView`: appearance (theme) + account/connection info.
   - **Right panel** — **Communications** rail (`CommPanel` in `Layout::Rail` —
