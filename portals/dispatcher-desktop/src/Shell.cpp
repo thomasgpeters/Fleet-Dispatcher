@@ -41,6 +41,7 @@ Shell::Shell(ApiClient* api, AppUser user, std::function<void()> onLogout)
     toaster_ = addNew<Toaster>();
 
     buildHeader();
+    buildToggleBar();
     buildBody();
     buildFooter();
 
@@ -75,12 +76,8 @@ void Shell::buildHeader() {
         b->clicked().connect(this, slot);
         return b;
     };
-    // Panel toggles use the disclosure aesthetic: ▼ when open, a pointing arrow
-    // when closed (▶ for the left panel, ◀ for the right).
-    leftToggleBtn_ =
-        iconBtn(Wt::WString::fromUTF8("▼"), "Hide / show left panel", &Shell::toggleLeft);
-    rightToggleBtn_ =
-        iconBtn(Wt::WString::fromUTF8("▼"), "Hide / show right panel", &Shell::toggleRight);
+    // Panel hide/show toggles live in their own bar above the body (see
+    // buildToggleBar) — anchored to the panel edges so they don't shift.
     iconBtn(Wt::WString::fromUTF8("◐"), "Toggle light / dark theme",
             &Shell::toggleTheme);
 
@@ -101,6 +98,25 @@ void Shell::buildHeader() {
         api_->clearAuthToken();
         if (onLogout_) onLogout_();
     });
+}
+
+void Shell::buildToggleBar() {
+    // A slim full-width bar directly above the body. The left toggle floats to
+    // the left edge (above the left panel), the right toggle to the right edge
+    // (above the right panel). Each is fixed-width and anchored to its own edge,
+    // so the disclosure glyph swap (▼ open / ▶ ◀ closed) never shifts anything.
+    auto* bar = addNew<Wt::WContainerWidget>();
+    bar->addStyleClass("fd-toggle-bar");
+
+    leftToggleBtn_ = bar->addNew<Wt::WPushButton>(Wt::WString::fromUTF8("▼"));
+    leftToggleBtn_->addStyleClass("btn btn-sm fd-panel-toggle");
+    leftToggleBtn_->setToolTip("Hide / show left panel");
+    leftToggleBtn_->clicked().connect(this, &Shell::toggleLeft);
+
+    rightToggleBtn_ = bar->addNew<Wt::WPushButton>(Wt::WString::fromUTF8("▼"));
+    rightToggleBtn_->addStyleClass("btn btn-sm fd-panel-toggle");
+    rightToggleBtn_->setToolTip("Hide / show right panel");
+    rightToggleBtn_->clicked().connect(this, &Shell::toggleRight);
 }
 
 void Shell::buildBody() {
@@ -244,12 +260,14 @@ void Shell::refreshModeButtons() {
 }
 
 void Shell::showBoard() {
+    exitCommsMode();
     refreshModeButtons();
     content_->clear();
     board_ = content_->addNew<BoardView>(api_, mode_);
 }
 
 void Shell::showLoadForm() {
+    exitCommsMode();
     board_ = nullptr;
     content_->clear();
     content_->addNew<LoadForm>(api_, [this] {
@@ -260,6 +278,7 @@ void Shell::showLoadForm() {
 }
 
 void Shell::showProfile() {
+    exitCommsMode();
     board_ = nullptr;
     content_->clear();
     content_->addNew<ProfileView>(api_, user_, [this](AppUser updated) {
@@ -271,30 +290,60 @@ void Shell::showProfile() {
 void Shell::showComms() {
     board_ = nullptr;
     content_->clear();
-    // Comms take over the full work area. Pass a null toaster so only the
-    // always-on right rail raises new-message toasts (avoids duplicates).
-    content_->addNew<CommPanel>(api_, user_, /*toaster=*/nullptr);
+    // Comms take over the full work area, so hide the (redundant) right rail.
+    // Pass a null toaster so only the always-on rail raises new-message toasts
+    // — but the rail is collapsed here, so toasts come from the rail instance
+    // that still lives in rightPanel_ (just not shown). Avoids duplicates.
+    enterCommsMode();
+    content_->addNew<CommPanel>(api_, user_, /*toaster=*/nullptr,
+                                CommPanel::Layout::Full);
+}
+
+void Shell::enterCommsMode() {
+    if (commsMode_) return;
+    commsMode_ = true;
+    rightWasCollapsed_ = rightCollapsed_;
+    if (!rightCollapsed_) {
+        rightPanel_->addStyleClass("fd-collapsed");  // CSS transitions the width
+        rightCollapsed_ = true;
+        rightToggleBtn_->setText(Wt::WString::fromUTF8("◀"));
+    }
+}
+
+void Shell::exitCommsMode() {
+    if (!commsMode_) return;
+    commsMode_ = false;
+    // Only re-open the rail if the user hadn't already collapsed it themselves.
+    if (!rightWasCollapsed_ && rightCollapsed_) {
+        rightPanel_->removeStyleClass("fd-collapsed");
+        rightCollapsed_ = false;
+        rightToggleBtn_->setText(Wt::WString::fromUTF8("▼"));
+    }
 }
 
 void Shell::showFleet() {
+    exitCommsMode();
     board_ = nullptr;
     content_->clear();
     content_->addNew<FleetView>(api_);
 }
 
 void Shell::showMap() {
+    exitCommsMode();
     board_ = nullptr;
     content_->clear();
     content_->addNew<MapView>(api_);
 }
 
 void Shell::showSettings() {
+    exitCommsMode();
     board_ = nullptr;
     content_->clear();
     content_->addNew<SettingsView>(api_, user_);
 }
 
 void Shell::showPlaceholder(const std::string& title) {
+    exitCommsMode();
     board_ = nullptr;
     content_->clear();
     content_->addNew<Wt::WText>(Wt::WString::fromUTF8(

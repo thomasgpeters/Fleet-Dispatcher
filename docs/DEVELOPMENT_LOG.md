@@ -3,6 +3,67 @@
 Newest first. One entry per meaningful change set; pair with the checklist in
 [`TODO.md`](TODO.md).
 
+## 2026-06-20
+
+### Comms P1/P2 desktop: role/status-aware composer
+- `CommPanel` fetches the selected channel's `ChannelMember`s
+  (`ApiClient::fetchChannelMembers`) and gates the composer via
+  `updatePostPermission`: hidden with a reason for read-only members of a
+  broadcast channel, or while muted/banned (respects `restricted_until` expiry).
+  Optimistic (composer on) until members load; server LogicBank rule remains the
+  authority. Models: `ChannelMember`, `Topic`; `Message` gains `topic_id`.
+
+### Comms: in-app per-board export + shared header toolbar
+- **Per-board export** (desktop console): an **Export** action bundles a board's
+  channel meta + topics + members + messages (raw JSON:API documents, high page
+  limit) into `board-<name>-<date>.json`, downloaded client-side via a Blob URL.
+  New `ApiClient::fetchRaw` (returns the JSON:API body verbatim); export logic in
+  `CommPanel` (chained fetches → assemble → JS download).
+- **Shared comm-panel header**: factored into `buildConvoHead(parent, full)`, now
+  present in **both** layouts — a reduced (icon) action set in the right rail and
+  the full (labeled) set in the take-over view. Future actions (stats, status,
+  archive) slot in here, gated on `full`.
+
+### Comms Feature 4 — P1–P3 foundation (admin role · status · topics)
+Schema-first (golden rules); verified on a throwaway PG16 (**42 tables** in
+`fleet`, `public` = 0). ALS regen + `make als-extensions` needed on the Linux
+box to activate the rule; client UI is the next slice.
+- **P1 admin role + broadcast lock** — `channel_member_role` gains `admin`
+  (owner/admin/member). New LogicBank rule
+  `als-extensions/logic_discovery/comms_governance.py`: in `broadcast` channels
+  only owner/admins may post. Seed adds a "Fleet Announcements" broadcast channel.
+- **P2 member status/restriction** — `channel_member_status` lookup
+  (active/muted/banned) + `channel_member.member_status_id` (default active) +
+  `restricted_until`; the same rule blocks posting while a mute/ban is active
+  (NULL = indefinite, past = expired).
+- **P3 topics** — `channel_topic` (channel_id, name, created_by, is_closed) +
+  `message.topic_id` (NULL = General stream) + indexes; seed adds a
+  "Lubbock → Denver" topic.
+- Docs: domain-model (roles/status/topics + broadcast policy), TODO (P1–P3 →
+  `[~]`; captured clarified board-robustness items: mentions, stats/unread, user
+  online status, comms backup/restore, archive-hidden-with-admin-revive),
+  als-extensions README.
+
+### Desktop: full Communications view (Channels/Groups) + HUD map fix
+- **HUD/Map white screen** — Wt ≥ 4.7 makes `WLeafletMap` read its Leaflet
+  sources from the `leafletJSURL`/`leafletCSSURL` **config properties** and
+  throws fatally if unset (blanked the HUD). Added the properties to
+  `wt_config.xml`, made `run.sh` actually load it (`-c`), and dropped the now
+  double-loading in-code `useStyleSheet`/`require` in `HudView`/`MapView`.
+- **Communications take-over view** — `CommPanel` gained a `Layout` (Rail/Full).
+  The Communications menu item now opens **Full**: a left **Channels (Groups)
+  directory** (sections by type: Groups / Direct / Broadcast) + the conversation
+  on the right. Reuses all the existing push/poll/send logic (DRY).
+- **Auto-hide right rail** — entering comms collapses the redundant rail (CSS
+  width transition); leaving restores it unless the user had collapsed it.
+- **Animation** — the full view animates in (`fd-comms-in`).
+- **Panel toggles** moved out of the header into an anchored bar directly above
+  the body (left/right toggles float to their panel edges, fixed-width, so the
+  ▼/▶/◀ glyph swap never shifts neighbours).
+- **Roadmap** — researched Telegram's channels/groups/members model and captured
+  a priority-ordered **Feature 4 — Telegram-style team communications** in
+  `TODO.md` (P1 admin role + broadcast lock → P8 polish).
+
 ## 2026-06-11
 
 ### Styling pass: pro compressed font + bright-white rounded panels

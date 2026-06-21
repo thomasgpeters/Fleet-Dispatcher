@@ -74,5 +74,8 @@ The console uses an app frame: **full-width header** (brand + navigation + theme
 toggle + user/role + sign out), a **three-column body** — collapsible **left
 panel** (filters/context), **center work panel** (active view), collapsible
 **right panel** (details/inspector) — and a **full-width footer** (copyright +
-links). Panels hide/show via header toggles (`.fd-collapsed`) and stack under the
-center column on narrow viewports.
+links). Panels hide/show via a slim **toggle bar directly above the body**: the
+two disclosure toggles are anchored to opposite edges (above their panels) and
+fixed-width, so the glyph swap (▼ open / ▶ ◀ closed) never shifts neighbours.
+Collapsing applies `.fd-collapsed`; panels stack under the center column on
+narrow viewports.

@@ -89,6 +89,35 @@ void getCollection(
     }
 }
 
+// Like getCollection, but hands back the raw response body (the whole JSON:API
+// document) without parsing into typed structs — used by the export bundler.
+void getRawDoc(
+    const std::string& url,
+    const std::string& bearer,
+    std::function<void(std::string)> onBody,
+    ApiClient::ErrorCallback onErr) {
+    auto client = std::make_shared<Wt::Http::Client>();
+    client->setTimeout(std::chrono::seconds(20));
+    client->done().connect(
+        [client, onBody, onErr](Wt::AsioWrapper::error_code err,
+                                const Wt::Http::Message& response) {
+            if (err) {
+                onErr(err.message());
+            } else if (response.status() != 200) {
+                onErr("HTTP " + std::to_string(response.status()));
+            } else {
+                onBody(response.body());
+            }
+            if (auto* app = Wt::WApplication::instance()) app->triggerUpdate();
+        });
+    std::vector<Wt::Http::Message::Header> headers{
+        {"Accept", "application/vnd.api+json"}};
+    if (!bearer.empty()) headers.push_back({"Authorization", "Bearer " + bearer});
+    if (!client->get(url, headers)) {
+        onErr("could not start request to " + url);
+    }
+}
+
 fd::Driver parseDriver(const Wt::Json::Object& res) {
     const Wt::Json::Object& a = res.get("attributes");
     Driver d;
@@ -306,9 +335,22 @@ fd::Message parseMessage(const Wt::Json::Object& res) {
     Message m;
     m.id = jstr(res, "id");
     m.channel_id = jstr(a, "channel_id");
+    m.topic_id = jstr(a, "topic_id");
     m.author_id = jstr(a, "author_id");
     m.body = jstr(a, "body");
     m.posted_at = jstr(a, "posted_at");
+    return m;
+}
+
+fd::ChannelMember parseChannelMember(const Wt::Json::Object& res) {
+    const Wt::Json::Object& a = res.get("attributes");
+    ChannelMember m;
+    m.id = jstr(res, "id");
+    m.channel_id = jstr(a, "channel_id");
+    m.user_id = jstr(a, "user_id");
+    m.member_role_id = jint(a, "member_role_id");
+    m.member_status_id = jint(a, "member_status_id");
+    m.restricted_until = jstr(a, "restricted_until");
     return m;
 }
 
@@ -378,6 +420,20 @@ void ApiClient::fetchMessages(const std::string& channelId, MessagesCallback onO
         std::move(onErr));
 }
 
+void ApiClient::fetchChannelMembers(const std::string& channelId,
+                                    ChannelMembersCallback onOk,
+                                    ErrorCallback onErr) {
+    getCollection(
+        baseUrl_ + "/ChannelMember?filter%5Bchannel_id%5D=" + urlEncode(channelId),
+        authToken_,
+        [onOk](const Wt::Json::Array& data) {
+            std::vector<ChannelMember> out;
+            for (const Wt::Json::Value& v : data) out.push_back(parseChannelMember(v));
+            onOk(std::move(out));
+        },
+        std::move(onErr));
+}
+
 void ApiClient::createMessage(const std::string& channelId,
                               const std::string& authorId, const std::string& body,
                               MessageCallback onOk, ErrorCallback onErr) {
@@ -390,6 +446,11 @@ void ApiClient::createMessage(const std::string& channelId,
         baseUrl_ + "/Message", payload, authToken_,
         [onOk](const Wt::Json::Object& obj) { onOk(parseMessage(obj)); },
         std::move(onErr));
+}
+
+void ApiClient::fetchRaw(const std::string& path, RawCallback onOk,
+                         ErrorCallback onErr) {
+    getRawDoc(baseUrl_ + "/" + path, authToken_, std::move(onOk), std::move(onErr));
 }
 
 void ApiClient::fetchOptions(const std::string& resource,

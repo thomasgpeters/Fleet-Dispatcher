@@ -165,7 +165,10 @@ resources). Codes shown below match the `code` column in
 - `commodity_category`: `vehicles`, `heavy_equipment`, `farm_equipment`,
   `generators`, `lifts`.
 - `channel_type`: `direct`, `group`, `broadcast`.
-- `channel_member_role`: `owner`, `member`.
+- `channel_member_role`: `owner`, `admin`, `member` (admin/owner may post in
+  broadcast channels — Feature 4 P1).
+- `channel_member_status`: `active`, `muted`, `banned` (mute/ban standing, with
+  `channel_member.restricted_until` expiry — Feature 4 P2).
 - `pin_scope`: `self`, `channel`, `everyone` (visibility chosen when pinning).
 - `document_type`: `document`, `image`, `bill_of_lading`, `invoice`,
   `inspection_photo`, `license`, `other`.
@@ -193,11 +196,18 @@ A **message board** for the three roles. Participants are `app_user`s, so
 drivers, dispatchers, and updaters all converse through one model.
 
 - **Channel** *(aggregate root)* — a conversation space: a `group`/board, a 1:1
-  `direct` thread, or a `broadcast`. Holds members and messages.
+  `direct` thread, or a `broadcast`. Holds members, topics, and messages.
+  `is_archived` hides a channel from users (admins can revive it).
 - **ChannelMember** — a user's membership in a channel, with `member_role`
-  (`owner`/`member`) and `last_read_at` (drives per-user unread counts).
-- **Message** — text posted to a channel by an author; `reply_to` supports
-  threaded replies; may be empty when it only carries documents.
+  (`owner`/`admin`/`member`), standing (`member_status` + `restricted_until` for
+  mute/ban), and `last_read_at` (drives per-user unread counts).
+- **ChannelTopic** — a forum topic (thread) within a channel; splits a group/
+  board into focused conversations (e.g. a topic per load/lane/region). A message
+  with no topic belongs to the channel's default ("General") stream.
+- **Message** — text posted to a channel by an author; `topic` places it in a
+  forum topic (else General); `reply_to` supports threaded replies; may be empty
+  when it only carries documents. In `broadcast` channels only owners/admins may
+  post; muted/banned members are blocked (LogicBank — `als-extensions/`).
 - **MessagePin** — a message a user pinned, with a `pin_scope` controlling who
   sees it: `self` (only the pinner), `channel` (channel members), or `everyone`
   (org-wide). One pin per (message, user); re-scoping updates the row.

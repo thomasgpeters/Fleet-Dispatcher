@@ -34,7 +34,10 @@ light/dark themes:
 
 - **Full-width header** — **logo branding (top-left)**; **profile (name) + the
   logged-in role + Sign out (top-right)**, plus a **theme toggle** (light/dark,
-  persisted) and the panel show/hide toggles. The toggles use the disclosure
+  persisted).
+- **Panel toggle bar** — a slim bar **directly above the body**; the left/right
+  panel show/hide toggles are anchored to opposite edges (above their panels)
+  and fixed-width, so they never shift when clicked. They use the disclosure
   aesthetic: **▼ when open**, a pointing arrow when closed (**▶** left panel,
   **◀** right panel).
 - **Three-column body**:
@@ -48,9 +51,21 @@ light/dark themes:
     - **Map** — `MapView`: **geo-positioning** of fleet locations on a Leaflet
       map (latest position per rig) + a detail table, refreshed on a timer.
     - **New Load** — the load intake form.
-    - **Communications** — comms take over the **full work area** (`CommPanel`).
+    - **Communications** — comms take over the **full work area**
+      (`CommPanel` in `Layout::Full`): a **Channels (Groups) directory** on the
+      left (channels listed in sections by type — Groups / Direct messages /
+      Broadcast) + the conversation on the right. The view **animates in**
+      (`fd-comms-in`) and the redundant right rail is **auto-hidden** while it's
+      active (and restored when you leave, unless you'd collapsed it yourself).
     - **Settings** — `SettingsView`: appearance (theme) + account/connection info.
-  - **Right panel** — **Communications** rail (`CommPanel`), collapsible.
+  - **Right panel** — **Communications** rail (`CommPanel` in `Layout::Rail` —
+    compact horizontal channel chips), collapsible.
+  - **Comm-panel header** (`buildConvoHead`) shows in **both** layouts: the
+    conversation title + a board-action toolbar — a **reduced** (icon) set in the
+    rail and the **full** (labeled) set in the take-over view. The first action is
+    **Export**: bundles the board's channel meta + topics + members + messages
+    (raw JSON:API docs) into `board-<name>-<date>.json`, downloaded via a Blob URL
+    (`ApiClient::fetchRaw`). Future actions (stats, status, archive) slot in here.
   - Panels hide/show via `.fd-collapsed` and stack under the center on narrow
     viewports.
 - **Full-width footer** — copyright + links (HUD, Docs, Support).

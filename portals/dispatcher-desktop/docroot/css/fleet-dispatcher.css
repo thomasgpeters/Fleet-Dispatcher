@@ -237,6 +237,30 @@ h1, h2, h3, h4, h5, .h4, .h5 { font-family: var(--fd-font); letter-spacing: 0.1p
 }
 .fd-muted { color: var(--fd-text-muted); }
 
+/* Panel hide/show toggle bar — sits directly above the three-column body. The
+ * two toggles anchor to opposite edges (aligned to the panel outer edges via
+ * the same 1rem inset as .fd-body) and are fixed-width, so the disclosure glyph
+ * swap (▼ open / ▶ ◀ closed) never shifts neighbouring controls. */
+.fd-toggle-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 1rem 0;   /* match .fd-body horizontal inset */
+}
+.fd-panel-toggle {
+    width: 2rem;
+    min-width: 2rem;
+    padding: 0.15rem 0;
+    text-align: center;
+    background-color: var(--fd-surface);
+    color: var(--fd-text-muted);
+    border: none;
+}
+.fd-panel-toggle:hover {
+    background-color: var(--fd-surface-2);
+    color: var(--fd-text);
+}
+
 /* Full-width footer */
 .fd-footer {
     background-color: var(--fd-footer-bg);
@@ -409,6 +433,83 @@ h1, h2, h3, h4, h5, .h4, .h5 { font-family: var(--fd-font); letter-spacing: 0.1p
 .fd-msg-mine .fd-msg-meta { color: rgba(255, 255, 255, 0.8); }
 .fd-comm-composer { display: flex; gap: 0.35rem; margin-top: 0.5rem; }
 .fd-comm-composer .form-control { flex: 1 1 auto; }
+/* Shown instead of the composer when the user can't post (P1/P2 governance). */
+.fd-comm-post-notice {
+    margin-top: 0.5rem;
+    padding: 0.5rem 0.6rem;
+    font-size: 0.85rem;
+    background: var(--fd-surface-2);
+    border-radius: 8px;
+    text-align: center;
+}
+
+/* Full-screen comms (Communications menu item): a Channels (Groups) directory
+ * on the left + the conversation on the right. Animates in when it takes over
+ * the work area; the right rail collapse/expand transitions via .fd-panel. */
+.fd-comm.fd-comm-full {
+    flex-direction: row;
+    gap: 1rem;
+    height: 100%;
+    animation: fd-comms-in 0.22s ease both;
+}
+@keyframes fd-comms-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: none; }
+}
+.fd-comm-directory {
+    flex: 0 0 240px;
+    width: 240px;
+    overflow: auto;
+    background-color: var(--fd-surface-2);
+    border-radius: var(--fd-radius);
+    padding: 0.85rem 0.9rem;
+}
+.fd-comm-convo {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+/* Conversation toolbar: title (left) + board actions (right). */
+.fd-comm-convo-head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.35rem;
+}
+.fd-comm-head-spacer { flex: 1 1 auto; }
+.fd-comm-export-status { font-size: 0.78rem; white-space: nowrap; }
+.fd-comm-convo-head .fd-comm-convo-title { margin: 0; }
+/* Rail header: tighter, with a compact icon-only action set. */
+.fd-comm-head-rail { gap: 0.35rem; }
+.fd-comm-head-rail .fd-comm-export { padding: 0.1rem 0.5rem; }
+.fd-comm-groups { display: flex; flex-direction: column; gap: 0.15rem; }
+.fd-comm-group-label {
+    margin: 0.75rem 0 0.2rem;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--fd-text-muted);
+}
+.fd-comm-group-label:first-child { margin-top: 0; }
+.fd-comm-group-item {
+    text-align: left;
+    background: transparent;
+    color: var(--fd-text);
+    border: 1px solid transparent;
+    border-radius: 8px;
+    width: 100%;
+}
+.fd-comm-group-item:hover {
+    background-color: rgba(44, 111, 179, 0.10);
+    color: var(--fd-text);
+}
+.fd-comm-group-item.fd-active {
+    background-color: rgba(44, 111, 179, 0.14);
+    border-left: 3px solid var(--fd-accent);   /* orange active marker */
+    font-weight: 600;
+}
 
 /* ===========================================================================
  * Toaster: top-right transient alerts

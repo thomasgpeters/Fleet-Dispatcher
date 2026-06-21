@@ -1,6 +1,9 @@
 #include "CommPanel.h"
 
 #include <algorithm>
+#include <cstdio>
+#include <ctime>
+#include <sstream>
 
 #include <Wt/WApplication.h>
 #include <Wt/WLineEdit.h>
@@ -33,32 +36,71 @@ std::string esc(const std::string& s) {
     }
     return o;
 }
+
+// Escape a string as a JSON value (used for the channel name we embed in the
+// export envelope; the per-resource bodies are already valid JSON).
+std::string jsonEscape(const std::string& s) {
+    std::string o;
+    o.reserve(s.size() + 8);
+    char buf[8];
+    for (unsigned char c : s) {
+        switch (c) {
+            case '"':  o += "\\\""; break;
+            case '\\': o += "\\\\"; break;
+            case '\n': o += "\\n";  break;
+            case '\r': o += "\\r";  break;
+            case '\t': o += "\\t";  break;
+            default:
+                if (c < 0x20) { std::snprintf(buf, sizeof(buf), "\\u%04x", c); o += buf; }
+                else o += static_cast<char>(c);  // leave UTF-8 bytes intact
+        }
+    }
+    return o;
+}
+
+// Wrap a string as a double-quoted JS string literal for doJavaScript. UTF-8
+// bytes pass through (Wt transmits JS as UTF-8); only structural chars escape.
+std::string jsStringLiteral(const std::string& s) {
+    return "\"" + jsonEscape(s) + "\"";
+}
+
+// Current UTC time as ISO-8601 (for the export's exported_at + filename stamp).
+std::string isoUtcNow() {
+    std::time_t t = std::time(nullptr);
+    std::tm tm{};
+    gmtime_r(&t, &tm);
+    char buf[24];
+    std::strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%SZ", &tm);
+    return buf;
+}
+
+// Filename-safe slug: lowercase alnum, runs of other chars -> single '-'.
+std::string slug(const std::string& s) {
+    std::string o;
+    bool dash = false;
+    for (unsigned char c : s) {
+        if (std::isalnum(c)) {
+            o += static_cast<char>(std::tolower(c));
+            dash = false;
+        } else if (!dash && !o.empty()) {
+            o += '-';
+            dash = true;
+        }
+    }
+    while (!o.empty() && o.back() == '-') o.pop_back();
+    return o.empty() ? "board" : o;
+}
 }  // namespace
 
-CommPanel::CommPanel(ApiClient* api, AppUser user, Toaster* toaster)
-    : api_(api), user_(std::move(user)), toaster_(toaster) {
+CommPanel::CommPanel(ApiClient* api, AppUser user, Toaster* toaster, Layout layout)
+    : api_(api), user_(std::move(user)), toaster_(toaster), layout_(layout) {
     addStyleClass("fd-comm");
-
-    addNew<Wt::WText>("<div class=\"fd-panel-title\">Communications</div>");
-
-    channelList_ = addNew<Wt::WContainerWidget>();
-    channelList_->addStyleClass("fd-comm-channels");
-
-    convoTitle_ = addNew<Wt::WText>();
-    convoTitle_->addStyleClass("fd-comm-convo-title");
-
-    messageList_ = addNew<Wt::WContainerWidget>();
-    messageList_->addStyleClass("fd-comm-messages");
-
-    auto* composerRow = addNew<Wt::WContainerWidget>();
-    composerRow->addStyleClass("fd-comm-composer");
-    composer_ = composerRow->addNew<Wt::WLineEdit>();
-    composer_->addStyleClass("form-control form-control-sm");
-    composer_->setPlaceholderText("Message…");
-    composer_->enterPressed().connect(this, &CommPanel::send);
-    auto* sendBtn = composerRow->addNew<Wt::WPushButton>("Send");
-    sendBtn->addStyleClass("btn btn-sm btn-primary");
-    sendBtn->clicked().connect(this, &CommPanel::send);
+    if (layout_ == Layout::Full) {
+        addStyleClass("fd-comm-full");
+        buildFull();
+    } else {
+        buildRail();
+    }
 
     loadChannels();
 
@@ -81,6 +123,77 @@ CommPanel::CommPanel(ApiClient* api, AppUser user, Toaster* toaster)
 
 CommPanel::~CommPanel() {
     CommBus::instance().unsubscribe(busToken_);
+}
+
+void CommPanel::buildRail() {
+    addNew<Wt::WText>("<div class=\"fd-panel-title\">Communications</div>");
+
+    channelList_ = addNew<Wt::WContainerWidget>();
+    channelList_->addStyleClass("fd-comm-channels");  // horizontal chips
+
+    buildConvoHead(this, /*full=*/false);  // title + reduced actions
+
+    messageList_ = addNew<Wt::WContainerWidget>();
+    messageList_->addStyleClass("fd-comm-messages");
+
+    buildComposer(this);
+}
+
+void CommPanel::buildFull() {
+    // Left: the Channels (Groups) directory — a vertical list grouped by type.
+    auto* directory = addNew<Wt::WContainerWidget>();
+    directory->addStyleClass("fd-comm-directory");
+    directory->addNew<Wt::WText>("<div class=\"fd-panel-title\">Channels</div>");
+    channelList_ = directory->addNew<Wt::WContainerWidget>();
+    channelList_->addStyleClass("fd-comm-groups");
+
+    // Right: the conversation (toolbar · messages · composer).
+    auto* convo = addNew<Wt::WContainerWidget>();
+    convo->addStyleClass("fd-comm-convo");
+    buildConvoHead(convo, /*full=*/true);  // title + full actions
+    messageList_ = convo->addNew<Wt::WContainerWidget>();
+    messageList_->addStyleClass("fd-comm-messages");
+    buildComposer(convo);
+}
+
+// The comm-panel header/toolbar: the conversation title + a board-action set.
+// Present in BOTH layouts — a reduced (icon) set in the rail, the full (labeled)
+// set in the take-over view. Add future actions (stats, status, archive) here,
+// gating the rail-only-vs-full ones on `full`.
+void CommPanel::buildConvoHead(Wt::WContainerWidget* parent, bool full) {
+    auto* head = parent->addNew<Wt::WContainerWidget>();
+    head->addStyleClass(full ? "fd-comm-convo-head" : "fd-comm-convo-head fd-comm-head-rail");
+
+    convoTitle_ = head->addNew<Wt::WText>();
+    convoTitle_->addStyleClass("fd-comm-convo-title");
+    head->addNew<Wt::WContainerWidget>()->addStyleClass("fd-comm-head-spacer");
+    exportStatus_ = head->addNew<Wt::WText>();
+    exportStatus_->addStyleClass("fd-comm-export-status fd-muted");
+
+    // Export: labeled in the full view, compact icon in the rail.
+    auto* exportBtn = head->addNew<Wt::WPushButton>(
+        Wt::WString::fromUTF8(full ? "⤓ Export" : "⤓"));
+    exportBtn->addStyleClass("btn btn-sm btn-outline-primary fd-comm-export");
+    exportBtn->setToolTip("Export this board (messages, members, topics) to a JSON file");
+    exportBtn->clicked().connect(this, &CommPanel::exportBoard);
+}
+
+void CommPanel::buildComposer(Wt::WContainerWidget* parent) {
+    // A read-only notice shown in place of the composer when the user can't post
+    // (broadcast member, or muted/banned). Hidden by default.
+    postNotice_ = parent->addNew<Wt::WText>();
+    postNotice_->addStyleClass("fd-comm-post-notice fd-muted");
+    postNotice_->hide();
+
+    composerRow_ = parent->addNew<Wt::WContainerWidget>();
+    composerRow_->addStyleClass("fd-comm-composer");
+    composer_ = composerRow_->addNew<Wt::WLineEdit>();
+    composer_->addStyleClass("form-control form-control-sm");
+    composer_->setPlaceholderText("Message…");
+    composer_->enterPressed().connect(this, &CommPanel::send);
+    auto* sendBtn = composerRow_->addNew<Wt::WPushButton>("Send");
+    sendBtn->addStyleClass("btn btn-sm btn-primary");
+    sendBtn->clicked().connect(this, &CommPanel::send);
 }
 
 std::string CommPanel::channelName(const std::string& id) const {
@@ -106,12 +219,45 @@ void CommPanel::loadChannels() {
 
 void CommPanel::renderChannels() {
     channelList_->clear();
+    if (layout_ == Layout::Full) { renderDirectory(); return; }
+    // Rail: a flat horizontal strip of channel chips.
     for (const Channel& c : channels_) {
         auto* btn = channelList_->addNew<Wt::WPushButton>(Wt::WString::fromUTF8(c.name));
         btn->addStyleClass("fd-comm-channel btn btn-sm");
         if (c.id == selectedChannelId_) btn->addStyleClass("fd-active");
         Channel copy = c;
         btn->clicked().connect([this, copy] { selectChannel(copy); });
+    }
+}
+
+void CommPanel::renderDirectory() {
+    // Channels (Groups) view: list channels in sections by type
+    // (channel_type_id: 1=direct, 2=group, 3=broadcast — see seed_data.sql).
+    struct Section { int type; const char* label; };
+    static const Section sections[] = {
+        {2, "Groups"}, {1, "Direct messages"}, {3, "Broadcast"}};
+
+    bool any = false;
+    for (const Section& s : sections) {
+        std::vector<const Channel*> in;
+        for (const Channel& c : channels_)
+            if (c.channel_type_id == s.type) in.push_back(&c);
+        if (in.empty()) continue;
+        any = true;
+        channelList_->addNew<Wt::WText>(Wt::WString::fromUTF8(
+            std::string("<div class=\"fd-comm-group-label\">") + s.label + "</div>"));
+        for (const Channel* c : in) {
+            auto* btn =
+                channelList_->addNew<Wt::WPushButton>(Wt::WString::fromUTF8(c->name));
+            btn->addStyleClass("fd-comm-group-item btn btn-sm");
+            if (c->id == selectedChannelId_) btn->addStyleClass("fd-active");
+            Channel copy = *c;
+            btn->clicked().connect([this, copy] { selectChannel(copy); });
+        }
+    }
+    if (!any) {
+        channelList_->addNew<Wt::WText>(
+            "<div class=\"fd-muted\">No channels yet.</div>");
     }
 }
 
@@ -122,6 +268,61 @@ void CommPanel::selectChannel(const Channel& c) {
     convoTitle_->setText(Wt::WString::fromUTF8("#" + c.name));
     renderChannels();
     refreshMessages(/*notifyOnNew=*/false);
+
+    // Gate the composer by this user's role + standing in the channel (P1/P2).
+    members_.clear();
+    updatePostPermission();  // optimistic (composer on) until members arrive
+    const std::string forChannel = selectedChannelId_;
+    api_->fetchChannelMembers(
+        forChannel,
+        [this, forChannel](std::vector<ChannelMember> ms) {
+            if (forChannel != selectedChannelId_) return;  // switched away
+            members_ = std::move(ms);
+            updatePostPermission();
+            if (auto* a = Wt::WApplication::instance()) a->triggerUpdate();
+        },
+        [](std::string) { /* leave composer enabled on a transient error */ });
+}
+
+void CommPanel::updatePostPermission() {
+    if (!composerRow_ || !postNotice_) return;
+
+    // Lookup ids — must match database/seed_data.sql.
+    constexpr int CHANNEL_BROADCAST = 3;
+    constexpr int ROLE_OWNER = 1, ROLE_ADMIN = 3;
+    constexpr int STATUS_MUTED = 2, STATUS_BANNED = 3;
+
+    int channelType = 0;
+    for (const Channel& c : channels_)
+        if (c.id == selectedChannelId_) channelType = c.channel_type_id;
+
+    const ChannelMember* me = nullptr;
+    for (const ChannelMember& m : members_)
+        if (m.user_id == user_.id) { me = &m; break; }
+
+    std::string reason;
+    if (me) {
+        const bool restricted =
+            (me->member_status_id == STATUS_MUTED || me->member_status_id == STATUS_BANNED) &&
+            (me->restricted_until.empty() || me->restricted_until > isoUtcNow());
+        if (me->member_status_id == STATUS_BANNED && restricted)
+            reason = "You are banned from this channel.";
+        else if (restricted)
+            reason = "You are muted in this channel.";
+        else if (channelType == CHANNEL_BROADCAST &&
+                 me->member_role_id != ROLE_OWNER && me->member_role_id != ROLE_ADMIN)
+            reason = "Only admins can post in this broadcast channel.";
+    }
+    // members_ empty (not yet loaded / error): stay optimistic, no reason.
+
+    if (reason.empty()) {
+        composerRow_->show();
+        postNotice_->hide();
+    } else {
+        composerRow_->hide();
+        postNotice_->setText(Wt::WString::fromUTF8("🔒 " + reason));
+        postNotice_->show();
+    }
 }
 
 void CommPanel::refreshMessages(bool notifyOnNew) {
@@ -206,6 +407,76 @@ void CommPanel::send() {
             if (toaster_)
                 toaster_->notify("Send failed", err, Toaster::Level::Danger);
         });
+}
+
+void CommPanel::exportBoard() {
+    if (selectedChannelId_.empty()) return;
+    if (exportStatus_) exportStatus_->setText(Wt::WString::fromUTF8("Exporting…"));
+
+    // Pull the board's data as raw JSON:API documents (messages → members →
+    // topics), then assemble + download. Chained so the bundle is consistent and
+    // we keep a single failure path. Captured by value; the panel owns api_.
+    const std::string ch = selectedChannelId_;
+    // High page limit so the export isn't truncated by SAFRS pagination. Very
+    // large boards should use the DB-level dump path (docs/TODO Feature 4).
+    const std::string pg = "&page%5Blimit%5D=10000";
+    auto fail = [this](const std::string& e) {
+        if (exportStatus_)
+            exportStatus_->setText(Wt::WString::fromUTF8("Export failed: " + e));
+    };
+    api_->fetchRaw(
+        "Message?filter%5Bchannel_id%5D=" + ch + pg,
+        [this, ch, pg, fail](std::string messages) {
+            api_->fetchRaw(
+                "ChannelMember?filter%5Bchannel_id%5D=" + ch + pg,
+                [this, ch, pg, fail, messages](std::string members) {
+                    api_->fetchRaw(
+                        "ChannelTopic?filter%5Bchannel_id%5D=" + ch + pg,
+                        [this, messages, members](std::string topics) {
+                            finishExport(messages, members, topics);
+                        },
+                        fail);
+                },
+                fail);
+        },
+        fail);
+}
+
+void CommPanel::finishExport(const std::string& messages, const std::string& members,
+                             const std::string& topics) {
+    // Channel metadata from what we already hold.
+    std::string name = selectedChannelName_;
+    int type = 0;
+    for (const Channel& c : channels_)
+        if (c.id == selectedChannelId_) { name = c.name; type = c.channel_type_id; }
+
+    const std::string when = isoUtcNow();
+    std::ostringstream doc;
+    doc << "{\"export_version\":1,"
+        << "\"exported_at\":\"" << when << "\","
+        << "\"channel\":{\"id\":\"" << jsonEscape(selectedChannelId_) << "\","
+        << "\"name\":\"" << jsonEscape(name) << "\","
+        << "\"channel_type_id\":" << type << "},"
+        // The per-resource bodies are already valid JSON:API documents.
+        << "\"topics\":" << topics << ","
+        << "\"members\":" << members << ","
+        << "\"messages\":" << messages << "}";
+
+    const std::string filename = "board-" + slug(name) + "-" + when.substr(0, 10) + ".json";
+
+    // Trigger a client-side download via a Blob object URL (robust for larger
+    // payloads; avoids data: URL length limits). All values are JS-escaped.
+    if (auto* app = Wt::WApplication::instance()) {
+        app->doJavaScript(
+            "(function(){var s=" + jsStringLiteral(doc.str()) + ";"
+            "var b=new Blob([s],{type:'application/json'});"
+            "var u=URL.createObjectURL(b);"
+            "var a=document.createElement('a');a.href=u;a.download=" +
+            jsStringLiteral(filename) + ";"
+            "document.body.appendChild(a);a.click();a.remove();"
+            "setTimeout(function(){URL.revokeObjectURL(u);},1000);})();");
+    }
+    if (exportStatus_) exportStatus_->setText(Wt::WString::fromUTF8("Exported ✓"));
 }
 
 }  // namespace fd

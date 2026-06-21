@@ -28,15 +28,23 @@ class Toaster;
 
 class CommPanel : public Wt::WContainerWidget {
 public:
-    CommPanel(ApiClient* api, AppUser user, Toaster* toaster);
+    // Rail: the compact right-rail surface (horizontal channel chips).
+    // Full:  the take-over view — a vertical Channels (Groups) directory on the
+    //        left + the conversation on the right.
+    enum class Layout { Rail, Full };
+
+    CommPanel(ApiClient* api, AppUser user, Toaster* toaster,
+              Layout layout = Layout::Rail);
     ~CommPanel() override;
 
 private:
     ApiClient* api_;
     AppUser user_;
     Toaster* toaster_;
+    Layout layout_;
 
     std::vector<Channel> channels_;
+    std::vector<ChannelMember> members_;   // members of the selected channel
     std::string selectedChannelId_;
     std::string selectedChannelName_;
     std::string lastLatestId_;  // newest message id seen (reconcile-poll dedupe)
@@ -45,19 +53,31 @@ private:
 
     Wt::WContainerWidget* channelList_ = nullptr;
     Wt::WText* convoTitle_ = nullptr;
+    Wt::WText* exportStatus_ = nullptr;  // Full layout only (export feedback)
     Wt::WContainerWidget* messageList_ = nullptr;
+    Wt::WContainerWidget* composerRow_ = nullptr;  // hidden when the user can't post
+    Wt::WText* postNotice_ = nullptr;              // why posting is blocked
     Wt::WLineEdit* composer_ = nullptr;
     Wt::WTimer* poll_ = nullptr;
 
+    void buildRail();          // compact right-rail layout
+    void buildFull();          // directory + conversation take-over layout
+    void buildConvoHead(Wt::WContainerWidget* parent, bool full);  // title + actions
+    void buildComposer(Wt::WContainerWidget* parent);
     void loadChannels();
     void renderChannels();
+    void renderDirectory();    // grouped vertical channel list (Full layout)
     void selectChannel(const Channel& c);
+    void updatePostPermission();  // gate the composer by role/standing (P1/P2)
     void refreshMessages(bool notifyOnNew);
     void renderMessages(const std::vector<Message>& msgs, bool notifyOnNew);
     void renderOne(const Message& m);          // append a single message row
     void onPushed(const Message& m);           // CommBus delivery (server push)
     std::string channelName(const std::string& id) const;
     void send();
+    void exportBoard();                        // Full layout: download a board bundle
+    void finishExport(const std::string& messages, const std::string& members,
+                      const std::string& topics);
 };
 
 }  // namespace fd

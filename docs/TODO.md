@@ -203,6 +203,95 @@ AI provider is admin-selectable (Anthropic default / OpenAI / Ollama).
 - [ ] Per-driver truck profile (height/weight) feeding route tools — needs auth
 - [ ] Live end-to-end test against a configured provider + HERE key
 
+## Feature 4 — Telegram-style team communications (channels · groups · members)
+
+Evolve the messaging core (Feature 1) toward the professional team-comms model
+fleet operators already use on Telegram. Researched 2026-06-20 (channels vs
+groups vs supergroups; granular admin rights; member permissions/restrictions;
+topics/forums; invite links + join requests; reactions). Our `channel_type`
+(direct/group/broadcast) already mirrors Telegram's three containers; the gaps
+are roles, enforcement, organization, and onboarding.
+
+Standing constraint: each item is a **schema change** → edit
+`database/schema.sql` + `seed_data.sql`, run **`/verify-db`** on throwaway PG16,
+then **regenerate ALS** (+ `make als-extensions`); update `docs/domain-model.md`.
+Clients (mobile + desktop `CommPanel` directory/roles) follow.
+
+Priority order (P1 = do first; small→large, value-weighted):
+
+- [~] **P1 — Admin role + broadcast posting lock** *(smallest, highest value)*.
+      DONE: `admin` added to `channel_member_role` (owner/admin/member); LogicBank
+      rule `als-extensions/logic_discovery/comms_governance.py` blocks non-owner/
+      admin posts in `broadcast` channels; seed has a "Fleet Announcements"
+      broadcast channel. Verified on PG16. Desktop: composer is **hidden with a
+      reason** for read-only members of a broadcast channel (`CommPanel`
+      fetches `ChannelMember`, gates via `updatePostPermission`). REMAINING:
+      role badges in the directory; mobile composer gating; ALS regen on the
+      Linux box to activate the server rule.
+- [~] **P2 — Member status & restriction**. DONE: `channel_member_status` lookup
+      (active/muted/banned) + `channel_member.member_status_id` (default active) +
+      `restricted_until` (expiry); LogicBank rule blocks posting while a mute/ban
+      is active (NULL until = indefinite; past = expired). Verified on PG16.
+      Desktop: composer also respects standing — hidden with "You are muted/
+      banned" while a restriction is active. REMAINING: admin UI to mute/ban/
+      remove members; surface standing in the directory; mobile.
+- [~] **P3 — Topics (forum threads)**. DONE: `channel_topic` (channel_id, name,
+      created_by, is_closed) + `message.topic_id` (nullable; General = NULL) +
+      indexes; seed has a "Lubbock -> Denver" topic. Verified on PG16. REMAINING:
+      client UI — topic list within a channel + compose-into-topic (desktop
+      `CommPanel` + mobile message board).
+- [ ] **P4 — Invite links + join requests**. `channel_invite` (token, created_by,
+      member_cap, expires_at, requires_approval, revoked) + a pending-join state
+      on `channel_member` (or `channel_join_request`). Onboards carriers/drivers
+      via a shareable link with optional admin approval. Needs auth/identity.
+- [ ] **P5 — Reactions (acks)**. `message_reaction` (message_id, user_id, emoji,
+      unique per (message,user,emoji)). 👍/✅ "got it" acks are genuinely useful
+      for dispatch confirmation. Realtime via the existing Kafka `message` plane.
+- [ ] **P6 — Read receipts / richer presence**. Surface per-member read state
+      (we already track `channel_member.last_read_at`): "seen by N" in small
+      groups; server-side `unread_count` (LogicBank) replacing client compute.
+- [ ] **P7 — Channel ↔ discussion link (comments)**. Link a `broadcast` channel
+      to a `group` channel so a broadcast post opens a comment thread (Telegram's
+      channel-comments). Add `channel.linked_channel_id` (self-FK, nullable).
+- [ ] **P8 — Polish**: slow mode (per-channel min seconds between posts),
+      broadcast **view counts**, new-member **history visibility** toggle, channel
+      **statistics**, author **signature** on broadcast posts. Each self-contained.
+
+> Sequencing rationale: P1–P2 are one small, safe schema bump that unlocks the
+> core broadcast/governance behavior; P3 is the headline organizational feature;
+> P4 enables external onboarding; P5–P8 are independent enhancements layerable in
+> any order once the role/topic foundation exists.
+
+### Message-board robustness (clarified 2026-06-20)
+
+Additional requirements for a robust board. Decisions captured from the user:
+
+- [ ] **Tag/mention users** (`@mention` in a group/board/channel). `message_mention`
+      (message_id, mentioned_user_id) written on send; composer autocomplete from
+      channel members; highlight + notification/toast + unread bump for the
+      mentioned user.
+- [ ] **Board stats + unread** in the comms toolbar. Per-channel + overall unread
+      (from `channel_member.last_read_at`), message/member counts, most-active
+      channels; server-side `unread_count` via LogicBank (replaces client compute).
+- [ ] **User online status** (toolbar switch). DECIDED: it's the **user's online
+      status** (presence/duty), not channel state. Add `app_user.user_status_id`
+      (lookup: online/away/driving/off-duty) shown beside the user in comms +
+      fleet view; live via the realtime plane.
+- [~] **Backup & restore of comms data**. DECIDED: back up **messages, members,
+      and related message data**. DONE: in-app **per-board export** on the desktop
+      console — the comm-panel header (present in both the rail [reduced/icon] and
+      the full take-over view [full/labeled]) has an **Export** action that bundles
+      the board's channel meta + topics + members + messages (raw JSON:API docs)
+      and downloads a `board-<name>-<date>.json` via a Blob URL
+      (`ApiClient::fetchRaw`). REMAINING: **restore** (import a bundle), mobile
+      export, and the DB-level `pg_dump`/restore + runbook/timer path for very
+      large boards.
+- [ ] **Archive / revive channels**. DECIDED: an **archived channel is no longer
+      visible to users**; **admins can revive** (unarchive) it. Wire up the
+      existing `channel.is_archived`: filter archived channels out of normal
+      client queries; admin-only "Archived" view with unarchive. Enforce
+      visibility server-side (LogicBank/ALS grants), not just client filtering.
+
 ## Cross-cutting
 
 - [x] **DB schema separation (DECIDED + done):** shared instance with
