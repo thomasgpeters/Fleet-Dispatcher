@@ -36,6 +36,7 @@ import {
   close,
   documentOutline,
   happyOutline,
+  lockClosedOutline,
   pin,
   pinOutline,
   returnDownForwardOutline,
@@ -43,11 +44,12 @@ import {
 } from "ionicons/icons";
 
 import { EmojiPicker } from "../components/EmojiPicker";
-import { api, PIN_SCOPE } from "../api/client";
+import { api, PIN_SCOPE, postBlockReason } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { useRealtime } from "../realtime/RealtimeContext";
 import type {
   Channel,
+  ChannelMember,
   Document,
   Message,
   MessagePin,
@@ -89,6 +91,7 @@ export function ChannelPage() {
   const { subscribe, addListener } = useRealtime();
   const userId = user?.id ?? "";
   const [channel, setChannel] = useState<Channel | null>(null);
+  const [membership, setMembership] = useState<ChannelMember | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [docsByMessage, setDocsByMessage] = useState<Record<string, Document[]>>({});
   const [pins, setPins] = useState<MessagePin[]>([]);
@@ -106,11 +109,13 @@ export function ChannelPage() {
 
   const load = async () => {
     try {
-      const [ch, msgs] = await Promise.all([
+      const [ch, msgs, myMember] = await Promise.all([
         api.getChannel(channelId),
         api.messagesForChannel(channelId),
+        api.myMembership(channelId, userId),
       ]);
       setChannel(ch);
+      setMembership(myMember);  // drives composer gating (P1/P2)
       const sorted = [...msgs].sort((a, b) => a.posted_at.localeCompare(b.posted_at));
       setMessages(sorted);
 
@@ -301,6 +306,9 @@ export function ChannelPage() {
   const messagesById: Record<string, Message> = {};
   for (const m of messages) messagesById[m.id] = m;
 
+  // P1/P2 governance: hide the composer with a reason when the user can't post.
+  const blockReason = postBlockReason(channel, membership);
+
   return (
     <IonPage>
       <IonHeader>
@@ -448,6 +456,18 @@ export function ChannelPage() {
       />
 
       <IonFooter>
+        {blockReason ? (
+          // Read-only: a single clean notice in place of the composer.
+          <IonToolbar>
+            <IonItem lines="none">
+              <IonIcon slot="start" icon={lockClosedOutline} color="medium" />
+              <IonLabel className="ion-text-wrap">
+                <IonNote>{blockReason}</IonNote>
+              </IonLabel>
+            </IonItem>
+          </IonToolbar>
+        ) : (
+        <>
         {replyTo && (
           <IonToolbar>
             <IonItem lines="none">
@@ -491,6 +511,8 @@ export function ChannelPage() {
             </IonButton>
           </IonButtons>
         </IonToolbar>
+        </>
+        )}
       </IonFooter>
 
       {/* Emoji picker for the composer (appends to the draft). */}

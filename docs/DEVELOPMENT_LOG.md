@@ -5,6 +5,15 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-06-20
 
+### Mobile parity: P1/P2 composer gating
+- Mobile `ChannelPage` now fetches the user's `ChannelMember` and, when they
+  can't post (broadcast non-admin, or muted/banned with an active restriction),
+  replaces the composer with a single read-only notice — mobile-native, no
+  clutter. Shared `postBlockReason()` helper + `CHANNEL_TYPE`/`MEMBER_ROLE`/
+  `MEMBER_STATUS` constants in `api/client`. Types: `ChannelMember` gains
+  `member_status_id`/`restricted_until`; `Message` gains `topic_id`; new
+  `ChannelTopic` (sets up P3). Mobile build clean.
+
 ### Comms P1/P2 desktop: role/status-aware composer
 - `CommPanel` fetches the selected channel's `ChannelMember`s
   (`ApiClient::fetchChannelMembers`) and gates the composer via

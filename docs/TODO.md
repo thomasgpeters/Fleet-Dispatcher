@@ -225,16 +225,17 @@ Priority order (P1 = do first; small→large, value-weighted):
       admin posts in `broadcast` channels; seed has a "Fleet Announcements"
       broadcast channel. Verified on PG16. Desktop: composer is **hidden with a
       reason** for read-only members of a broadcast channel (`CommPanel`
-      fetches `ChannelMember`, gates via `updatePostPermission`). REMAINING:
-      role badges in the directory; mobile composer gating; ALS regen on the
-      Linux box to activate the server rule.
+      fetches `ChannelMember`, gates via `updatePostPermission`). Mobile:
+      `ChannelPage` fetches the user's membership and replaces the composer with
+      a read-only notice (`postBlockReason` in `api/client`). REMAINING: role
+      badges in the directory; ALS regen on the Linux box to activate the rule.
 - [~] **P2 — Member status & restriction**. DONE: `channel_member_status` lookup
       (active/muted/banned) + `channel_member.member_status_id` (default active) +
       `restricted_until` (expiry); LogicBank rule blocks posting while a mute/ban
       is active (NULL until = indefinite; past = expired). Verified on PG16.
-      Desktop: composer also respects standing — hidden with "You are muted/
-      banned" while a restriction is active. REMAINING: admin UI to mute/ban/
-      remove members; surface standing in the directory; mobile.
+      Desktop + mobile: composer also respects standing — hidden with "You are
+      muted/banned" while a restriction is active. REMAINING: admin UI to mute/
+      ban/remove members; surface standing in the directory.
 - [~] **P3 — Topics (forum threads)**. DONE: `channel_topic` (channel_id, name,
       created_by, is_closed) + `message.topic_id` (nullable; General = NULL) +
       indexes; seed has a "Lubbock -> Denver" topic. Verified on PG16. REMAINING:

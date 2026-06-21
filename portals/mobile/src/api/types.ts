@@ -113,9 +113,20 @@ export interface Channel {
   is_archived: boolean;
 }
 
+// A forum topic (thread) within a channel (Feature 4 P3). A message with no
+// topic_id belongs to the channel's default ("General") stream.
+export interface ChannelTopic {
+  id: string;
+  channel_id: string;
+  name: string;
+  created_by: string;
+  is_closed: boolean;
+}
+
 export interface Message {
   id: string;
   channel_id: string;
+  topic_id?: string | null; // -> ChannelTopic (null = General stream)
   author_id: string;
   reply_to_id?: string;
   body: string;
@@ -127,7 +138,9 @@ export interface ChannelMember {
   id: string;
   channel_id: string;
   user_id: string;
-  member_role_id: number;
+  member_role_id: number; // 1 owner · 2 member · 3 admin
+  member_status_id: number; // 1 active · 2 muted · 3 banned
+  restricted_until?: string | null; // mute/ban expiry (null = none/indefinite)
   joined_at?: string;
   last_read_at?: string | null;
 }

@@ -29,6 +29,41 @@ export const API_BASE_URL: string =
 /** pin_scope ids (match database/seed_data.sql). */
 export const PIN_SCOPE = { self: 1, channel: 2, everyone: 3 } as const;
 
+/** channel_type / channel_member_role / channel_member_status ids (seed_data.sql). */
+export const CHANNEL_TYPE = { direct: 1, group: 2, broadcast: 3 } as const;
+export const MEMBER_ROLE = { owner: 1, member: 2, admin: 3 } as const;
+export const MEMBER_STATUS = { active: 1, muted: 2, banned: 3 } as const;
+
+/**
+ * Whether a member may post in a channel, given the channel and their membership
+ * (mirrors the server LogicBank rule — UI advisory; the server is authoritative):
+ *  - broadcast channels: owner/admin only
+ *  - muted/banned: blocked while the restriction is active (restricted_until
+ *    null = indefinite; a past timestamp = expired)
+ * Returns a reason string when posting is blocked, or null when allowed.
+ */
+export function postBlockReason(
+  channel: Channel | null,
+  member: ChannelMember | null,
+): string | null {
+  if (member) {
+    const restricted =
+      (member.member_status_id === MEMBER_STATUS.muted ||
+        member.member_status_id === MEMBER_STATUS.banned) &&
+      (!member.restricted_until ||
+        member.restricted_until > new Date().toISOString());
+    if (member.member_status_id === MEMBER_STATUS.banned && restricted)
+      return "You are banned from this channel.";
+    if (restricted) return "You are muted in this channel.";
+  }
+  if (channel?.channel_type_id === CHANNEL_TYPE.broadcast) {
+    const role = member?.member_role_id;
+    if (role !== MEMBER_ROLE.owner && role !== MEMBER_ROLE.admin)
+      return "Only admins can post in this broadcast channel.";
+  }
+  return null;
+}
+
 // --- Auth token (set by the auth context after login) ------------------------
 
 let authToken: string | null = null;
