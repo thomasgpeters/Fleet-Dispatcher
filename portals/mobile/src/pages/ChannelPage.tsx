@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import {
   IonActionSheet,
+  IonAlert,
   IonBackButton,
   IonButton,
   IonButtons,
@@ -31,6 +32,7 @@ import type { RefresherCustomEvent } from "@ionic/react";
 import {
   arrowUndoOutline,
   attachOutline,
+  addOutline,
   bookmark,
   bookmarkOutline,
   chatbubblesOutline,
@@ -45,7 +47,7 @@ import {
 } from "ionicons/icons";
 
 import { EmojiPicker } from "../components/EmojiPicker";
-import { api, PIN_SCOPE, postBlockReason } from "../api/client";
+import { api, canManageTopics, PIN_SCOPE, postBlockReason } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { useRealtime } from "../realtime/RealtimeContext";
 import type {
@@ -107,6 +109,7 @@ export function ChannelPage() {
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [draft, setDraft] = useState("");
   const [emojiOpen, setEmojiOpen] = useState(false);
+  const [newTopicOpen, setNewTopicOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -330,6 +333,19 @@ export function ChannelPage() {
 
   // P1/P2 governance: hide the composer with a reason when the user can't post.
   const blockReason = postBlockReason(channel, membership);
+  // Only admins/dispatchers add topics (mirrors the server rule).
+  const canAddTopics = canManageTopics(membership, user?.app_role_id);
+
+  const createTopic_ = async (name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    try {
+      const t = await api.createTopic(channelId, trimmed, userId);
+      setTopics((prev) => [...prev, t]);
+    } catch (e) {
+      fail(e);
+    }
+  };
 
   return (
     <IonPage>
@@ -385,13 +401,20 @@ export function ChannelPage() {
           </IonList>
         )}
 
-        {/* Topics (channel mode only): tap to drill into a focused thread. */}
-        {!topicId && topics.length > 0 && (
+        {/* Topics (channel mode): tap to drill into a focused thread. Admins/
+            dispatchers can add topics; regular members only browse them. */}
+        {!topicId && (topics.length > 0 || canAddTopics) && (
           <IonList>
             <IonListHeader>
               <IonLabel>
                 <IonIcon icon={chatbubblesOutline} /> Topics
               </IonLabel>
+              {canAddTopics && (
+                <IonButton onClick={() => setNewTopicOpen(true)}>
+                  <IonIcon slot="start" icon={addOutline} />
+                  New
+                </IonButton>
+              )}
             </IonListHeader>
             {topics.map((t) => (
               <IonItem
@@ -504,6 +527,23 @@ export function ChannelPage() {
             },
           },
           { text: "Cancel", role: "cancel" },
+        ]}
+      />
+
+      {/* New-topic prompt (admins/dispatchers only). */}
+      <IonAlert
+        isOpen={newTopicOpen}
+        header="New topic"
+        onDidDismiss={() => setNewTopicOpen(false)}
+        inputs={[{ name: "name", type: "text", placeholder: "Topic name" }]}
+        buttons={[
+          { text: "Cancel", role: "cancel" },
+          {
+            text: "Create",
+            handler: (data) => {
+              void createTopic_(String(data?.name ?? ""));
+            },
+          },
         ]}
       />
 

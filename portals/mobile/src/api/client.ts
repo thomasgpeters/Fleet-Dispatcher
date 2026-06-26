@@ -30,10 +30,25 @@ export const API_BASE_URL: string =
 /** pin_scope ids (match database/seed_data.sql). */
 export const PIN_SCOPE = { self: 1, channel: 2, everyone: 3 } as const;
 
-/** channel_type / channel_member_role / channel_member_status ids (seed_data.sql). */
+/** channel_type / channel_member_role / channel_member_status / app_role ids. */
 export const CHANNEL_TYPE = { direct: 1, group: 2, broadcast: 3 } as const;
 export const MEMBER_ROLE = { owner: 1, member: 2, admin: 3 } as const;
 export const MEMBER_STATUS = { active: 1, muted: 2, banned: 3 } as const;
+export const APP_ROLE = { dispatcher: 1, driver: 2, updater: 3 } as const;
+
+/**
+ * Whether a user may create/manage topics in a channel: channel owner/admins,
+ * or anyone with the dispatcher app-role. Regular members don't add topics.
+ * (Mirrors the server LogicBank rule; UI advisory.)
+ */
+export function canManageTopics(
+  member: ChannelMember | null,
+  appRoleId: number | undefined,
+): boolean {
+  if (appRoleId === APP_ROLE.dispatcher) return true;
+  const role = member?.member_role_id;
+  return role === MEMBER_ROLE.owner || role === MEMBER_ROLE.admin;
+}
 
 /**
  * Whether a member may post in a channel, given the channel and their membership

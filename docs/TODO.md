@@ -242,7 +242,10 @@ Priority order (P1 = do first; small→large, value-weighted):
       drill-in flow — Channel shows a **Topics** list + the General stream; a
       topic opens its own focused page (own timeline + compose-into-topic), back
       button to the channel (`ChannelPage` is topic-aware via route param;
-      realtime carries `topic_id`; producer updated). REMAINING: desktop
+      realtime carries `topic_id`; producer updated). **Topic creation is
+      restricted to admins/dispatchers** (channel owner/admin or dispatcher
+      app-role) — enforced by a LogicBank constraint on `ChannelTopic` and gated
+      in the mobile UI (drivers/updaters only browse topics). REMAINING: desktop
       `CommPanel` topic selector + compose-into-topic.
 - [ ] **P4 — Invite links + join requests**. `channel_invite` (token, created_by,
       member_cap, expires_at, requires_approval, revoked) + a pending-join state

@@ -5,6 +5,13 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-06-20
 
+### Comms: topic creation restricted to admins/dispatchers
+- Topic creation is now governed: only a channel owner/admin or a dispatcher
+  (app-role) may add topics; drivers/updaters just browse them. Enforced by a
+  LogicBank constraint on `ChannelTopic` (`als-extensions/comms_governance.py`)
+  and gated in the mobile UI — a "+ New" appears in the channel's Topics header
+  only for those users (`canManageTopics` helper). Mobile build clean.
+
 ### Mobile parity: P3 topics (forum threads, drill-in)
 - Mobile-native flow (one focus per screen): the Channel page shows a **Topics**
   list + the **General** stream (messages with no topic); tapping a topic pushes
