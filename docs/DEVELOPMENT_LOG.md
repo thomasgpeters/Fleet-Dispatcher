@@ -5,6 +5,17 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-06-20
 
+### Mobile parity: per-board export + role/standing badges
+- **Per-board export** (mobile): an Export action in the channel header (admins/
+  dispatchers only) bundles channel + topics + members + messages into a
+  `board-<name>-<date>.json` downloaded via a Blob URL — matches the desktop
+  console. New `membersForChannel` client fn.
+- **Role/standing badges**: the channel list shows per-row badges — channel type
+  (Direct/Group/Broadcast), the user's role (Owner/Admin), and standing
+  (Muted/Banned, danger) — surfaced at the row edge. Memberships captured in the
+  existing per-channel load.
+- Mobile build clean.
+
 ### Comms: topic creation restricted to admins/dispatchers
 - Topic creation is now governed: only a channel owner/admin or a dispatcher
   (app-role) may add topics; drivers/updaters just browse them. Enforced by a

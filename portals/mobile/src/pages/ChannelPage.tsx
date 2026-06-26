@@ -38,6 +38,7 @@ import {
   chatbubblesOutline,
   close,
   documentOutline,
+  downloadOutline,
   happyOutline,
   lockClosedOutline,
   pin,
@@ -333,8 +334,42 @@ export function ChannelPage() {
 
   // P1/P2 governance: hide the composer with a reason when the user can't post.
   const blockReason = postBlockReason(channel, membership);
-  // Only admins/dispatchers add topics (mirrors the server rule).
-  const canAddTopics = canManageTopics(membership, user?.app_role_id);
+  // Admins/dispatchers manage the board: add topics + export (member data).
+  const canManage = canManageTopics(membership, user?.app_role_id);
+
+  // Per-board export (channel mode): bundle channel + topics + members +
+  // messages to a JSON file the user downloads. Mirrors the desktop console.
+  const exportBoard = async () => {
+    try {
+      const members = await api.membersForChannel(channelId);
+      const bundle = {
+        export_version: 1,
+        exported_at: new Date().toISOString(),
+        channel,
+        topics,
+        members,
+        messages,
+      };
+      const blob = new Blob([JSON.stringify(bundle, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const slug =
+        (channel?.name ?? "board")
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-+|-+$/g, "") || "board";
+      a.href = url;
+      a.download = `board-${slug}-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (e) {
+      fail(e);
+    }
+  };
 
   const createTopic_ = async (name: string) => {
     const trimmed = name.trim();
@@ -361,6 +396,17 @@ export function ChannelPage() {
               ? (topic?.name ?? "Topic")
               : (channel?.name ?? "Channel")}
           </IonTitle>
+          {/* Per-board export — admins/dispatchers, channel view only. */}
+          {!topicId && canManage && (
+            <IonButtons slot="end">
+              <IonButton
+                onClick={() => void exportBoard()}
+                aria-label="Export board"
+              >
+                <IonIcon slot="icon-only" icon={downloadOutline} />
+              </IonButton>
+            </IonButtons>
+          )}
         </IonToolbar>
       </IonHeader>
 
@@ -403,13 +449,13 @@ export function ChannelPage() {
 
         {/* Topics (channel mode): tap to drill into a focused thread. Admins/
             dispatchers can add topics; regular members only browse them. */}
-        {!topicId && (topics.length > 0 || canAddTopics) && (
+        {!topicId && (topics.length > 0 || canManage) && (
           <IonList>
             <IonListHeader>
               <IonLabel>
                 <IonIcon icon={chatbubblesOutline} /> Topics
               </IonLabel>
-              {canAddTopics && (
+              {canManage && (
                 <IonButton onClick={() => setNewTopicOpen(true)}>
                   <IonIcon slot="start" icon={addOutline} />
                   New

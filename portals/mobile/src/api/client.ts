@@ -329,6 +329,13 @@ export const api = {
     });
   },
 
+  /** All members of a channel (roles + standing) — used by export + badges. */
+  membersForChannel(channelId: string): Promise<ChannelMember[]> {
+    return getCollection<ChannelMember>("ChannelMember", {
+      channel_id: channelId,
+    });
+  },
+
   /** The current user's membership row for a channel (for read state). */
   async myMembership(
     channelId: string,

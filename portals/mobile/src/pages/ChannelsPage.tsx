@@ -20,8 +20,28 @@ import {
 import type { RefresherCustomEvent } from "@ionic/react";
 import { bookmarkOutline } from "ionicons/icons";
 
-import { api } from "../api/client";
-import type { Channel } from "../api/types";
+import {
+  api,
+  CHANNEL_TYPE,
+  MEMBER_ROLE,
+  MEMBER_STATUS,
+} from "../api/client";
+import type { Channel, ChannelMember } from "../api/types";
+
+/** Human labels for the badges shown on each channel row. */
+const CHANNEL_TYPE_LABEL: Record<number, string> = {
+  [CHANNEL_TYPE.direct]: "Direct message",
+  [CHANNEL_TYPE.group]: "Group",
+  [CHANNEL_TYPE.broadcast]: "Broadcast",
+};
+const ROLE_LABEL: Record<number, string> = {
+  [MEMBER_ROLE.owner]: "Owner",
+  [MEMBER_ROLE.admin]: "Admin",
+};
+const STATUS_LABEL: Record<number, string> = {
+  [MEMBER_STATUS.muted]: "Muted",
+  [MEMBER_STATUS.banned]: "Banned",
+};
 import { useAuth } from "../auth/AuthContext";
 import { useRealtime } from "../realtime/RealtimeContext";
 
@@ -38,6 +58,7 @@ export function ChannelsPage() {
   const { subscribe, addListener } = useRealtime();
   const [channels, setChannels] = useState<Channel[]>([]);
   const [unread, setUnread] = useState<Record<string, number>>({});
+  const [memberships, setMemberships] = useState<Record<string, ChannelMember>>({});
   const [error, setError] = useState<string | null>(null);
 
   const load = async () => {
@@ -47,12 +68,14 @@ export function ChannelsPage() {
       setChannels(chs);
 
       const counts: Record<string, number> = {};
+      const mine: Record<string, ChannelMember> = {};
       await Promise.all(
         chs.map(async (ch) => {
           const [membership, messages] = await Promise.all([
             api.myMembership(ch.id, user.id),
             api.messagesForChannel(ch.id),
           ]);
+          if (membership) mine[ch.id] = membership;
           const lastRead = membership?.last_read_at ?? null;
           counts[ch.id] = messages.filter(
             (m) =>
@@ -62,6 +85,7 @@ export function ChannelsPage() {
         }),
       );
       setUnread(counts);
+      setMemberships(mine);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -113,19 +137,37 @@ export function ChannelsPage() {
           </IonText>
         )}
         <IonList>
-          {channels.map((ch) => (
-            <IonItem key={ch.id} routerLink={`/messages/${ch.id}`} detail>
-              <IonLabel>
-                <h2>{ch.name}</h2>
-                <IonNote>channel #{ch.channel_type_id}</IonNote>
-              </IonLabel>
-              {unread[ch.id] > 0 && (
-                <IonBadge slot="end" color="primary">
-                  {unread[ch.id]}
-                </IonBadge>
-              )}
-            </IonItem>
-          ))}
+          {channels.map((ch) => {
+            const m = memberships[ch.id];
+            const standing = m && STATUS_LABEL[m.member_status_id];
+            const role = m && ROLE_LABEL[m.member_role_id];
+            return (
+              <IonItem key={ch.id} routerLink={`/messages/${ch.id}`} detail>
+                <IonLabel>
+                  <h2>{ch.name}</h2>
+                  <IonNote>
+                    {CHANNEL_TYPE_LABEL[ch.channel_type_id] ?? "Channel"}
+                  </IonNote>
+                </IonLabel>
+                {/* Role / standing / unread badges at the row edge. */}
+                {standing && (
+                  <IonBadge slot="end" color="danger">
+                    {standing}
+                  </IonBadge>
+                )}
+                {role && (
+                  <IonBadge slot="end" color="medium">
+                    {role}
+                  </IonBadge>
+                )}
+                {unread[ch.id] > 0 && (
+                  <IonBadge slot="end" color="primary">
+                    {unread[ch.id]}
+                  </IonBadge>
+                )}
+              </IonItem>
+            );
+          })}
         </IonList>
       </IonContent>
     </IonPage>

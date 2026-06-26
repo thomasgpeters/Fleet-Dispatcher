@@ -234,8 +234,9 @@ Priority order (P1 = do first; small→large, value-weighted):
       `restricted_until` (expiry); LogicBank rule blocks posting while a mute/ban
       is active (NULL until = indefinite; past = expired). Verified on PG16.
       Desktop + mobile: composer also respects standing — hidden with "You are
-      muted/banned" while a restriction is active. REMAINING: admin UI to mute/
-      ban/remove members; surface standing in the directory.
+      muted/banned" while a restriction is active. Mobile channel list shows
+      role (Owner/Admin) + standing (Muted/Banned) + channel-type badges per row.
+      REMAINING: admin UI to mute/ban/remove members; desktop directory badges.
 - [~] **P3 — Topics (forum threads)**. DONE: `channel_topic` (channel_id, name,
       created_by, is_closed) + `message.topic_id` (nullable; General = NULL) +
       indexes; seed has a "Lubbock -> Denver" topic. Verified on PG16. Mobile:
@@ -290,9 +291,12 @@ Additional requirements for a robust board. Decisions captured from the user:
       the full take-over view [full/labeled]) has an **Export** action that bundles
       the board's channel meta + topics + members + messages (raw JSON:API docs)
       and downloads a `board-<name>-<date>.json` via a Blob URL
-      (`ApiClient::fetchRaw`). REMAINING: **restore** (import a bundle), mobile
-      export, and the DB-level `pg_dump`/restore + runbook/timer path for very
-      large boards.
+      (`ApiClient::fetchRaw`). Mobile: per-board **Export** action in the channel
+      header (admins/dispatchers only) bundles channel + topics + members +
+      messages to a downloaded JSON (Blob URL). REMAINING: **restore** (import a
+      bundle), align the desktop raw-doc vs mobile structured format when restore
+      lands, native Capacitor file save (Filesystem/Share), and the DB-level
+      `pg_dump`/restore + runbook/timer path for very large boards.
 - [ ] **Archive / revive channels**. DECIDED: an **archived channel is no longer
       visible to users**; **admins can revive** (unarchive) it. Wire up the
       existing `channel.is_archived`: filter archived channels out of normal
