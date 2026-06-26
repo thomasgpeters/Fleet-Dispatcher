@@ -5,6 +5,17 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-06-20
 
+### Mobile parity: P3 topics (forum threads, drill-in)
+- Mobile-native flow (one focus per screen): the Channel page shows a **Topics**
+  list + the **General** stream (messages with no topic); tapping a topic pushes
+  a focused topic page (its own timeline + composer, back to the channel).
+  `ChannelPage` is topic-aware via an optional `:topicId` route param — General
+  filters to `!topic_id`, topic mode to `topic_id === topicId`; compose/attach
+  carry the topic.
+- API: `topicsForChannel` / `getTopic` / `createTopic`; `createMessage` takes an
+  optional `topicId`. Realtime message events now carry `topic_id` (mobile
+  handler + `als-extensions` producer). Mobile build clean.
+
 ### Mobile parity: P1/P2 composer gating
 - Mobile `ChannelPage` now fetches the user's `ChannelMember` and, when they
   can't post (broadcast non-admin, or muted/banned with an active restriction),

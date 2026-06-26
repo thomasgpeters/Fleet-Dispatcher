@@ -8,6 +8,7 @@ import type {
   AppUser,
   Channel,
   ChannelMember,
+  ChannelTopic,
   Document,
   Driver,
   DriverEquipment,
@@ -260,6 +261,30 @@ export const api = {
     return getOne<Channel>("Channel", channelId);
   },
 
+  /** Forum topics in a channel (Feature 4 P3). */
+  topicsForChannel(channelId: string): Promise<ChannelTopic[]> {
+    return getCollection<ChannelTopic>("ChannelTopic", { channel_id: channelId });
+  },
+
+  /** A single topic (topic page header). */
+  getTopic(topicId: string): Promise<ChannelTopic> {
+    return getOne<ChannelTopic>("ChannelTopic", topicId);
+  },
+
+  /** Create a topic in a channel. */
+  createTopic(
+    channelId: string,
+    name: string,
+    createdBy: string,
+  ): Promise<ChannelTopic> {
+    return createResource<ChannelTopic>("ChannelTopic", {
+      channel_id: channelId,
+      name,
+      created_by: createdBy,
+      is_closed: false,
+    });
+  },
+
   /** Messages in a channel (oldest-first; sort handled client-side for now). */
   messagesForChannel(channelId: string): Promise<Message[]> {
     return getCollection<Message>("Message", { channel_id: channelId });
@@ -271,18 +296,21 @@ export const api = {
   },
 
   /** Post a new text message to a channel; pass `replyToId` to thread it under
-   * another message (renders a quoted snippet in the timeline). */
+   * another message (renders a quoted snippet in the timeline), and `topicId`
+   * to place it in a forum topic (omit for the channel's General stream). */
   createMessage(
     channelId: string,
     authorId: string,
     body: string,
     replyToId?: string,
+    topicId?: string,
   ): Promise<Message> {
     return createResource<Message>("Message", {
       channel_id: channelId,
       author_id: authorId,
       body,
       ...(replyToId ? { reply_to_id: replyToId } : {}),
+      ...(topicId ? { topic_id: topicId } : {}),
     });
   },
 

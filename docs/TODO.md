@@ -238,9 +238,12 @@ Priority order (P1 = do first; small→large, value-weighted):
       ban/remove members; surface standing in the directory.
 - [~] **P3 — Topics (forum threads)**. DONE: `channel_topic` (channel_id, name,
       created_by, is_closed) + `message.topic_id` (nullable; General = NULL) +
-      indexes; seed has a "Lubbock -> Denver" topic. Verified on PG16. REMAINING:
-      client UI — topic list within a channel + compose-into-topic (desktop
-      `CommPanel` + mobile message board).
+      indexes; seed has a "Lubbock -> Denver" topic. Verified on PG16. Mobile:
+      drill-in flow — Channel shows a **Topics** list + the General stream; a
+      topic opens its own focused page (own timeline + compose-into-topic), back
+      button to the channel (`ChannelPage` is topic-aware via route param;
+      realtime carries `topic_id`; producer updated). REMAINING: desktop
+      `CommPanel` topic selector + compose-into-topic.
 - [ ] **P4 — Invite links + join requests**. `channel_invite` (token, created_by,
       member_cap, expires_at, requires_approval, revoked) + a pending-join state
       on `channel_member` (or `channel_join_request`). Onboards carriers/drivers

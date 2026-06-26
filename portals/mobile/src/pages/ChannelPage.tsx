@@ -33,6 +33,7 @@ import {
   attachOutline,
   bookmark,
   bookmarkOutline,
+  chatbubblesOutline,
   close,
   documentOutline,
   happyOutline,
@@ -50,6 +51,7 @@ import { useRealtime } from "../realtime/RealtimeContext";
 import type {
   Channel,
   ChannelMember,
+  ChannelTopic,
   Document,
   Message,
   MessagePin,
@@ -86,12 +88,16 @@ function fileToBase64(file: File): Promise<string> {
  * user's personal archive; visible pins surface in a strip at the top.
  */
 export function ChannelPage() {
-  const { channelId } = useParams<{ channelId: string }>();
+  // topicId is present when viewing a forum topic (drill-in); absent = the
+  // channel's General stream.
+  const { channelId, topicId } = useParams<{ channelId: string; topicId?: string }>();
   const { user } = useAuth();
   const { subscribe, addListener } = useRealtime();
   const userId = user?.id ?? "";
   const [channel, setChannel] = useState<Channel | null>(null);
   const [membership, setMembership] = useState<ChannelMember | null>(null);
+  const [topics, setTopics] = useState<ChannelTopic[]>([]);   // channel mode
+  const [topic, setTopic] = useState<ChannelTopic | null>(null);  // topic mode
   const [messages, setMessages] = useState<Message[]>([]);
   const [docsByMessage, setDocsByMessage] = useState<Record<string, Document[]>>({});
   const [pins, setPins] = useState<MessagePin[]>([]);
@@ -109,13 +115,19 @@ export function ChannelPage() {
 
   const load = async () => {
     try {
-      const [ch, msgs, myMember] = await Promise.all([
+      const [ch, msgs, myMember, tps] = await Promise.all([
         api.getChannel(channelId),
         api.messagesForChannel(channelId),
         api.myMembership(channelId, userId),
+        topicId ? api.getTopic(topicId) : api.topicsForChannel(channelId),
       ]);
       setChannel(ch);
       setMembership(myMember);  // drives composer gating (P1/P2)
+      if (topicId) {
+        setTopic(tps as ChannelTopic);
+      } else {
+        setTopics(tps as ChannelTopic[]);
+      }
       const sorted = [...msgs].sort((a, b) => a.posted_at.localeCompare(b.posted_at));
       setMessages(sorted);
 
@@ -174,6 +186,7 @@ export function ChannelPage() {
       const incoming: Message = {
         id: String(evt.id),
         channel_id: String(evt.channel_id),
+        topic_id: evt.topic_id ? String(evt.topic_id) : null,
         author_id: String(evt.author_id),
         body: String(evt.body ?? ""),
         posted_at: String(evt.posted_at ?? new Date().toISOString()),
@@ -199,6 +212,7 @@ export function ChannelPage() {
         userId,
         draft.trim(),
         replyTo?.id,
+        topicId,  // undefined = General stream
       );
       setMessages((prev) => [...prev, msg]);
       setDraft("");
@@ -269,6 +283,8 @@ export function ChannelPage() {
         channelId,
         userId,
         `📎 ${file.name}`,
+        undefined,
+        topicId,  // attach within the current topic (or General)
       );
       const doc = await api.createDocument({
         title: file.name,
@@ -306,6 +322,12 @@ export function ChannelPage() {
   const messagesById: Record<string, Message> = {};
   for (const m of messages) messagesById[m.id] = m;
 
+  // Topic mode shows just that topic's messages; channel mode shows the General
+  // stream (messages with no topic). Topics are reached via the list below.
+  const timeline = messages.filter((m) =>
+    topicId ? m.topic_id === topicId : !m.topic_id,
+  );
+
   // P1/P2 governance: hide the composer with a reason when the user can't post.
   const blockReason = postBlockReason(channel, membership);
 
@@ -314,9 +336,15 @@ export function ChannelPage() {
       <IonHeader>
         <IonToolbar>
           <IonButtons slot="start">
-            <IonBackButton defaultHref="/messages" />
+            <IonBackButton
+              defaultHref={topicId ? `/messages/${channelId}` : "/messages"}
+            />
           </IonButtons>
-          <IonTitle>{channel?.name ?? "Channel"}</IonTitle>
+          <IonTitle>
+            {topicId
+              ? (topic?.name ?? "Topic")
+              : (channel?.name ?? "Channel")}
+          </IonTitle>
         </IonToolbar>
       </IonHeader>
 
@@ -357,8 +385,32 @@ export function ChannelPage() {
           </IonList>
         )}
 
+        {/* Topics (channel mode only): tap to drill into a focused thread. */}
+        {!topicId && topics.length > 0 && (
+          <IonList>
+            <IonListHeader>
+              <IonLabel>
+                <IonIcon icon={chatbubblesOutline} /> Topics
+              </IonLabel>
+            </IonListHeader>
+            {topics.map((t) => (
+              <IonItem
+                key={t.id}
+                button
+                detail
+                routerLink={`/messages/${channelId}/topics/${t.id}`}
+              >
+                <IonLabel>
+                  {t.name}
+                  {t.is_closed && <IonNote> · closed</IonNote>}
+                </IonLabel>
+              </IonItem>
+            ))}
+          </IonList>
+        )}
+
         <IonList>
-          {messages.map((m) => (
+          {timeline.map((m) => (
             <IonItemSliding key={m.id}>
               <IonItem lines="none">
                 <IonLabel className="ion-text-wrap">
