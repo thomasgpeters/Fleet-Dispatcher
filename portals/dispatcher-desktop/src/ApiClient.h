@@ -60,6 +60,8 @@ public:
     using MessagesCallback = std::function<void(std::vector<Message>)>;
     using MessageCallback = std::function<void(Message)>;
     using ChannelMembersCallback = std::function<void(std::vector<ChannelMember>)>;
+    using TopicsCallback = std::function<void(std::vector<Topic>)>;
+    using TopicCallback = std::function<void(Topic)>;
     using RawCallback = std::function<void(std::string)>;  // raw JSON:API doc text
     using TokenCallback = std::function<void(std::string)>;
     using UserCallback = std::function<void(AppUser)>;
@@ -97,9 +99,17 @@ public:
     // Members of a channel (role + standing) — drives composer gating (P1/P2).
     void fetchChannelMembers(const std::string& channelId,
                              ChannelMembersCallback onOk, ErrorCallback onErr);
+    // Forum topics in a channel (P3); create restricted to admins/dispatchers
+    // server-side (LogicBank) — the UI also gates the action.
+    void fetchTopics(const std::string& channelId, TopicsCallback onOk,
+                     ErrorCallback onErr);
+    void createTopic(const std::string& channelId, const std::string& name,
+                     const std::string& createdBy, TopicCallback onOk,
+                     ErrorCallback onErr);
+    // Post a message; topicId empty = the channel's General stream.
     void createMessage(const std::string& channelId, const std::string& authorId,
-                       const std::string& body, MessageCallback onOk,
-                       ErrorCallback onErr);
+                       const std::string& body, const std::string& topicId,
+                       MessageCallback onOk, ErrorCallback onErr);
 
     // Generic option fetch for form combos: GET /resource, label from labelAttr.
     void fetchOptions(const std::string& resource, const std::string& labelAttr,

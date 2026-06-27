@@ -246,8 +246,11 @@ Priority order (P1 = do first; small→large, value-weighted):
       realtime carries `topic_id`; producer updated). **Topic creation is
       restricted to admins/dispatchers** (channel owner/admin or dispatcher
       app-role) — enforced by a LogicBank constraint on `ChannelTopic` and gated
-      in the mobile UI (drivers/updaters only browse topics). REMAINING: desktop
-      `CommPanel` topic selector + compose-into-topic.
+      in both UIs (drivers/updaters only browse topics). Desktop: `CommPanel`
+      shows a topic-chip bar (General + topics) that filters the timeline +
+      composes into the selected topic, with a gated "+ Topic" dialog
+      (`fetchTopics`/`createTopic`; `createMessage` takes a topicId). DONE both
+      clients.
 - [ ] **P4 — Invite links + join requests**. `channel_invite` (token, created_by,
       member_cap, expires_at, requires_approval, revoked) + a pending-join state
       on `channel_member` (or `channel_join_request`). Onboards carriers/drivers

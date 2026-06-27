@@ -342,6 +342,17 @@ fd::Message parseMessage(const Wt::Json::Object& res) {
     return m;
 }
 
+fd::Topic parseTopic(const Wt::Json::Object& res) {
+    const Wt::Json::Object& a = res.get("attributes");
+    Topic t;
+    t.id = jstr(res, "id");
+    t.channel_id = jstr(a, "channel_id");
+    t.name = jstr(a, "name");
+    auto it = a.find("is_closed");
+    t.is_closed = (it == a.end()) ? false : static_cast<bool>(it->second);
+    return t;
+}
+
 fd::ChannelMember parseChannelMember(const Wt::Json::Object& res) {
     const Wt::Json::Object& a = res.get("attributes");
     ChannelMember m;
@@ -434,14 +445,45 @@ void ApiClient::fetchChannelMembers(const std::string& channelId,
         std::move(onErr));
 }
 
+void ApiClient::fetchTopics(const std::string& channelId, TopicsCallback onOk,
+                            ErrorCallback onErr) {
+    getCollection(
+        baseUrl_ + "/ChannelTopic?filter%5Bchannel_id%5D=" + urlEncode(channelId),
+        authToken_,
+        [onOk](const Wt::Json::Array& data) {
+            std::vector<Topic> out;
+            for (const Wt::Json::Value& v : data) out.push_back(parseTopic(v));
+            onOk(std::move(out));
+        },
+        std::move(onErr));
+}
+
+void ApiClient::createTopic(const std::string& channelId, const std::string& name,
+                            const std::string& createdBy, TopicCallback onOk,
+                            ErrorCallback onErr) {
+    const std::string payload =
+        "{\"data\":{\"type\":\"ChannelTopic\",\"attributes\":{"
+        "\"channel_id\":\"" + jsonEscape(channelId) + "\","
+        "\"name\":\"" + jsonEscape(name) + "\","
+        "\"created_by\":\"" + jsonEscape(createdBy) + "\"}}}";
+    postJson(
+        baseUrl_ + "/ChannelTopic", payload, authToken_,
+        [onOk](const Wt::Json::Object& obj) { onOk(parseTopic(obj)); },
+        std::move(onErr));
+}
+
 void ApiClient::createMessage(const std::string& channelId,
                               const std::string& authorId, const std::string& body,
-                              MessageCallback onOk, ErrorCallback onErr) {
-    const std::string payload =
-        "{\"data\":{\"type\":\"Message\",\"attributes\":{"
+                              const std::string& topicId, MessageCallback onOk,
+                              ErrorCallback onErr) {
+    std::string attrs =
         "\"channel_id\":\"" + jsonEscape(channelId) + "\","
         "\"author_id\":\"" + jsonEscape(authorId) + "\","
-        "\"body\":\"" + jsonEscape(body) + "\"}}}";
+        "\"body\":\"" + jsonEscape(body) + "\"";
+    if (!topicId.empty())
+        attrs += ",\"topic_id\":\"" + jsonEscape(topicId) + "\"";
+    const std::string payload =
+        "{\"data\":{\"type\":\"Message\",\"attributes\":{" + attrs + "}}}";
     postJson(
         baseUrl_ + "/Message", payload, authToken_,
         [onOk](const Wt::Json::Object& obj) { onOk(parseMessage(obj)); },

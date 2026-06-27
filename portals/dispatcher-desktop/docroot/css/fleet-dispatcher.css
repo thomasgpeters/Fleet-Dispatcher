@@ -446,6 +446,21 @@ h1, h2, h3, h4, h5, .h4, .h5 { font-family: var(--fd-font); letter-spacing: 0.1p
     border-color: var(--fd-primary);
 }
 .fd-comm-convo-title { font-weight: 600; margin: 0.25rem 0; }
+
+/* Topic chips (P3): General + each forum topic; "+ Topic" for managers. */
+.fd-comm-topics { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-bottom: 0.5rem; }
+.fd-comm-topic {
+    background: var(--fd-surface-2);
+    color: var(--fd-text);
+    border: none;
+    transition: background-color var(--fd-dur-fast) var(--fd-ease),
+                color var(--fd-dur-fast) var(--fd-ease);
+}
+.fd-comm-topic.fd-active {
+    background-color: var(--fd-primary);
+    color: var(--fd-primary-contrast);
+}
+.fd-comm-topic-add { margin-left: auto; }
 .fd-comm-messages {
     flex: 1 1 auto;
     overflow: auto;

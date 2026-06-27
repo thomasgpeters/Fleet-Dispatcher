@@ -5,6 +5,16 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-06-20
 
+### Desktop parity: P3 topics in CommPanel
+- Desktop comms reaches topic parity: a topic-chip bar (General + each topic)
+  filters the conversation and sets the compose target; a gated "+ Topic" dialog
+  creates topics (owner/admin or dispatcher app-role, mirroring the server rule).
+  CommPanel now retains the channel's full message set (`allMessages_`) and
+  renders a topic-filtered timeline (send/push/refresh all route through it).
+- ApiClient: `fetchTopics` / `createTopic` (+ `parseTopic`); `createMessage`
+  takes a `topicId`. Built carefully — Wt isn't compiled in-sandbox; build on the
+  Linux box.
+
 ### Mobile parity: per-board export + role/standing badges
 - **Per-board export** (mobile): an Export action in the channel header (admins/
   dispatchers only) bundles channel + topics + members + messages into a
