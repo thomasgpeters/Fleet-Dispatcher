@@ -273,6 +273,24 @@ Priority order (P1 = do first; small→large, value-weighted):
 > P4 enables external onboarding; P5–P8 are independent enhancements layerable in
 > any order once the role/topic foundation exists.
 
+### Desktop message-board parity run (2026-06-20)
+
+Close the remaining gaps where the desktop `CommPanel` trails the mobile board.
+Sequenced cheapest→largest; each ships as its own commit (Wt builds on Linux).
+
+- [x] **1 — Directory badges + unread**. Desktop directory rows show **unread**
+      counts + **role/standing** badges (Owner/Admin, Muted/Banned); rail chips
+      show unread in the label. `fetchMyMemberships` + per-channel unread; entering
+      a channel clears it and stamps `markChannelRead`; incoming messages to other
+      channels bump the badge. (Type is conveyed by the directory grouping.)
+- [ ] **2 — Reply/quote + emoji**. Per-message **Reply** (quoted snippet in the
+      timeline; `message.reply_to_id`) and an **emoji** picker in the composer.
+- [ ] **3 — Pins + Saved**. Pin a message with a scope (self/channel/everyone) +
+      a visible-pins strip; a personal **Saved** archive view. (`MessagePin`,
+      `SavedMessage` — already in the schema/mobile.)
+- [ ] **4 — Attachments**. Upload a file (→ `document` + `message_document`),
+      render attachment chips, open/preview. (Wt `WFileUpload`.)
+
 ### Message-board robustness (clarified 2026-06-20)
 
 Additional requirements for a robust board. Decisions captured from the user:

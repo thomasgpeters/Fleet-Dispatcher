@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <ctime>
+#include <map>
 #include <sstream>
 
 #include <Wt/WApplication.h>
@@ -213,6 +214,7 @@ void CommPanel::loadChannels() {
         [this](std::vector<Channel> chs) {
             channels_ = std::move(chs);
             renderChannels();
+            loadDirectoryMeta();   // badges: my role/standing + unread per channel
             if (selectedChannelId_.empty() && !channels_.empty())
                 selectChannel(channels_.front());
         },
@@ -223,12 +225,73 @@ void CommPanel::loadChannels() {
         });
 }
 
+// Fetch the current user's memberships (role/standing) + per-channel unread, then
+// re-render so the directory/rail show badges (mirrors the mobile channel list).
+void CommPanel::loadDirectoryMeta() {
+    api_->fetchMyMemberships(
+        user_.id,
+        [this](std::vector<ChannelMember> ms) {
+            myMemberships_.clear();
+            for (auto& m : ms) myMemberships_[m.channel_id] = m;
+            // Unread per channel: messages newer than my last_read_at, not mine.
+            for (const Channel& c : channels_) {
+                const std::string cid = c.id;
+                std::string lastRead;
+                auto it = myMemberships_.find(cid);
+                if (it != myMemberships_.end()) lastRead = it->second.last_read_at;
+                api_->fetchMessages(
+                    cid,
+                    [this, cid, lastRead](std::vector<Message> msgs) {
+                        int n = 0;
+                        for (const Message& m : msgs)
+                            if (m.author_id != user_.id &&
+                                (lastRead.empty() || m.posted_at > lastRead))
+                                ++n;
+                        if (cid == selectedChannelId_) n = 0;  // currently viewing
+                        unread_[cid] = n;
+                        renderChannels();
+                        if (auto* a = Wt::WApplication::instance()) a->triggerUpdate();
+                    },
+                    [](std::string) {});
+            }
+            renderChannels();
+        },
+        [](std::string) { /* badges optional; ignore */ });
+}
+
+// Append unread + role/standing badges (WText spans render as XHTML) to a row.
+void CommPanel::appendChannelBadges(Wt::WContainerWidget* row,
+                                    const std::string& channelId) {
+    auto u = unread_.find(channelId);
+    if (u != unread_.end() && u->second > 0)
+        row->addNew<Wt::WText>(Wt::WString::fromUTF8(
+            "<span class=\"fd-badge fd-badge-unread\">" +
+            std::to_string(u->second) + "</span>"));
+    auto m = myMemberships_.find(channelId);
+    if (m != myMemberships_.end()) {
+        const int status = m->second.member_status_id;  // 2 muted, 3 banned
+        const int role = m->second.member_role_id;      // 1 owner, 3 admin
+        if (status == 2 || status == 3)
+            row->addNew<Wt::WText>(Wt::WString::fromUTF8(
+                "<span class=\"fd-badge fd-badge-danger\">" +
+                std::string(status == 3 ? "Banned" : "Muted") + "</span>"));
+        if (role == 1)
+            row->addNew<Wt::WText>("<span class=\"fd-badge\">Owner</span>");
+        else if (role == 3)
+            row->addNew<Wt::WText>("<span class=\"fd-badge\">Admin</span>");
+    }
+}
+
 void CommPanel::renderChannels() {
     channelList_->clear();
     if (layout_ == Layout::Full) { renderDirectory(); return; }
-    // Rail: a flat horizontal strip of channel chips.
+    // Rail: a flat horizontal strip of channel chips (unread count in label).
     for (const Channel& c : channels_) {
-        auto* btn = channelList_->addNew<Wt::WPushButton>(Wt::WString::fromUTF8(c.name));
+        auto u = unread_.find(c.id);
+        std::string label = c.name;
+        if (u != unread_.end() && u->second > 0)
+            label += " (" + std::to_string(u->second) + ")";
+        auto* btn = channelList_->addNew<Wt::WPushButton>(Wt::WString::fromUTF8(label));
         btn->addStyleClass("fd-comm-channel btn btn-sm");
         if (c.id == selectedChannelId_) btn->addStyleClass("fd-active");
         Channel copy = c;
@@ -253,12 +316,15 @@ void CommPanel::renderDirectory() {
         channelList_->addNew<Wt::WText>(Wt::WString::fromUTF8(
             std::string("<div class=\"fd-comm-group-label\">") + s.label + "</div>"));
         for (const Channel* c : in) {
+            auto* row = channelList_->addNew<Wt::WContainerWidget>();
+            row->addStyleClass("fd-comm-group-row");
             auto* btn =
-                channelList_->addNew<Wt::WPushButton>(Wt::WString::fromUTF8(c->name));
+                row->addNew<Wt::WPushButton>(Wt::WString::fromUTF8(c->name));
             btn->addStyleClass("fd-comm-group-item btn btn-sm");
             if (c->id == selectedChannelId_) btn->addStyleClass("fd-active");
             Channel copy = *c;
             btn->clicked().connect([this, copy] { selectChannel(copy); });
+            appendChannelBadges(row, c->id);
         }
     }
     if (!any) {
@@ -275,6 +341,13 @@ void CommPanel::selectChannel(const Channel& c) {
     allMessages_.clear();
     topics_.clear();
     convoTitle_->setText(Wt::WString::fromUTF8("#" + c.name));
+    // Entering a channel clears its unread + stamps it read.
+    unread_[c.id] = 0;
+    {
+        auto it = myMemberships_.find(c.id);
+        if (it != myMemberships_.end())
+            api_->markChannelRead(it->second.id, [](std::string) {});
+    }
     renderChannels();
     renderTopicBar();           // General-only until topics arrive
     refreshMessages(/*notifyOnNew=*/false);
@@ -500,9 +573,13 @@ void CommPanel::onPushed(const Message& m) {
         if (toaster_ && m.author_id != user_.id)
             toaster_->notify("New message · #" + selectedChannelName_,
                              snippet(m.body), Toaster::Level::Info);
-    } else if (toaster_ && m.author_id != user_.id) {
-        toaster_->notify("New message · #" + channelName(m.channel_id),
-                         snippet(m.body), Toaster::Level::Info);
+    } else if (m.author_id != user_.id) {
+        // Another channel: bump its unread badge and toast.
+        unread_[m.channel_id] = (unread_.count(m.channel_id) ? unread_[m.channel_id] : 0) + 1;
+        renderChannels();
+        if (toaster_)
+            toaster_->notify("New message · #" + channelName(m.channel_id),
+                             snippet(m.body), Toaster::Level::Info);
     }
 }
 

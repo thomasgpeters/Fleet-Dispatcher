@@ -7,6 +7,7 @@
 // middleware emits change events. New messages from others raise a top-right toast.
 #pragma once
 
+#include <map>
 #include <set>
 #include <string>
 #include <vector>
@@ -45,6 +46,8 @@ private:
 
     std::vector<Channel> channels_;
     std::vector<ChannelMember> members_;   // members of the selected channel
+    std::map<std::string, ChannelMember> myMemberships_;  // my membership per channel
+    std::map<std::string, int> unread_;    // unread count per channel
     std::vector<Topic> topics_;            // topics of the selected channel
     std::vector<Message> allMessages_;     // the channel's full set (filtered per topic)
     std::string selectedChannelId_;
@@ -69,6 +72,8 @@ private:
     void buildConvoHead(Wt::WContainerWidget* parent, bool full);  // title + actions
     void buildComposer(Wt::WContainerWidget* parent);
     void loadChannels();
+    void loadDirectoryMeta();   // my memberships + per-channel unread (badges)
+    void appendChannelBadges(Wt::WContainerWidget* row, const std::string& channelId);
     void renderChannels();
     void renderDirectory();    // grouped vertical channel list (Full layout)
     void selectChannel(const Channel& c);

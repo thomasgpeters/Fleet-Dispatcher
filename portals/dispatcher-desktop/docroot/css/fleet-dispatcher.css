@@ -559,6 +559,21 @@ h1, h2, h3, h4, h5, .h4, .h5 { font-family: var(--fd-font); letter-spacing: 0.1p
     border-left: 3px solid var(--fd-accent);   /* orange active marker */
     font-weight: 600;
 }
+/* Directory row = channel button + edge badges (unread / role / standing). */
+.fd-comm-group-row { display: flex; align-items: center; gap: 0.35rem; }
+.fd-comm-group-row .fd-comm-group-item { flex: 1 1 auto; }
+.fd-badge {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    background: var(--fd-surface-2);
+    color: var(--fd-text-muted);
+    border-radius: 999px;
+    padding: 0.05rem 0.45rem;
+    white-space: nowrap;
+}
+.fd-badge-unread { background: var(--fd-primary); color: var(--fd-primary-contrast); }
+.fd-badge-danger { background: #d65a4f; color: #fff; }
 
 /* ===========================================================================
  * Toaster: top-right transient alerts

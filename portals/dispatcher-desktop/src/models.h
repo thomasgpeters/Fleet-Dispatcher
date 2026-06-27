@@ -48,6 +48,7 @@ struct ChannelMember {
     int member_role_id = 0;     // 1=owner, 2=member, 3=admin
     int member_status_id = 1;   // 1=active, 2=muted, 3=banned
     std::string restricted_until;  // ISO8601 mute/ban expiry (empty = none/indefinite)
+    std::string last_read_at;   // ISO8601 read position (drives unread counts)
 };
 
 struct Message {

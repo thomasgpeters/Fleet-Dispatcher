@@ -4,6 +4,7 @@
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <ctime>
 #include <memory>
 #include <sstream>
 #include <string>
@@ -362,6 +363,7 @@ fd::ChannelMember parseChannelMember(const Wt::Json::Object& res) {
     m.member_role_id = jint(a, "member_role_id");
     m.member_status_id = jint(a, "member_status_id");
     m.restricted_until = jstr(a, "restricted_until");
+    m.last_read_at = jstr(a, "last_read_at");
     return m;
 }
 
@@ -443,6 +445,36 @@ void ApiClient::fetchChannelMembers(const std::string& channelId,
             onOk(std::move(out));
         },
         std::move(onErr));
+}
+
+void ApiClient::fetchMyMemberships(const std::string& userId,
+                                   ChannelMembersCallback onOk,
+                                   ErrorCallback onErr) {
+    getCollection(
+        baseUrl_ + "/ChannelMember?filter%5Buser_id%5D=" + urlEncode(userId),
+        authToken_,
+        [onOk](const Wt::Json::Array& data) {
+            std::vector<ChannelMember> out;
+            for (const Wt::Json::Value& v : data) out.push_back(parseChannelMember(v));
+            onOk(std::move(out));
+        },
+        std::move(onErr));
+}
+
+void ApiClient::markChannelRead(const std::string& membershipId,
+                                ErrorCallback onErr) {
+    // ISO-8601 UTC "now".
+    std::time_t t = std::time(nullptr);
+    std::tm tm{};
+    gmtime_r(&t, &tm);
+    char buf[24];
+    std::strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%SZ", &tm);
+    const std::string body =
+        "{\"data\":{\"type\":\"ChannelMember\",\"id\":\"" + jsonEscape(membershipId) +
+        "\",\"attributes\":{\"last_read_at\":\"" + std::string(buf) + "\"}}}";
+    patchJson(
+        baseUrl_ + "/ChannelMember/" + membershipId, body, authToken_,
+        [](const Wt::Json::Object&) { /* best-effort */ }, std::move(onErr));
 }
 
 void ApiClient::fetchTopics(const std::string& channelId, TopicsCallback onOk,

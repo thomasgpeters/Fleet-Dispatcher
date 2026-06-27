@@ -5,6 +5,14 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-06-20
 
+### Desktop parity run — step 1: directory badges + unread
+- Desktop channel directory now shows per-channel **unread** counts +
+  **role/standing** badges (Owner/Admin, Muted/Banned); rail chips carry the
+  unread count in their label. `ApiClient::fetchMyMemberships` (role/standing +
+  last_read_at) + per-channel unread count; selecting a channel clears it and
+  `markChannelRead` stamps last_read_at; messages to other channels bump the
+  badge live. `ChannelMember` gains `last_read_at`. Wt builds on Linux.
+
 ### Desktop parity: P3 topics in CommPanel
 - Desktop comms reaches topic parity: a topic-chip bar (General + each topic)
   filters the conversation and sets the compose target; a gated "+ Topic" dialog
