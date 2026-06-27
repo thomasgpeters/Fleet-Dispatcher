@@ -112,10 +112,11 @@ public:
     void createTopic(const std::string& channelId, const std::string& name,
                      const std::string& createdBy, TopicCallback onOk,
                      ErrorCallback onErr);
-    // Post a message; topicId empty = the channel's General stream.
+    // Post a message; topicId empty = General stream, replyToId empty = top-level.
     void createMessage(const std::string& channelId, const std::string& authorId,
                        const std::string& body, const std::string& topicId,
-                       MessageCallback onOk, ErrorCallback onErr);
+                       const std::string& replyToId, MessageCallback onOk,
+                       ErrorCallback onErr);
 
     // Generic option fetch for form combos: GET /resource, label from labelAttr.
     void fetchOptions(const std::string& resource, const std::string& labelAttr,

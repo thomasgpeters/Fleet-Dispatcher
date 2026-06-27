@@ -337,6 +337,7 @@ fd::Message parseMessage(const Wt::Json::Object& res) {
     m.id = jstr(res, "id");
     m.channel_id = jstr(a, "channel_id");
     m.topic_id = jstr(a, "topic_id");
+    m.reply_to_id = jstr(a, "reply_to_id");
     m.author_id = jstr(a, "author_id");
     m.body = jstr(a, "body");
     m.posted_at = jstr(a, "posted_at");
@@ -506,7 +507,8 @@ void ApiClient::createTopic(const std::string& channelId, const std::string& nam
 
 void ApiClient::createMessage(const std::string& channelId,
                               const std::string& authorId, const std::string& body,
-                              const std::string& topicId, MessageCallback onOk,
+                              const std::string& topicId,
+                              const std::string& replyToId, MessageCallback onOk,
                               ErrorCallback onErr) {
     std::string attrs =
         "\"channel_id\":\"" + jsonEscape(channelId) + "\","
@@ -514,6 +516,8 @@ void ApiClient::createMessage(const std::string& channelId,
         "\"body\":\"" + jsonEscape(body) + "\"";
     if (!topicId.empty())
         attrs += ",\"topic_id\":\"" + jsonEscape(topicId) + "\"";
+    if (!replyToId.empty())
+        attrs += ",\"reply_to_id\":\"" + jsonEscape(replyToId) + "\"";
     const std::string payload =
         "{\"data\":{\"type\":\"Message\",\"attributes\":{" + attrs + "}}}";
     postJson(

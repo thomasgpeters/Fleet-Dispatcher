@@ -195,11 +195,9 @@ Make the HUD a live operations wall, not just a board mirror:
 - Mechanism: controls live on the **console** and drive the HUD via
   `HudControlBus` (the HUD is an operator-less wall display) — new commands
   `SetScope{driver|region|fleet, id}` and `FollowDriver{id}` alongside `SetMode`.
-- OPEN QUESTION — **how is "region" defined?** No region entity exists today.
-  Options: (a) by US **state** derived from position lat/lng (no schema change,
-  approximate), (b) a new `region` lookup + `driver.region_id` (explicit, schema
-  change + ALS regen), (c) group by `driver.home_base`. Needs a decision before
-  the region scope ships; driver + fleet scopes can land first.
+- DECIDED (2026-06-20): **"region" = US state derived from each driver's latest
+  position lat/lng** (no schema change; approximate). Driver + fleet scopes can
+  land first; the state lookup is a geospatial/client mapping.
 
 ## Feature 3 — Hey Dispatch driver voice assistant
 
@@ -304,8 +302,10 @@ Sequenced cheapest→largest; each ships as its own commit (Wt builds on Linux).
       show unread in the label. `fetchMyMemberships` + per-channel unread; entering
       a channel clears it and stamps `markChannelRead`; incoming messages to other
       channels bump the badge. (Type is conveyed by the directory grouping.)
-- [ ] **2 — Reply/quote + emoji**. Per-message **Reply** (quoted snippet in the
-      timeline; `message.reply_to_id`) and an **emoji** picker in the composer.
+- [x] **2 — Reply/quote + emoji**. Per-message hover **Reply** → composer reply
+      banner; the reply renders a quoted snippet in the timeline
+      (`message.reply_to_id`; `createMessage` takes a replyToId). Composer **emoji**
+      picker (toggle panel, trucking-relevant set, UTF-8). Wt builds on Linux.
 - [ ] **3 — Pins + Saved**. Pin a message with a scope (self/channel/everyone) +
       a visible-pins strip; a personal **Saved** archive view. (`MessagePin`,
       `SavedMessage` — already in the schema/mobile.)

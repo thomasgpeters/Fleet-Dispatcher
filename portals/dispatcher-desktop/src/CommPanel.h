@@ -64,8 +64,12 @@ private:
     Wt::WContainerWidget* messageList_ = nullptr;
     Wt::WContainerWidget* composerRow_ = nullptr;  // hidden when the user can't post
     Wt::WText* postNotice_ = nullptr;              // why posting is blocked
+    Wt::WContainerWidget* replyBanner_ = nullptr;  // "Replying to …" (hidden by default)
+    Wt::WText* replyBannerText_ = nullptr;
+    Wt::WContainerWidget* emojiPanel_ = nullptr;   // emoji picker (hidden by default)
     Wt::WLineEdit* composer_ = nullptr;
     Wt::WTimer* poll_ = nullptr;
+    std::string replyToId_;                        // pending reply target (empty = none)
 
     void buildRail();          // compact right-rail layout
     void buildFull();          // directory + conversation take-over layout
@@ -88,6 +92,9 @@ private:
     void renderTimeline();        // render allMessages_ filtered by topic
     bool inSelectedTopic(const Message& m) const;
     void renderOne(const Message& m);          // append a single message row
+    void startReply(const Message& m);         // begin a threaded reply
+    void cancelReply();
+    void buildEmojiPanel(Wt::WContainerWidget* parent);  // composer emoji picker
     void onPushed(const Message& m);           // CommBus delivery (server push)
     std::string channelName(const std::string& id) const;
     void send();

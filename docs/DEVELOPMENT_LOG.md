@@ -5,6 +5,15 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-06-20
 
+### Desktop parity run — step 2: reply/quote + emoji
+- Per-message hover **Reply** opens a composer reply banner; the sent reply
+  carries `reply_to_id` and renders a quoted snippet above the message
+  (resolved from the loaded set). `createMessage` gains a `replyToId`; `Message`
+  gains `reply_to_id`. Composer **emoji** picker — a toggle panel of a compact
+  trucking-relevant set, appended to the draft (UTF-8 end to end). Wt builds on
+  Linux.
+- Region decision recorded for the HUD: "region" = US state from position lat/lng.
+
 ### Desktop parity run — step 1: directory badges + unread
 - Desktop channel directory now shows per-channel **unread** counts +
   **role/standing** badges (Owner/Admin, Muted/Banned); rail chips carry the

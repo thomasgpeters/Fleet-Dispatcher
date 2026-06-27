@@ -186,14 +186,34 @@ void CommPanel::buildConvoHead(Wt::WContainerWidget* parent, bool full) {
 }
 
 void CommPanel::buildComposer(Wt::WContainerWidget* parent) {
+    // Reply banner ("Replying to …" + cancel), shown while composing a reply.
+    replyBanner_ = parent->addNew<Wt::WContainerWidget>();
+    replyBanner_->addStyleClass("fd-comm-reply-banner");
+    replyBannerText_ = replyBanner_->addNew<Wt::WText>();
+    replyBannerText_->addStyleClass("fd-comm-reply-text fd-muted");
+    auto* cancelReplyBtn = replyBanner_->addNew<Wt::WPushButton>(
+        Wt::WString::fromUTF8("✕"));
+    cancelReplyBtn->addStyleClass("btn btn-sm fd-comm-reply-cancel");
+    cancelReplyBtn->clicked().connect(this, &CommPanel::cancelReply);
+    replyBanner_->hide();
+
     // A read-only notice shown in place of the composer when the user can't post
     // (broadcast member, or muted/banned). Hidden by default.
     postNotice_ = parent->addNew<Wt::WText>();
     postNotice_->addStyleClass("fd-comm-post-notice fd-muted");
     postNotice_->hide();
 
+    buildEmojiPanel(parent);  // hidden until the emoji button toggles it
+
     composerRow_ = parent->addNew<Wt::WContainerWidget>();
     composerRow_->addStyleClass("fd-comm-composer");
+    auto* emojiBtn = composerRow_->addNew<Wt::WPushButton>(Wt::WString::fromUTF8("☺"));
+    emojiBtn->addStyleClass("btn btn-sm fd-comm-emoji-btn");
+    emojiBtn->setToolTip("Emoji");
+    emojiBtn->clicked().connect([this] {
+        if (emojiPanel_) emojiPanel_->isHidden() ? emojiPanel_->show()
+                                                 : emojiPanel_->hide();
+    });
     composer_ = composerRow_->addNew<Wt::WLineEdit>();
     composer_->addStyleClass("form-control form-control-sm");
     composer_->setPlaceholderText("Message…");
@@ -201,6 +221,38 @@ void CommPanel::buildComposer(Wt::WContainerWidget* parent) {
     auto* sendBtn = composerRow_->addNew<Wt::WPushButton>("Send");
     sendBtn->addStyleClass("btn btn-sm btn-primary");
     sendBtn->clicked().connect(this, &CommPanel::send);
+}
+
+void CommPanel::buildEmojiPanel(Wt::WContainerWidget* parent) {
+    emojiPanel_ = parent->addNew<Wt::WContainerWidget>();
+    emojiPanel_->addStyleClass("fd-comm-emoji");
+    emojiPanel_->hide();
+    // A compact, trucking-relevant set (transport is UTF-8 end to end).
+    static const char* kEmoji[] = {
+        "👍", "👌", "✅", "❌", "⚠️", "🚚", "🛻", "🚛", "⛽", "🅿️",
+        "🕒", "📍", "🗺️", "📦", "📝", "🙏", "😀", "😅", "👀", "🔥"};
+    for (const char* e : kEmoji) {
+        auto* b = emojiPanel_->addNew<Wt::WPushButton>(Wt::WString::fromUTF8(e));
+        b->addStyleClass("btn btn-sm fd-emoji");
+        std::string emoji = e;
+        b->clicked().connect([this, emoji] {
+            if (composer_) composer_->setText(composer_->text().toUTF8() + emoji);
+        });
+    }
+}
+
+void CommPanel::startReply(const Message& m) {
+    replyToId_ = m.id;
+    if (replyBannerText_)
+        replyBannerText_->setText(Wt::WString::fromUTF8(
+            "↩ Replying to: " + esc(snippet(m.body))));
+    if (replyBanner_) replyBanner_->show();
+    if (composer_) composer_->setFocus();
+}
+
+void CommPanel::cancelReply() {
+    replyToId_.clear();
+    if (replyBanner_) replyBanner_->hide();
 }
 
 std::string CommPanel::channelName(const std::string& id) const {
@@ -552,6 +604,16 @@ void CommPanel::renderOne(const Message& m) {
     const bool mine = (m.author_id == user_.id);
     auto* row = messageList_->addNew<Wt::WContainerWidget>();
     row->addStyleClass(mine ? "fd-msg fd-msg-mine" : "fd-msg");
+
+    // Quoted reply: resolve the target from the loaded set (else a placeholder).
+    if (!m.reply_to_id.empty()) {
+        std::string quoted = "quoted message";
+        for (const Message& x : allMessages_)
+            if (x.id == m.reply_to_id) { quoted = snippet(x.body); break; }
+        row->addNew<Wt::WText>(Wt::WString::fromUTF8(
+            "<div class=\"fd-msg-quote\">↩ " + esc(quoted) + "</div>"));
+    }
+
     row->addNew<Wt::WText>(Wt::WString::fromUTF8(
         "<div class=\"fd-msg-body\">" + esc(m.body) + "</div>"));
     const std::string when =
@@ -559,6 +621,13 @@ void CommPanel::renderOne(const Message& m) {
     row->addNew<Wt::WText>(Wt::WString::fromUTF8(
         "<div class=\"fd-msg-meta\">" + (mine ? std::string("You") : "—") + " · " +
         esc(when) + "</div>"));
+
+    // Per-message reply action.
+    auto* reply = row->addNew<Wt::WPushButton>(Wt::WString::fromUTF8("↩"));
+    reply->addStyleClass("btn btn-sm fd-msg-reply");
+    reply->setToolTip("Reply");
+    Message copy = m;
+    reply->clicked().connect([this, copy] { startReply(copy); });
 }
 
 void CommPanel::onPushed(const Message& m) {
@@ -587,8 +656,9 @@ void CommPanel::send() {
     const std::string body = composer_->text().toUTF8();
     if (body.empty() || selectedChannelId_.empty()) return;
     composer_->setText("");
+    if (emojiPanel_) emojiPanel_->hide();
     api_->createMessage(
-        selectedChannelId_, user_.id, body, selectedTopicId_,
+        selectedChannelId_, user_.id, body, selectedTopicId_, replyToId_,
         [this](Message created) {
             allMessages_.push_back(created);
             lastLatestId_ = created.id;
@@ -600,6 +670,7 @@ void CommPanel::send() {
             if (toaster_)
                 toaster_->notify("Send failed", err, Toaster::Level::Danger);
         });
+    cancelReply();  // reply target captured in the call above; clear the banner
 }
 
 void CommPanel::exportBoard() {

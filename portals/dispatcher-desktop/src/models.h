@@ -54,6 +54,7 @@ struct ChannelMember {
 struct Message {
     std::string id;
     std::string channel_id;
+    std::string reply_to_id;   // threaded reply target (empty = top-level)
     std::string topic_id;    // empty = General stream
     std::string author_id;
     std::string body;

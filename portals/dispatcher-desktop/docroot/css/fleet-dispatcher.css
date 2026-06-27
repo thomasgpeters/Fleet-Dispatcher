@@ -484,6 +484,60 @@ h1, h2, h3, h4, h5, .h4, .h5 { font-family: var(--fd-font); letter-spacing: 0.1p
 .fd-msg-body { font-size: 0.9rem; }
 .fd-msg-meta { font-size: 0.7rem; color: var(--fd-text-muted); margin-top: 0.1rem; }
 .fd-msg-mine .fd-msg-meta { color: rgba(255, 255, 255, 0.8); }
+
+/* Reply: quoted snippet above a message + a hover reply action. */
+.fd-msg { position: relative; }
+.fd-msg-quote {
+    font-size: 0.8rem;
+    font-style: italic;
+    color: var(--fd-text-muted);
+    border-left: 3px solid var(--fd-border);
+    padding-left: 0.5rem;
+    margin-bottom: 0.2rem;
+}
+.fd-msg-mine .fd-msg-quote { color: rgba(255, 255, 255, 0.85); border-left-color: rgba(255,255,255,0.4); }
+.fd-msg-reply {
+    position: absolute;
+    top: 0.15rem;
+    right: 0.3rem;
+    padding: 0 0.35rem;
+    font-size: 0.8rem;
+    background: transparent;
+    border: none;
+    color: var(--fd-text-muted);
+    opacity: 0;
+    transition: opacity var(--fd-dur-fast) var(--fd-ease);
+}
+.fd-msg:hover .fd-msg-reply { opacity: 1; }
+.fd-msg-mine .fd-msg-reply { color: rgba(255, 255, 255, 0.85); }
+
+/* Composer: reply banner + emoji picker. */
+.fd-comm-reply-banner {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.3rem 0.5rem;
+    background: var(--fd-surface-2);
+    border-radius: 8px;
+    margin-bottom: 0.35rem;
+}
+.fd-comm-reply-text { flex: 1 1 auto; font-size: 0.82rem; }
+.fd-comm-reply-cancel { background: transparent; border: none; color: var(--fd-text-muted); }
+.fd-comm-emoji {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.15rem;
+    padding: 0.35rem;
+    background: var(--fd-surface-2);
+    border-radius: 8px;
+    margin-bottom: 0.35rem;
+    max-height: 8rem;
+    overflow: auto;
+}
+.fd-emoji { background: transparent; border: none; font-size: 1.1rem; padding: 0.1rem 0.3rem; }
+.fd-emoji:hover { background: rgba(44, 111, 179, 0.10); }
+.fd-comm-emoji-btn { background: transparent; border: none; color: var(--fd-text-muted); font-size: 1.1rem; }
+
 .fd-comm-composer { display: flex; gap: 0.35rem; margin-top: 0.5rem; }
 .fd-comm-composer .form-control { flex: 1 1 auto; }
 /* Shown instead of the composer when the user can't post (P1/P2 governance). */
