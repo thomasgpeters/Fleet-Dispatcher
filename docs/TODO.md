@@ -180,6 +180,27 @@ Powers the HUD's map. See "Planned" in `domain-model.md`.
 - [ ] HUD map: overlay routes (`route.polyline`) and driver-focus/load-highlight
       commands
 
+### HUD trips & live tracking (requested 2026-06-20)
+
+Make the HUD a live operations wall, not just a board mirror:
+
+- [ ] **Trips on the HUD**, with a **scope selector**: single **driver** /
+      **region** / **whole fleet**. Filters both the trips shown and the map.
+- [ ] **Per-driver locations on the map** from latest `position_report`, with the
+      **zoom level auto-fit** to the active scope (whole-fleet = fit all; single
+      driver = zoom in).
+- [ ] **Follow-driver mode**: continuously pan/zoom the map to a chosen driver's
+      latest fix as new positions stream in (extends `HudControlBus::FocusDriver`,
+      currently stubbed).
+- Mechanism: controls live on the **console** and drive the HUD via
+  `HudControlBus` (the HUD is an operator-less wall display) — new commands
+  `SetScope{driver|region|fleet, id}` and `FollowDriver{id}` alongside `SetMode`.
+- OPEN QUESTION — **how is "region" defined?** No region entity exists today.
+  Options: (a) by US **state** derived from position lat/lng (no schema change,
+  approximate), (b) a new `region` lookup + `driver.region_id` (explicit, schema
+  change + ALS regen), (c) group by `driver.home_base`. Needs a decision before
+  the region scope ships; driver + fleet scopes can land first.
+
 ## Feature 3 — Hey Dispatch driver voice assistant
 
 Hands-free assistant: driver says "Hey Dispatch", push-to-talk, on-device speech.
