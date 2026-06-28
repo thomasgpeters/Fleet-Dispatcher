@@ -44,6 +44,7 @@ ROLE_OWNER = 1
 ROLE_ADMIN = 3
 STATUS_MUTED = 2
 STATUS_BANNED = 3
+APP_ROLE_DISPATCHER = 1
 
 
 def _restriction_active(member) -> bool:
@@ -86,6 +87,32 @@ def _can_post(row, old_row, logic_row: LogicRow) -> bool:
     return True
 
 
+def _can_create_topic(row, old_row, logic_row: LogicRow) -> bool:
+    """Constraint: only admins/dispatchers may create channel topics.
+
+    Allowed when the creator is the channel owner/admin, OR has the dispatcher
+    app-role. Regular members (drivers/updaters) don't create their own topics.
+    """
+    if not logic_row.is_inserted():
+        return True
+
+    session = logic_row.session
+    user = (
+        session.query(models.AppUser)
+        .filter_by(id=row.created_by)
+        .one_or_none()
+    )
+    if user is not None and user.app_role_id == APP_ROLE_DISPATCHER:
+        return True
+
+    member = (
+        session.query(models.ChannelMember)
+        .filter_by(channel_id=row.channel_id, user_id=row.created_by)
+        .one_or_none()
+    )
+    return member is not None and member.member_role_id in (ROLE_OWNER, ROLE_ADMIN)
+
+
 def declare_logic() -> None:
     """Registered by ALS logic discovery on server start."""
     Rule.constraint(
@@ -93,4 +120,12 @@ def declare_logic() -> None:
         calling=_can_post,
         error_msg="You don't have permission to post in this channel.",
     )
-    log.info("Fleet Dispatcher comms governance registered (broadcast lock + mute/ban)")
+    Rule.constraint(
+        validate=models.ChannelTopic,
+        calling=_can_create_topic,
+        error_msg="Only admins and dispatchers can create topics.",
+    )
+    log.info(
+        "Fleet Dispatcher comms governance registered "
+        "(broadcast lock + mute/ban + topic-create)"
+    )

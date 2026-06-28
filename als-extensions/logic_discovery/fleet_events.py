@@ -59,6 +59,7 @@ def _send_message_event(row, old_row, logic_row: LogicRow) -> None:
         "type": "message",
         "id": str(row.id),
         "channel_id": str(row.channel_id),
+        "topic_id": str(row.topic_id) if row.topic_id else None,  # forum topic (P3)
         "author_id": str(row.author_id),
         "reply_to_id": str(row.reply_to_id) if row.reply_to_id else None,
         "posted_at": str(row.posted_at),

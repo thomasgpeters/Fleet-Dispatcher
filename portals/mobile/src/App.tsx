@@ -80,6 +80,11 @@ function AuthedApp() {
           <Route exact path="/messages" component={ChannelsPage} />
           <Route exact path="/saved" component={SavedPage} />
           <Route exact path="/messages/:channelId" component={ChannelPage} />
+          <Route
+            exact
+            path="/messages/:channelId/topics/:topicId"
+            component={ChannelPage}
+          />
           <Route exact path="/locate" component={LocatePage} />
           <Route exact path="/assistant" component={AssistantPage} />
           <Route exact path="/profile" component={ProfilePage} />

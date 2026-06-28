@@ -5,6 +5,71 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-06-20
 
+### Desktop parity run — step 2: reply/quote + emoji
+- Per-message hover **Reply** opens a composer reply banner; the sent reply
+  carries `reply_to_id` and renders a quoted snippet above the message
+  (resolved from the loaded set). `createMessage` gains a `replyToId`; `Message`
+  gains `reply_to_id`. Composer **emoji** picker — a toggle panel of a compact
+  trucking-relevant set, appended to the draft (UTF-8 end to end). Wt builds on
+  Linux.
+- Region decision recorded for the HUD: "region" = US state from position lat/lng.
+
+### Desktop parity run — step 1: directory badges + unread
+- Desktop channel directory now shows per-channel **unread** counts +
+  **role/standing** badges (Owner/Admin, Muted/Banned); rail chips carry the
+  unread count in their label. `ApiClient::fetchMyMemberships` (role/standing +
+  last_read_at) + per-channel unread count; selecting a channel clears it and
+  `markChannelRead` stamps last_read_at; messages to other channels bump the
+  badge live. `ChannelMember` gains `last_read_at`. Wt builds on Linux.
+
+### Desktop parity: P3 topics in CommPanel
+- Desktop comms reaches topic parity: a topic-chip bar (General + each topic)
+  filters the conversation and sets the compose target; a gated "+ Topic" dialog
+  creates topics (owner/admin or dispatcher app-role, mirroring the server rule).
+  CommPanel now retains the channel's full message set (`allMessages_`) and
+  renders a topic-filtered timeline (send/push/refresh all route through it).
+- ApiClient: `fetchTopics` / `createTopic` (+ `parseTopic`); `createMessage`
+  takes a `topicId`. Built carefully — Wt isn't compiled in-sandbox; build on the
+  Linux box.
+
+### Mobile parity: per-board export + role/standing badges
+- **Per-board export** (mobile): an Export action in the channel header (admins/
+  dispatchers only) bundles channel + topics + members + messages into a
+  `board-<name>-<date>.json` downloaded via a Blob URL — matches the desktop
+  console. New `membersForChannel` client fn.
+- **Role/standing badges**: the channel list shows per-row badges — channel type
+  (Direct/Group/Broadcast), the user's role (Owner/Admin), and standing
+  (Muted/Banned, danger) — surfaced at the row edge. Memberships captured in the
+  existing per-channel load.
+- Mobile build clean.
+
+### Comms: topic creation restricted to admins/dispatchers
+- Topic creation is now governed: only a channel owner/admin or a dispatcher
+  (app-role) may add topics; drivers/updaters just browse them. Enforced by a
+  LogicBank constraint on `ChannelTopic` (`als-extensions/comms_governance.py`)
+  and gated in the mobile UI — a "+ New" appears in the channel's Topics header
+  only for those users (`canManageTopics` helper). Mobile build clean.
+
+### Mobile parity: P3 topics (forum threads, drill-in)
+- Mobile-native flow (one focus per screen): the Channel page shows a **Topics**
+  list + the **General** stream (messages with no topic); tapping a topic pushes
+  a focused topic page (its own timeline + composer, back to the channel).
+  `ChannelPage` is topic-aware via an optional `:topicId` route param — General
+  filters to `!topic_id`, topic mode to `topic_id === topicId`; compose/attach
+  carry the topic.
+- API: `topicsForChannel` / `getTopic` / `createTopic`; `createMessage` takes an
+  optional `topicId`. Realtime message events now carry `topic_id` (mobile
+  handler + `als-extensions` producer). Mobile build clean.
+
+### Mobile parity: P1/P2 composer gating
+- Mobile `ChannelPage` now fetches the user's `ChannelMember` and, when they
+  can't post (broadcast non-admin, or muted/banned with an active restriction),
+  replaces the composer with a single read-only notice — mobile-native, no
+  clutter. Shared `postBlockReason()` helper + `CHANNEL_TYPE`/`MEMBER_ROLE`/
+  `MEMBER_STATUS` constants in `api/client`. Types: `ChannelMember` gains
+  `member_status_id`/`restricted_until`; `Message` gains `topic_id`; new
+  `ChannelTopic` (sets up P3). Mobile build clean.
+
 ### Comms P1/P2 desktop: role/status-aware composer
 - `CommPanel` fetches the selected channel's `ChannelMember`s
   (`ApiClient::fetchChannelMembers`) and gates the composer via

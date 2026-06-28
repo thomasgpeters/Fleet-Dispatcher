@@ -180,6 +180,25 @@ Powers the HUD's map. See "Planned" in `domain-model.md`.
 - [ ] HUD map: overlay routes (`route.polyline`) and driver-focus/load-highlight
       commands
 
+### HUD trips & live tracking (requested 2026-06-20)
+
+Make the HUD a live operations wall, not just a board mirror:
+
+- [ ] **Trips on the HUD**, with a **scope selector**: single **driver** /
+      **region** / **whole fleet**. Filters both the trips shown and the map.
+- [ ] **Per-driver locations on the map** from latest `position_report`, with the
+      **zoom level auto-fit** to the active scope (whole-fleet = fit all; single
+      driver = zoom in).
+- [ ] **Follow-driver mode**: continuously pan/zoom the map to a chosen driver's
+      latest fix as new positions stream in (extends `HudControlBus::FocusDriver`,
+      currently stubbed).
+- Mechanism: controls live on the **console** and drive the HUD via
+  `HudControlBus` (the HUD is an operator-less wall display) — new commands
+  `SetScope{driver|region|fleet, id}` and `FollowDriver{id}` alongside `SetMode`.
+- DECIDED (2026-06-20): **"region" = US state derived from each driver's latest
+  position lat/lng** (no schema change; approximate). Driver + fleet scopes can
+  land first; the state lookup is a geospatial/client mapping.
+
 ## Feature 3 — Hey Dispatch driver voice assistant
 
 Hands-free assistant: driver says "Hey Dispatch", push-to-talk, on-device speech.
@@ -225,21 +244,32 @@ Priority order (P1 = do first; small→large, value-weighted):
       admin posts in `broadcast` channels; seed has a "Fleet Announcements"
       broadcast channel. Verified on PG16. Desktop: composer is **hidden with a
       reason** for read-only members of a broadcast channel (`CommPanel`
-      fetches `ChannelMember`, gates via `updatePostPermission`). REMAINING:
-      role badges in the directory; mobile composer gating; ALS regen on the
-      Linux box to activate the server rule.
+      fetches `ChannelMember`, gates via `updatePostPermission`). Mobile:
+      `ChannelPage` fetches the user's membership and replaces the composer with
+      a read-only notice (`postBlockReason` in `api/client`). REMAINING: role
+      badges in the directory; ALS regen on the Linux box to activate the rule.
 - [~] **P2 — Member status & restriction**. DONE: `channel_member_status` lookup
       (active/muted/banned) + `channel_member.member_status_id` (default active) +
       `restricted_until` (expiry); LogicBank rule blocks posting while a mute/ban
       is active (NULL until = indefinite; past = expired). Verified on PG16.
-      Desktop: composer also respects standing — hidden with "You are muted/
-      banned" while a restriction is active. REMAINING: admin UI to mute/ban/
-      remove members; surface standing in the directory; mobile.
+      Desktop + mobile: composer also respects standing — hidden with "You are
+      muted/banned" while a restriction is active. Mobile channel list shows
+      role (Owner/Admin) + standing (Muted/Banned) + channel-type badges per row.
+      REMAINING: admin UI to mute/ban/remove members; desktop directory badges.
 - [~] **P3 — Topics (forum threads)**. DONE: `channel_topic` (channel_id, name,
       created_by, is_closed) + `message.topic_id` (nullable; General = NULL) +
-      indexes; seed has a "Lubbock -> Denver" topic. Verified on PG16. REMAINING:
-      client UI — topic list within a channel + compose-into-topic (desktop
-      `CommPanel` + mobile message board).
+      indexes; seed has a "Lubbock -> Denver" topic. Verified on PG16. Mobile:
+      drill-in flow — Channel shows a **Topics** list + the General stream; a
+      topic opens its own focused page (own timeline + compose-into-topic), back
+      button to the channel (`ChannelPage` is topic-aware via route param;
+      realtime carries `topic_id`; producer updated). **Topic creation is
+      restricted to admins/dispatchers** (channel owner/admin or dispatcher
+      app-role) — enforced by a LogicBank constraint on `ChannelTopic` and gated
+      in both UIs (drivers/updaters only browse topics). Desktop: `CommPanel`
+      shows a topic-chip bar (General + topics) that filters the timeline +
+      composes into the selected topic, with a gated "+ Topic" dialog
+      (`fetchTopics`/`createTopic`; `createMessage` takes a topicId). DONE both
+      clients.
 - [ ] **P4 — Invite links + join requests**. `channel_invite` (token, created_by,
       member_cap, expires_at, requires_approval, revoked) + a pending-join state
       on `channel_member` (or `channel_join_request`). Onboards carriers/drivers
@@ -262,6 +292,26 @@ Priority order (P1 = do first; small→large, value-weighted):
 > P4 enables external onboarding; P5–P8 are independent enhancements layerable in
 > any order once the role/topic foundation exists.
 
+### Desktop message-board parity run (2026-06-20)
+
+Close the remaining gaps where the desktop `CommPanel` trails the mobile board.
+Sequenced cheapest→largest; each ships as its own commit (Wt builds on Linux).
+
+- [x] **1 — Directory badges + unread**. Desktop directory rows show **unread**
+      counts + **role/standing** badges (Owner/Admin, Muted/Banned); rail chips
+      show unread in the label. `fetchMyMemberships` + per-channel unread; entering
+      a channel clears it and stamps `markChannelRead`; incoming messages to other
+      channels bump the badge. (Type is conveyed by the directory grouping.)
+- [x] **2 — Reply/quote + emoji**. Per-message hover **Reply** → composer reply
+      banner; the reply renders a quoted snippet in the timeline
+      (`message.reply_to_id`; `createMessage` takes a replyToId). Composer **emoji**
+      picker (toggle panel, trucking-relevant set, UTF-8). Wt builds on Linux.
+- [ ] **3 — Pins + Saved**. Pin a message with a scope (self/channel/everyone) +
+      a visible-pins strip; a personal **Saved** archive view. (`MessagePin`,
+      `SavedMessage` — already in the schema/mobile.)
+- [ ] **4 — Attachments**. Upload a file (→ `document` + `message_document`),
+      render attachment chips, open/preview. (Wt `WFileUpload`.)
+
 ### Message-board robustness (clarified 2026-06-20)
 
 Additional requirements for a robust board. Decisions captured from the user:
@@ -283,9 +333,12 @@ Additional requirements for a robust board. Decisions captured from the user:
       the full take-over view [full/labeled]) has an **Export** action that bundles
       the board's channel meta + topics + members + messages (raw JSON:API docs)
       and downloads a `board-<name>-<date>.json` via a Blob URL
-      (`ApiClient::fetchRaw`). REMAINING: **restore** (import a bundle), mobile
-      export, and the DB-level `pg_dump`/restore + runbook/timer path for very
-      large boards.
+      (`ApiClient::fetchRaw`). Mobile: per-board **Export** action in the channel
+      header (admins/dispatchers only) bundles channel + topics + members +
+      messages to a downloaded JSON (Blob URL). REMAINING: **restore** (import a
+      bundle), align the desktop raw-doc vs mobile structured format when restore
+      lands, native Capacitor file save (Filesystem/Share), and the DB-level
+      `pg_dump`/restore + runbook/timer path for very large boards.
 - [ ] **Archive / revive channels**. DECIDED: an **archived channel is no longer
       visible to users**; **admins can revive** (unarchive) it. Wire up the
       existing `channel.is_archived`: filter archived channels out of normal

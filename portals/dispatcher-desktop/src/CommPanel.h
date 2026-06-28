@@ -7,6 +7,7 @@
 // middleware emits change events. New messages from others raise a top-right toast.
 #pragma once
 
+#include <map>
 #include <set>
 #include <string>
 #include <vector>
@@ -45,33 +46,55 @@ private:
 
     std::vector<Channel> channels_;
     std::vector<ChannelMember> members_;   // members of the selected channel
+    std::map<std::string, ChannelMember> myMemberships_;  // my membership per channel
+    std::map<std::string, int> unread_;    // unread count per channel
+    std::vector<Topic> topics_;            // topics of the selected channel
+    std::vector<Message> allMessages_;     // the channel's full set (filtered per topic)
     std::string selectedChannelId_;
     std::string selectedChannelName_;
+    std::string selectedTopicId_;          // empty = the General stream
     std::string lastLatestId_;  // newest message id seen (reconcile-poll dedupe)
     std::string busToken_;      // CommBus subscription
     std::set<std::string> seenIds_;  // rendered message ids (de-dup intra/bridge)
 
     Wt::WContainerWidget* channelList_ = nullptr;
+    Wt::WContainerWidget* topicBar_ = nullptr;   // General + topic chips (P3)
     Wt::WText* convoTitle_ = nullptr;
     Wt::WText* exportStatus_ = nullptr;  // Full layout only (export feedback)
     Wt::WContainerWidget* messageList_ = nullptr;
     Wt::WContainerWidget* composerRow_ = nullptr;  // hidden when the user can't post
     Wt::WText* postNotice_ = nullptr;              // why posting is blocked
+    Wt::WContainerWidget* replyBanner_ = nullptr;  // "Replying to …" (hidden by default)
+    Wt::WText* replyBannerText_ = nullptr;
+    Wt::WContainerWidget* emojiPanel_ = nullptr;   // emoji picker (hidden by default)
     Wt::WLineEdit* composer_ = nullptr;
     Wt::WTimer* poll_ = nullptr;
+    std::string replyToId_;                        // pending reply target (empty = none)
 
     void buildRail();          // compact right-rail layout
     void buildFull();          // directory + conversation take-over layout
     void buildConvoHead(Wt::WContainerWidget* parent, bool full);  // title + actions
     void buildComposer(Wt::WContainerWidget* parent);
     void loadChannels();
+    void loadDirectoryMeta();   // my memberships + per-channel unread (badges)
+    void appendChannelBadges(Wt::WContainerWidget* row, const std::string& channelId);
     void renderChannels();
     void renderDirectory();    // grouped vertical channel list (Full layout)
     void selectChannel(const Channel& c);
     void updatePostPermission();  // gate the composer by role/standing (P1/P2)
+    void loadTopics();            // fetch the selected channel's topics (P3)
+    void renderTopicBar();        // General + topic chips (+ gated "New")
+    void selectTopic(const std::string& topicId);  // "" = General
+    bool canManageTopics() const; // owner/admin or dispatcher app-role
+    void promptNewTopic();        // dialog -> createTopic (managers only)
     void refreshMessages(bool notifyOnNew);
     void renderMessages(const std::vector<Message>& msgs, bool notifyOnNew);
+    void renderTimeline();        // render allMessages_ filtered by topic
+    bool inSelectedTopic(const Message& m) const;
     void renderOne(const Message& m);          // append a single message row
+    void startReply(const Message& m);         // begin a threaded reply
+    void cancelReply();
+    void buildEmojiPanel(Wt::WContainerWidget* parent);  // composer emoji picker
     void onPushed(const Message& m);           // CommBus delivery (server push)
     std::string channelName(const std::string& id) const;
     void send();

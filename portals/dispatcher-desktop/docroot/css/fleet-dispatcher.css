@@ -41,6 +41,13 @@
         -apple-system, Roboto, Helvetica, Arial, sans-serif;
     --fd-radius: 12px;          /* rounded panels */
 
+    /* Motion system — consistent durations + easing across all transitions and
+     * keyframes. Honor prefers-reduced-motion (see the guard near the bottom). */
+    --fd-dur-fast: 120ms;
+    --fd-dur: 200ms;
+    --fd-dur-slow: 320ms;
+    --fd-ease: cubic-bezier(0.2, 0.7, 0.2, 1);   /* gentle ease-out */
+
     --fd-board-gap: 0.75rem;
     --fd-panel-w: 260px;
 }
@@ -105,7 +112,19 @@ body {
 h1, h2, h3, h4, h5, .h4, .h5 { font-family: var(--fd-font); letter-spacing: 0.1px; }
 
 /* Align the Bootstrap theme + common components with the palette. */
-.btn { border-radius: 999px; }   /* pill buttons */
+.btn {
+    border-radius: 999px;        /* pill buttons */
+    transition: background-color var(--fd-dur-fast) var(--fd-ease),
+                border-color var(--fd-dur-fast) var(--fd-ease),
+                color var(--fd-dur-fast) var(--fd-ease),
+                transform var(--fd-dur-fast) var(--fd-ease),
+                box-shadow var(--fd-dur-fast) var(--fd-ease);
+}
+.btn:active { transform: translateY(1px); }   /* tactile press feedback */
+.btn:focus-visible {                            /* keyboard focus ring */
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(44, 111, 179, 0.35);
+}
 .btn-primary {
     background-color: var(--fd-primary);
     border-color: var(--fd-primary);
@@ -225,6 +244,9 @@ h1, h2, h3, h4, h5, .h4, .h5 { font-family: var(--fd-font); letter-spacing: 0.1p
     border-radius: var(--fd-radius);
     padding: 1.5rem 1.75rem;
 }
+/* Every view animates in when the center work panel swaps (menu navigation).
+ * Targets the view root Shell inserts; comms overrides flex but reuses the anim. */
+.fd-work > * { animation: fd-rise-in var(--fd-dur) var(--fd-ease) both; }
 /* Nested .card renders flat (no double panel). */
 .fd-work > .card,
 .fd-work .card { border: none; background: transparent; }
@@ -318,6 +340,13 @@ h1, h2, h3, h4, h5, .h4, .h5 { font-family: var(--fd-font); letter-spacing: 0.1p
 .fd-work table tbody tr:nth-child(odd) td {
     background-color: rgba(20, 30, 50, 0.025);   /* faint zebra */
 }
+/* Interactive row hover — feedback that rows are live/selectable. */
+.fd-tablecard tbody tr td,
+.fd-work table tbody tr td { transition: background-color var(--fd-dur-fast) var(--fd-ease); }
+.fd-tablecard tbody tr:hover td,
+.fd-work table tbody tr:hover td {
+    background-color: rgba(44, 111, 179, 0.08);
+}
 
 /* ===========================================================================
  * Board + HUD
@@ -378,8 +407,15 @@ h1, h2, h3, h4, h5, .h4, .h5 { font-family: var(--fd-font); letter-spacing: 0.1p
     background: transparent;
     color: var(--fd-text);
     border: 1px solid transparent;
+    transition: background-color var(--fd-dur-fast) var(--fd-ease),
+                color var(--fd-dur-fast) var(--fd-ease),
+                padding-left var(--fd-dur-fast) var(--fd-ease);
 }
-.fd-menu-item:hover { background-color: rgba(44, 111, 179, 0.10); color: var(--fd-text); }
+.fd-menu-item:hover {
+    background-color: rgba(44, 111, 179, 0.10);
+    color: var(--fd-text);
+    padding-left: 1rem;   /* subtle slide toward the content it opens */
+}
 .fd-menu-item.fd-active {
     background-color: rgba(44, 111, 179, 0.14);
     border-left: 3px solid var(--fd-accent);  /* orange active marker */
@@ -401,6 +437,8 @@ h1, h2, h3, h4, h5, .h4, .h5 { font-family: var(--fd-font); letter-spacing: 0.1p
     background: var(--fd-surface-2);
     color: var(--fd-text);
     border: none;
+    transition: background-color var(--fd-dur-fast) var(--fd-ease),
+                color var(--fd-dur-fast) var(--fd-ease);
 }
 .fd-comm-channel.fd-active {
     background-color: var(--fd-primary);
@@ -408,6 +446,21 @@ h1, h2, h3, h4, h5, .h4, .h5 { font-family: var(--fd-font); letter-spacing: 0.1p
     border-color: var(--fd-primary);
 }
 .fd-comm-convo-title { font-weight: 600; margin: 0.25rem 0; }
+
+/* Topic chips (P3): General + each forum topic; "+ Topic" for managers. */
+.fd-comm-topics { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-bottom: 0.5rem; }
+.fd-comm-topic {
+    background: var(--fd-surface-2);
+    color: var(--fd-text);
+    border: none;
+    transition: background-color var(--fd-dur-fast) var(--fd-ease),
+                color var(--fd-dur-fast) var(--fd-ease);
+}
+.fd-comm-topic.fd-active {
+    background-color: var(--fd-primary);
+    color: var(--fd-primary-contrast);
+}
+.fd-comm-topic-add { margin-left: auto; }
 .fd-comm-messages {
     flex: 1 1 auto;
     overflow: auto;
@@ -431,6 +484,60 @@ h1, h2, h3, h4, h5, .h4, .h5 { font-family: var(--fd-font); letter-spacing: 0.1p
 .fd-msg-body { font-size: 0.9rem; }
 .fd-msg-meta { font-size: 0.7rem; color: var(--fd-text-muted); margin-top: 0.1rem; }
 .fd-msg-mine .fd-msg-meta { color: rgba(255, 255, 255, 0.8); }
+
+/* Reply: quoted snippet above a message + a hover reply action. */
+.fd-msg { position: relative; }
+.fd-msg-quote {
+    font-size: 0.8rem;
+    font-style: italic;
+    color: var(--fd-text-muted);
+    border-left: 3px solid var(--fd-border);
+    padding-left: 0.5rem;
+    margin-bottom: 0.2rem;
+}
+.fd-msg-mine .fd-msg-quote { color: rgba(255, 255, 255, 0.85); border-left-color: rgba(255,255,255,0.4); }
+.fd-msg-reply {
+    position: absolute;
+    top: 0.15rem;
+    right: 0.3rem;
+    padding: 0 0.35rem;
+    font-size: 0.8rem;
+    background: transparent;
+    border: none;
+    color: var(--fd-text-muted);
+    opacity: 0;
+    transition: opacity var(--fd-dur-fast) var(--fd-ease);
+}
+.fd-msg:hover .fd-msg-reply { opacity: 1; }
+.fd-msg-mine .fd-msg-reply { color: rgba(255, 255, 255, 0.85); }
+
+/* Composer: reply banner + emoji picker. */
+.fd-comm-reply-banner {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.3rem 0.5rem;
+    background: var(--fd-surface-2);
+    border-radius: 8px;
+    margin-bottom: 0.35rem;
+}
+.fd-comm-reply-text { flex: 1 1 auto; font-size: 0.82rem; }
+.fd-comm-reply-cancel { background: transparent; border: none; color: var(--fd-text-muted); }
+.fd-comm-emoji {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.15rem;
+    padding: 0.35rem;
+    background: var(--fd-surface-2);
+    border-radius: 8px;
+    margin-bottom: 0.35rem;
+    max-height: 8rem;
+    overflow: auto;
+}
+.fd-emoji { background: transparent; border: none; font-size: 1.1rem; padding: 0.1rem 0.3rem; }
+.fd-emoji:hover { background: rgba(44, 111, 179, 0.10); }
+.fd-comm-emoji-btn { background: transparent; border: none; color: var(--fd-text-muted); font-size: 1.1rem; }
+
 .fd-comm-composer { display: flex; gap: 0.35rem; margin-top: 0.5rem; }
 .fd-comm-composer .form-control { flex: 1 1 auto; }
 /* Shown instead of the composer when the user can't post (P1/P2 governance). */
@@ -450,11 +557,7 @@ h1, h2, h3, h4, h5, .h4, .h5 { font-family: var(--fd-font); letter-spacing: 0.1p
     flex-direction: row;
     gap: 1rem;
     height: 100%;
-    animation: fd-comms-in 0.22s ease both;
-}
-@keyframes fd-comms-in {
-    from { opacity: 0; transform: translateY(8px); }
-    to { opacity: 1; transform: none; }
+    animation: fd-rise-in var(--fd-dur-slow) var(--fd-ease) both;  /* shared keyframe */
 }
 .fd-comm-directory {
     flex: 0 0 240px;
@@ -510,6 +613,21 @@ h1, h2, h3, h4, h5, .h4, .h5 { font-family: var(--fd-font); letter-spacing: 0.1p
     border-left: 3px solid var(--fd-accent);   /* orange active marker */
     font-weight: 600;
 }
+/* Directory row = channel button + edge badges (unread / role / standing). */
+.fd-comm-group-row { display: flex; align-items: center; gap: 0.35rem; }
+.fd-comm-group-row .fd-comm-group-item { flex: 1 1 auto; }
+.fd-badge {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    background: var(--fd-surface-2);
+    color: var(--fd-text-muted);
+    border-radius: 999px;
+    padding: 0.05rem 0.45rem;
+    white-space: nowrap;
+}
+.fd-badge-unread { background: var(--fd-primary); color: var(--fd-primary-contrast); }
+.fd-badge-danger { background: #d65a4f; color: #fff; }
 
 /* ===========================================================================
  * Toaster: top-right transient alerts
@@ -549,4 +667,33 @@ h1, h2, h3, h4, h5, .h4, .h5 { font-family: var(--fd-font); letter-spacing: 0.1p
 @keyframes fd-toast-in {
     from { opacity: 0; transform: translateX(12px); }
     to { opacity: 1; transform: none; }
+}
+
+/* ===========================================================================
+ * Motion system — shared keyframes + the accessibility guard.
+ * Keep all entrance animations referencing these so timing/easing stay uniform.
+ * ======================================================================== */
+@keyframes fd-rise-in {            /* view swaps + comms take-over */
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: none; }
+}
+@keyframes fd-fade-in {            /* gentle fade, no movement */
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+@keyframes fd-pop-in {             /* badges / chips drawing attention */
+    from { opacity: 0; transform: scale(0.94); }
+    to   { opacity: 1; transform: none; }
+}
+
+/* Accessibility: respect the OS "reduce motion" setting — neutralize animations
+ * and transitions so nothing moves for users who opt out (and avoids vestibular
+ * discomfort). One guard covers the whole stylesheet. */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+        scroll-behavior: auto !important;
+    }
 }

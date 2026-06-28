@@ -203,7 +203,9 @@ drivers, dispatchers, and updaters all converse through one model.
   mute/ban), and `last_read_at` (drives per-user unread counts).
 - **ChannelTopic** — a forum topic (thread) within a channel; splits a group/
   board into focused conversations (e.g. a topic per load/lane/region). A message
-  with no topic belongs to the channel's default ("General") stream.
+  with no topic belongs to the channel's default ("General") stream. Only
+  **admins/dispatchers** create topics (channel owner/admin or dispatcher
+  app-role; enforced by LogicBank) — regular members browse them.
 - **Message** — text posted to a channel by an author; `topic` places it in a
   forum topic (else General); `reply_to` supports threaded replies; may be empty
   when it only carries documents. In `broadcast` channels only owners/admins may

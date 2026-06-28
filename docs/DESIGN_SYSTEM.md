@@ -58,6 +58,23 @@ framework defaults.
   (`--fd-accent`), not framework yellow. Mobile mirrors this (`ion-button`
   pill radius; `--ion-color-warning` remapped to the orange accent).
 
+## Motion
+
+Motion is a small system, not one-off animations — consistent timing + easing,
+and it **respects `prefers-reduced-motion`** (a single guard neutralizes all
+animations/transitions for users who opt out).
+
+- **Tokens** (desktop CSS): `--fd-dur-fast` (120ms), `--fd-dur` (200ms),
+  `--fd-dur-slow` (320ms), `--fd-ease` (gentle ease-out). Use these everywhere
+  rather than hard-coded values.
+- **Shared keyframes:** `fd-rise-in` (fade + slight rise — view swaps, comms
+  take-over), `fd-fade-in`, `fd-pop-in` (badges/chips). Toasts use `fd-toast-in`.
+- **Interactive feedback:** buttons (press `translateY`, focus ring), left-menu
+  items (hover slide), table rows (hover highlight), comm channels, and panel
+  collapse/expand (width transition) — all on the shared tokens.
+- **GPU-friendly:** prefer `opacity`/`transform`; avoid animating layout where
+  possible. Mobile keeps Ionic's native page transitions (don't fight them).
+
 ## Theming mechanism
 
 - **Default = follow the OS** via `@media (prefers-color-scheme: dark)`.

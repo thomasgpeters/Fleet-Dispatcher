@@ -4,6 +4,7 @@
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <ctime>
 #include <memory>
 #include <sstream>
 #include <string>
@@ -336,10 +337,22 @@ fd::Message parseMessage(const Wt::Json::Object& res) {
     m.id = jstr(res, "id");
     m.channel_id = jstr(a, "channel_id");
     m.topic_id = jstr(a, "topic_id");
+    m.reply_to_id = jstr(a, "reply_to_id");
     m.author_id = jstr(a, "author_id");
     m.body = jstr(a, "body");
     m.posted_at = jstr(a, "posted_at");
     return m;
+}
+
+fd::Topic parseTopic(const Wt::Json::Object& res) {
+    const Wt::Json::Object& a = res.get("attributes");
+    Topic t;
+    t.id = jstr(res, "id");
+    t.channel_id = jstr(a, "channel_id");
+    t.name = jstr(a, "name");
+    auto it = a.find("is_closed");
+    t.is_closed = (it == a.end()) ? false : static_cast<bool>(it->second);
+    return t;
 }
 
 fd::ChannelMember parseChannelMember(const Wt::Json::Object& res) {
@@ -351,6 +364,7 @@ fd::ChannelMember parseChannelMember(const Wt::Json::Object& res) {
     m.member_role_id = jint(a, "member_role_id");
     m.member_status_id = jint(a, "member_status_id");
     m.restricted_until = jstr(a, "restricted_until");
+    m.last_read_at = jstr(a, "last_read_at");
     return m;
 }
 
@@ -434,14 +448,78 @@ void ApiClient::fetchChannelMembers(const std::string& channelId,
         std::move(onErr));
 }
 
+void ApiClient::fetchMyMemberships(const std::string& userId,
+                                   ChannelMembersCallback onOk,
+                                   ErrorCallback onErr) {
+    getCollection(
+        baseUrl_ + "/ChannelMember?filter%5Buser_id%5D=" + urlEncode(userId),
+        authToken_,
+        [onOk](const Wt::Json::Array& data) {
+            std::vector<ChannelMember> out;
+            for (const Wt::Json::Value& v : data) out.push_back(parseChannelMember(v));
+            onOk(std::move(out));
+        },
+        std::move(onErr));
+}
+
+void ApiClient::markChannelRead(const std::string& membershipId,
+                                ErrorCallback onErr) {
+    // ISO-8601 UTC "now".
+    std::time_t t = std::time(nullptr);
+    std::tm tm{};
+    gmtime_r(&t, &tm);
+    char buf[24];
+    std::strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%SZ", &tm);
+    const std::string body =
+        "{\"data\":{\"type\":\"ChannelMember\",\"id\":\"" + jsonEscape(membershipId) +
+        "\",\"attributes\":{\"last_read_at\":\"" + std::string(buf) + "\"}}}";
+    patchJson(
+        baseUrl_ + "/ChannelMember/" + membershipId, body, authToken_,
+        [](const Wt::Json::Object&) { /* best-effort */ }, std::move(onErr));
+}
+
+void ApiClient::fetchTopics(const std::string& channelId, TopicsCallback onOk,
+                            ErrorCallback onErr) {
+    getCollection(
+        baseUrl_ + "/ChannelTopic?filter%5Bchannel_id%5D=" + urlEncode(channelId),
+        authToken_,
+        [onOk](const Wt::Json::Array& data) {
+            std::vector<Topic> out;
+            for (const Wt::Json::Value& v : data) out.push_back(parseTopic(v));
+            onOk(std::move(out));
+        },
+        std::move(onErr));
+}
+
+void ApiClient::createTopic(const std::string& channelId, const std::string& name,
+                            const std::string& createdBy, TopicCallback onOk,
+                            ErrorCallback onErr) {
+    const std::string payload =
+        "{\"data\":{\"type\":\"ChannelTopic\",\"attributes\":{"
+        "\"channel_id\":\"" + jsonEscape(channelId) + "\","
+        "\"name\":\"" + jsonEscape(name) + "\","
+        "\"created_by\":\"" + jsonEscape(createdBy) + "\"}}}";
+    postJson(
+        baseUrl_ + "/ChannelTopic", payload, authToken_,
+        [onOk](const Wt::Json::Object& obj) { onOk(parseTopic(obj)); },
+        std::move(onErr));
+}
+
 void ApiClient::createMessage(const std::string& channelId,
                               const std::string& authorId, const std::string& body,
-                              MessageCallback onOk, ErrorCallback onErr) {
-    const std::string payload =
-        "{\"data\":{\"type\":\"Message\",\"attributes\":{"
+                              const std::string& topicId,
+                              const std::string& replyToId, MessageCallback onOk,
+                              ErrorCallback onErr) {
+    std::string attrs =
         "\"channel_id\":\"" + jsonEscape(channelId) + "\","
         "\"author_id\":\"" + jsonEscape(authorId) + "\","
-        "\"body\":\"" + jsonEscape(body) + "\"}}}";
+        "\"body\":\"" + jsonEscape(body) + "\"";
+    if (!topicId.empty())
+        attrs += ",\"topic_id\":\"" + jsonEscape(topicId) + "\"";
+    if (!replyToId.empty())
+        attrs += ",\"reply_to_id\":\"" + jsonEscape(replyToId) + "\"";
+    const std::string payload =
+        "{\"data\":{\"type\":\"Message\",\"attributes\":{" + attrs + "}}}";
     postJson(
         baseUrl_ + "/Message", payload, authToken_,
         [onOk](const Wt::Json::Object& obj) { onOk(parseMessage(obj)); },

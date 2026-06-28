@@ -48,11 +48,13 @@ struct ChannelMember {
     int member_role_id = 0;     // 1=owner, 2=member, 3=admin
     int member_status_id = 1;   // 1=active, 2=muted, 3=banned
     std::string restricted_until;  // ISO8601 mute/ban expiry (empty = none/indefinite)
+    std::string last_read_at;   // ISO8601 read position (drives unread counts)
 };
 
 struct Message {
     std::string id;
     std::string channel_id;
+    std::string reply_to_id;   // threaded reply target (empty = top-level)
     std::string topic_id;    // empty = General stream
     std::string author_id;
     std::string body;

@@ -8,6 +8,7 @@ import type {
   AppUser,
   Channel,
   ChannelMember,
+  ChannelTopic,
   Document,
   Driver,
   DriverEquipment,
@@ -28,6 +29,56 @@ export const API_BASE_URL: string =
 
 /** pin_scope ids (match database/seed_data.sql). */
 export const PIN_SCOPE = { self: 1, channel: 2, everyone: 3 } as const;
+
+/** channel_type / channel_member_role / channel_member_status / app_role ids. */
+export const CHANNEL_TYPE = { direct: 1, group: 2, broadcast: 3 } as const;
+export const MEMBER_ROLE = { owner: 1, member: 2, admin: 3 } as const;
+export const MEMBER_STATUS = { active: 1, muted: 2, banned: 3 } as const;
+export const APP_ROLE = { dispatcher: 1, driver: 2, updater: 3 } as const;
+
+/**
+ * Whether a user may create/manage topics in a channel: channel owner/admins,
+ * or anyone with the dispatcher app-role. Regular members don't add topics.
+ * (Mirrors the server LogicBank rule; UI advisory.)
+ */
+export function canManageTopics(
+  member: ChannelMember | null,
+  appRoleId: number | undefined,
+): boolean {
+  if (appRoleId === APP_ROLE.dispatcher) return true;
+  const role = member?.member_role_id;
+  return role === MEMBER_ROLE.owner || role === MEMBER_ROLE.admin;
+}
+
+/**
+ * Whether a member may post in a channel, given the channel and their membership
+ * (mirrors the server LogicBank rule — UI advisory; the server is authoritative):
+ *  - broadcast channels: owner/admin only
+ *  - muted/banned: blocked while the restriction is active (restricted_until
+ *    null = indefinite; a past timestamp = expired)
+ * Returns a reason string when posting is blocked, or null when allowed.
+ */
+export function postBlockReason(
+  channel: Channel | null,
+  member: ChannelMember | null,
+): string | null {
+  if (member) {
+    const restricted =
+      (member.member_status_id === MEMBER_STATUS.muted ||
+        member.member_status_id === MEMBER_STATUS.banned) &&
+      (!member.restricted_until ||
+        member.restricted_until > new Date().toISOString());
+    if (member.member_status_id === MEMBER_STATUS.banned && restricted)
+      return "You are banned from this channel.";
+    if (restricted) return "You are muted in this channel.";
+  }
+  if (channel?.channel_type_id === CHANNEL_TYPE.broadcast) {
+    const role = member?.member_role_id;
+    if (role !== MEMBER_ROLE.owner && role !== MEMBER_ROLE.admin)
+      return "Only admins can post in this broadcast channel.";
+  }
+  return null;
+}
 
 // --- Auth token (set by the auth context after login) ------------------------
 
@@ -225,6 +276,30 @@ export const api = {
     return getOne<Channel>("Channel", channelId);
   },
 
+  /** Forum topics in a channel (Feature 4 P3). */
+  topicsForChannel(channelId: string): Promise<ChannelTopic[]> {
+    return getCollection<ChannelTopic>("ChannelTopic", { channel_id: channelId });
+  },
+
+  /** A single topic (topic page header). */
+  getTopic(topicId: string): Promise<ChannelTopic> {
+    return getOne<ChannelTopic>("ChannelTopic", topicId);
+  },
+
+  /** Create a topic in a channel. */
+  createTopic(
+    channelId: string,
+    name: string,
+    createdBy: string,
+  ): Promise<ChannelTopic> {
+    return createResource<ChannelTopic>("ChannelTopic", {
+      channel_id: channelId,
+      name,
+      created_by: createdBy,
+      is_closed: false,
+    });
+  },
+
   /** Messages in a channel (oldest-first; sort handled client-side for now). */
   messagesForChannel(channelId: string): Promise<Message[]> {
     return getCollection<Message>("Message", { channel_id: channelId });
@@ -236,18 +311,28 @@ export const api = {
   },
 
   /** Post a new text message to a channel; pass `replyToId` to thread it under
-   * another message (renders a quoted snippet in the timeline). */
+   * another message (renders a quoted snippet in the timeline), and `topicId`
+   * to place it in a forum topic (omit for the channel's General stream). */
   createMessage(
     channelId: string,
     authorId: string,
     body: string,
     replyToId?: string,
+    topicId?: string,
   ): Promise<Message> {
     return createResource<Message>("Message", {
       channel_id: channelId,
       author_id: authorId,
       body,
       ...(replyToId ? { reply_to_id: replyToId } : {}),
+      ...(topicId ? { topic_id: topicId } : {}),
+    });
+  },
+
+  /** All members of a channel (roles + standing) — used by export + badges. */
+  membersForChannel(channelId: string): Promise<ChannelMember[]> {
+    return getCollection<ChannelMember>("ChannelMember", {
+      channel_id: channelId,
     });
   },
 

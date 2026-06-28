@@ -3,9 +3,11 @@
 #include <algorithm>
 #include <cstdio>
 #include <ctime>
+#include <map>
 #include <sstream>
 
 #include <Wt/WApplication.h>
+#include <Wt/WDialog.h>
 #include <Wt/WLineEdit.h>
 #include <Wt/WPushButton.h>
 #include <Wt/WString.h>
@@ -133,6 +135,9 @@ void CommPanel::buildRail() {
 
     buildConvoHead(this, /*full=*/false);  // title + reduced actions
 
+    topicBar_ = addNew<Wt::WContainerWidget>();
+    topicBar_->addStyleClass("fd-comm-topics");
+
     messageList_ = addNew<Wt::WContainerWidget>();
     messageList_->addStyleClass("fd-comm-messages");
 
@@ -151,6 +156,8 @@ void CommPanel::buildFull() {
     auto* convo = addNew<Wt::WContainerWidget>();
     convo->addStyleClass("fd-comm-convo");
     buildConvoHead(convo, /*full=*/true);  // title + full actions
+    topicBar_ = convo->addNew<Wt::WContainerWidget>();
+    topicBar_->addStyleClass("fd-comm-topics");
     messageList_ = convo->addNew<Wt::WContainerWidget>();
     messageList_->addStyleClass("fd-comm-messages");
     buildComposer(convo);
@@ -179,14 +186,34 @@ void CommPanel::buildConvoHead(Wt::WContainerWidget* parent, bool full) {
 }
 
 void CommPanel::buildComposer(Wt::WContainerWidget* parent) {
+    // Reply banner ("Replying to …" + cancel), shown while composing a reply.
+    replyBanner_ = parent->addNew<Wt::WContainerWidget>();
+    replyBanner_->addStyleClass("fd-comm-reply-banner");
+    replyBannerText_ = replyBanner_->addNew<Wt::WText>();
+    replyBannerText_->addStyleClass("fd-comm-reply-text fd-muted");
+    auto* cancelReplyBtn = replyBanner_->addNew<Wt::WPushButton>(
+        Wt::WString::fromUTF8("✕"));
+    cancelReplyBtn->addStyleClass("btn btn-sm fd-comm-reply-cancel");
+    cancelReplyBtn->clicked().connect(this, &CommPanel::cancelReply);
+    replyBanner_->hide();
+
     // A read-only notice shown in place of the composer when the user can't post
     // (broadcast member, or muted/banned). Hidden by default.
     postNotice_ = parent->addNew<Wt::WText>();
     postNotice_->addStyleClass("fd-comm-post-notice fd-muted");
     postNotice_->hide();
 
+    buildEmojiPanel(parent);  // hidden until the emoji button toggles it
+
     composerRow_ = parent->addNew<Wt::WContainerWidget>();
     composerRow_->addStyleClass("fd-comm-composer");
+    auto* emojiBtn = composerRow_->addNew<Wt::WPushButton>(Wt::WString::fromUTF8("☺"));
+    emojiBtn->addStyleClass("btn btn-sm fd-comm-emoji-btn");
+    emojiBtn->setToolTip("Emoji");
+    emojiBtn->clicked().connect([this] {
+        if (emojiPanel_) emojiPanel_->isHidden() ? emojiPanel_->show()
+                                                 : emojiPanel_->hide();
+    });
     composer_ = composerRow_->addNew<Wt::WLineEdit>();
     composer_->addStyleClass("form-control form-control-sm");
     composer_->setPlaceholderText("Message…");
@@ -194,6 +221,38 @@ void CommPanel::buildComposer(Wt::WContainerWidget* parent) {
     auto* sendBtn = composerRow_->addNew<Wt::WPushButton>("Send");
     sendBtn->addStyleClass("btn btn-sm btn-primary");
     sendBtn->clicked().connect(this, &CommPanel::send);
+}
+
+void CommPanel::buildEmojiPanel(Wt::WContainerWidget* parent) {
+    emojiPanel_ = parent->addNew<Wt::WContainerWidget>();
+    emojiPanel_->addStyleClass("fd-comm-emoji");
+    emojiPanel_->hide();
+    // A compact, trucking-relevant set (transport is UTF-8 end to end).
+    static const char* kEmoji[] = {
+        "👍", "👌", "✅", "❌", "⚠️", "🚚", "🛻", "🚛", "⛽", "🅿️",
+        "🕒", "📍", "🗺️", "📦", "📝", "🙏", "😀", "😅", "👀", "🔥"};
+    for (const char* e : kEmoji) {
+        auto* b = emojiPanel_->addNew<Wt::WPushButton>(Wt::WString::fromUTF8(e));
+        b->addStyleClass("btn btn-sm fd-emoji");
+        std::string emoji = e;
+        b->clicked().connect([this, emoji] {
+            if (composer_) composer_->setText(composer_->text().toUTF8() + emoji);
+        });
+    }
+}
+
+void CommPanel::startReply(const Message& m) {
+    replyToId_ = m.id;
+    if (replyBannerText_)
+        replyBannerText_->setText(Wt::WString::fromUTF8(
+            "↩ Replying to: " + esc(snippet(m.body))));
+    if (replyBanner_) replyBanner_->show();
+    if (composer_) composer_->setFocus();
+}
+
+void CommPanel::cancelReply() {
+    replyToId_.clear();
+    if (replyBanner_) replyBanner_->hide();
 }
 
 std::string CommPanel::channelName(const std::string& id) const {
@@ -207,6 +266,7 @@ void CommPanel::loadChannels() {
         [this](std::vector<Channel> chs) {
             channels_ = std::move(chs);
             renderChannels();
+            loadDirectoryMeta();   // badges: my role/standing + unread per channel
             if (selectedChannelId_.empty() && !channels_.empty())
                 selectChannel(channels_.front());
         },
@@ -217,12 +277,73 @@ void CommPanel::loadChannels() {
         });
 }
 
+// Fetch the current user's memberships (role/standing) + per-channel unread, then
+// re-render so the directory/rail show badges (mirrors the mobile channel list).
+void CommPanel::loadDirectoryMeta() {
+    api_->fetchMyMemberships(
+        user_.id,
+        [this](std::vector<ChannelMember> ms) {
+            myMemberships_.clear();
+            for (auto& m : ms) myMemberships_[m.channel_id] = m;
+            // Unread per channel: messages newer than my last_read_at, not mine.
+            for (const Channel& c : channels_) {
+                const std::string cid = c.id;
+                std::string lastRead;
+                auto it = myMemberships_.find(cid);
+                if (it != myMemberships_.end()) lastRead = it->second.last_read_at;
+                api_->fetchMessages(
+                    cid,
+                    [this, cid, lastRead](std::vector<Message> msgs) {
+                        int n = 0;
+                        for (const Message& m : msgs)
+                            if (m.author_id != user_.id &&
+                                (lastRead.empty() || m.posted_at > lastRead))
+                                ++n;
+                        if (cid == selectedChannelId_) n = 0;  // currently viewing
+                        unread_[cid] = n;
+                        renderChannels();
+                        if (auto* a = Wt::WApplication::instance()) a->triggerUpdate();
+                    },
+                    [](std::string) {});
+            }
+            renderChannels();
+        },
+        [](std::string) { /* badges optional; ignore */ });
+}
+
+// Append unread + role/standing badges (WText spans render as XHTML) to a row.
+void CommPanel::appendChannelBadges(Wt::WContainerWidget* row,
+                                    const std::string& channelId) {
+    auto u = unread_.find(channelId);
+    if (u != unread_.end() && u->second > 0)
+        row->addNew<Wt::WText>(Wt::WString::fromUTF8(
+            "<span class=\"fd-badge fd-badge-unread\">" +
+            std::to_string(u->second) + "</span>"));
+    auto m = myMemberships_.find(channelId);
+    if (m != myMemberships_.end()) {
+        const int status = m->second.member_status_id;  // 2 muted, 3 banned
+        const int role = m->second.member_role_id;      // 1 owner, 3 admin
+        if (status == 2 || status == 3)
+            row->addNew<Wt::WText>(Wt::WString::fromUTF8(
+                "<span class=\"fd-badge fd-badge-danger\">" +
+                std::string(status == 3 ? "Banned" : "Muted") + "</span>"));
+        if (role == 1)
+            row->addNew<Wt::WText>("<span class=\"fd-badge\">Owner</span>");
+        else if (role == 3)
+            row->addNew<Wt::WText>("<span class=\"fd-badge\">Admin</span>");
+    }
+}
+
 void CommPanel::renderChannels() {
     channelList_->clear();
     if (layout_ == Layout::Full) { renderDirectory(); return; }
-    // Rail: a flat horizontal strip of channel chips.
+    // Rail: a flat horizontal strip of channel chips (unread count in label).
     for (const Channel& c : channels_) {
-        auto* btn = channelList_->addNew<Wt::WPushButton>(Wt::WString::fromUTF8(c.name));
+        auto u = unread_.find(c.id);
+        std::string label = c.name;
+        if (u != unread_.end() && u->second > 0)
+            label += " (" + std::to_string(u->second) + ")";
+        auto* btn = channelList_->addNew<Wt::WPushButton>(Wt::WString::fromUTF8(label));
         btn->addStyleClass("fd-comm-channel btn btn-sm");
         if (c.id == selectedChannelId_) btn->addStyleClass("fd-active");
         Channel copy = c;
@@ -247,12 +368,15 @@ void CommPanel::renderDirectory() {
         channelList_->addNew<Wt::WText>(Wt::WString::fromUTF8(
             std::string("<div class=\"fd-comm-group-label\">") + s.label + "</div>"));
         for (const Channel* c : in) {
+            auto* row = channelList_->addNew<Wt::WContainerWidget>();
+            row->addStyleClass("fd-comm-group-row");
             auto* btn =
-                channelList_->addNew<Wt::WPushButton>(Wt::WString::fromUTF8(c->name));
+                row->addNew<Wt::WPushButton>(Wt::WString::fromUTF8(c->name));
             btn->addStyleClass("fd-comm-group-item btn btn-sm");
             if (c->id == selectedChannelId_) btn->addStyleClass("fd-active");
             Channel copy = *c;
             btn->clicked().connect([this, copy] { selectChannel(copy); });
+            appendChannelBadges(row, c->id);
         }
     }
     if (!any) {
@@ -264,10 +388,22 @@ void CommPanel::renderDirectory() {
 void CommPanel::selectChannel(const Channel& c) {
     selectedChannelId_ = c.id;
     selectedChannelName_ = c.name;
+    selectedTopicId_.clear();   // back to General on channel switch
     lastLatestId_.clear();
+    allMessages_.clear();
+    topics_.clear();
     convoTitle_->setText(Wt::WString::fromUTF8("#" + c.name));
+    // Entering a channel clears its unread + stamps it read.
+    unread_[c.id] = 0;
+    {
+        auto it = myMemberships_.find(c.id);
+        if (it != myMemberships_.end())
+            api_->markChannelRead(it->second.id, [](std::string) {});
+    }
     renderChannels();
+    renderTopicBar();           // General-only until topics arrive
     refreshMessages(/*notifyOnNew=*/false);
+    loadTopics();
 
     // Gate the composer by this user's role + standing in the channel (P1/P2).
     members_.clear();
@@ -279,9 +415,100 @@ void CommPanel::selectChannel(const Channel& c) {
             if (forChannel != selectedChannelId_) return;  // switched away
             members_ = std::move(ms);
             updatePostPermission();
+            renderTopicBar();  // members known -> reveal "New" for managers
             if (auto* a = Wt::WApplication::instance()) a->triggerUpdate();
         },
         [](std::string) { /* leave composer enabled on a transient error */ });
+}
+
+void CommPanel::loadTopics() {
+    const std::string forChannel = selectedChannelId_;
+    api_->fetchTopics(
+        forChannel,
+        [this, forChannel](std::vector<Topic> ts) {
+            if (forChannel != selectedChannelId_) return;
+            topics_ = std::move(ts);
+            renderTopicBar();
+            if (auto* a = Wt::WApplication::instance()) a->triggerUpdate();
+        },
+        [](std::string) { /* topics optional; ignore transient errors */ });
+}
+
+bool CommPanel::canManageTopics() const {
+    // Dispatcher app-role, or owner/admin in this channel (mirrors server rule).
+    if (user_.app_role_id == 1) return true;  // 1 = dispatcher (seed_data.sql)
+    for (const ChannelMember& m : members_)
+        if (m.user_id == user_.id)
+            return m.member_role_id == 1 || m.member_role_id == 3;  // owner/admin
+    return false;
+}
+
+void CommPanel::renderTopicBar() {
+    if (!topicBar_) return;
+    topicBar_->clear();
+    // Nothing to show if there are no topics and the user can't add any.
+    if (topics_.empty() && !canManageTopics()) return;
+
+    auto chip = [&](const std::string& label, const std::string& id) {
+        auto* b = topicBar_->addNew<Wt::WPushButton>(Wt::WString::fromUTF8(label));
+        b->addStyleClass("fd-comm-topic btn btn-sm");
+        if (id == selectedTopicId_) b->addStyleClass("fd-active");
+        b->clicked().connect([this, id] { selectTopic(id); });
+    };
+    chip("General", "");                       // the no-topic stream
+    for (const Topic& t : topics_)
+        chip(t.name + (t.is_closed ? " (closed)" : ""), t.id);
+
+    if (canManageTopics()) {
+        auto* add = topicBar_->addNew<Wt::WPushButton>(Wt::WString::fromUTF8("+ Topic"));
+        add->addStyleClass("fd-comm-topic-add btn btn-sm btn-outline-primary");
+        add->setToolTip("Create a topic (admins/dispatchers)");
+        add->clicked().connect(this, &CommPanel::promptNewTopic);
+    }
+}
+
+void CommPanel::selectTopic(const std::string& topicId) {
+    selectedTopicId_ = topicId;
+    renderTopicBar();
+    renderTimeline();
+}
+
+void CommPanel::promptNewTopic() {
+    if (selectedChannelId_.empty()) return;
+    auto* dialog = addChild(std::make_unique<Wt::WDialog>("New topic"));
+    auto* edit = dialog->contents()->addNew<Wt::WLineEdit>();
+    edit->setPlaceholderText("Topic name");
+    edit->addStyleClass("form-control");
+    auto* create = dialog->footer()->addNew<Wt::WPushButton>("Create");
+    create->addStyleClass("btn btn-sm btn-primary");
+    auto* cancel = dialog->footer()->addNew<Wt::WPushButton>("Cancel");
+    cancel->addStyleClass("btn btn-sm");
+
+    const std::string forChannel = selectedChannelId_;
+    auto submit = [this, dialog, edit, forChannel] {
+        const std::string name = edit->text().toUTF8();
+        if (!name.empty()) {
+            api_->createTopic(
+                forChannel, name, user_.id,
+                [this, forChannel](Topic t) {
+                    if (forChannel != selectedChannelId_) return;
+                    topics_.push_back(std::move(t));
+                    renderTopicBar();
+                    if (auto* a = Wt::WApplication::instance()) a->triggerUpdate();
+                },
+                [this](std::string err) {
+                    if (toaster_)
+                        toaster_->notify("Couldn't create topic", err,
+                                         Toaster::Level::Danger);
+                });
+        }
+        dialog->accept();
+    };
+    create->clicked().connect(submit);
+    edit->enterPressed().connect(submit);
+    cancel->clicked().connect([dialog] { dialog->reject(); });
+    dialog->finished().connect([this, dialog](Wt::DialogCode) { removeChild(dialog); });
+    dialog->show();
 }
 
 void CommPanel::updatePostPermission() {
@@ -351,12 +578,24 @@ void CommPanel::renderMessages(const std::vector<Message>& msgs, bool notifyOnNe
         }
         lastLatestId_ = latest.id;
     }
+    allMessages_ = msgs;   // full channel set; the timeline filters by topic
+    renderTimeline();
+}
 
+bool CommPanel::inSelectedTopic(const Message& m) const {
+    return selectedTopicId_.empty() ? m.topic_id.empty()
+                                    : m.topic_id == selectedTopicId_;
+}
+
+void CommPanel::renderTimeline() {
     messageList_->clear();
     seenIds_.clear();
+    std::vector<const Message*> view;
+    for (const Message& m : allMessages_)
+        if (inSelectedTopic(m)) view.push_back(&m);
     const std::size_t maxShown = 30;
-    const std::size_t start = msgs.size() > maxShown ? msgs.size() - maxShown : 0;
-    for (std::size_t i = start; i < msgs.size(); ++i) renderOne(msgs[i]);
+    const std::size_t start = view.size() > maxShown ? view.size() - maxShown : 0;
+    for (std::size_t i = start; i < view.size(); ++i) renderOne(*view[i]);
     if (auto* app = Wt::WApplication::instance()) app->triggerUpdate();
 }
 
@@ -365,6 +604,16 @@ void CommPanel::renderOne(const Message& m) {
     const bool mine = (m.author_id == user_.id);
     auto* row = messageList_->addNew<Wt::WContainerWidget>();
     row->addStyleClass(mine ? "fd-msg fd-msg-mine" : "fd-msg");
+
+    // Quoted reply: resolve the target from the loaded set (else a placeholder).
+    if (!m.reply_to_id.empty()) {
+        std::string quoted = "quoted message";
+        for (const Message& x : allMessages_)
+            if (x.id == m.reply_to_id) { quoted = snippet(x.body); break; }
+        row->addNew<Wt::WText>(Wt::WString::fromUTF8(
+            "<div class=\"fd-msg-quote\">↩ " + esc(quoted) + "</div>"));
+    }
+
     row->addNew<Wt::WText>(Wt::WString::fromUTF8(
         "<div class=\"fd-msg-body\">" + esc(m.body) + "</div>"));
     const std::string when =
@@ -372,22 +621,34 @@ void CommPanel::renderOne(const Message& m) {
     row->addNew<Wt::WText>(Wt::WString::fromUTF8(
         "<div class=\"fd-msg-meta\">" + (mine ? std::string("You") : "—") + " · " +
         esc(when) + "</div>"));
+
+    // Per-message reply action.
+    auto* reply = row->addNew<Wt::WPushButton>(Wt::WString::fromUTF8("↩"));
+    reply->addStyleClass("btn btn-sm fd-msg-reply");
+    reply->setToolTip("Reply");
+    Message copy = m;
+    reply->clicked().connect([this, copy] { startReply(copy); });
 }
 
 void CommPanel::onPushed(const Message& m) {
     // De-dup: a message can arrive both intra-server (CommBus) and via the
-    // external bridge (ALS->Kafka->RealtimeClient->CommBus) — render it once.
-    if (!m.id.empty() && seenIds_.count(m.id)) return;
-
+    // external bridge (ALS->Kafka->RealtimeClient->CommBus) — keep it once.
     if (m.channel_id == selectedChannelId_) {
-        renderOne(m);  // inserts into seenIds_
+        for (const Message& x : allMessages_)
+            if (!m.id.empty() && x.id == m.id) return;  // already have it
+        allMessages_.push_back(m);
         lastLatestId_ = m.id;
+        renderTimeline();  // shows only if it's in the current topic view
         if (toaster_ && m.author_id != user_.id)
             toaster_->notify("New message · #" + selectedChannelName_,
                              snippet(m.body), Toaster::Level::Info);
-    } else if (toaster_ && m.author_id != user_.id) {
-        toaster_->notify("New message · #" + channelName(m.channel_id),
-                         snippet(m.body), Toaster::Level::Info);
+    } else if (m.author_id != user_.id) {
+        // Another channel: bump its unread badge and toast.
+        unread_[m.channel_id] = (unread_.count(m.channel_id) ? unread_[m.channel_id] : 0) + 1;
+        renderChannels();
+        if (toaster_)
+            toaster_->notify("New message · #" + channelName(m.channel_id),
+                             snippet(m.body), Toaster::Level::Info);
     }
 }
 
@@ -395,11 +656,13 @@ void CommPanel::send() {
     const std::string body = composer_->text().toUTF8();
     if (body.empty() || selectedChannelId_.empty()) return;
     composer_->setText("");
+    if (emojiPanel_) emojiPanel_->hide();
     api_->createMessage(
-        selectedChannelId_, user_.id, body,
+        selectedChannelId_, user_.id, body, selectedTopicId_, replyToId_,
         [this](Message created) {
-            renderOne(created);          // show mine immediately (no refetch)
+            allMessages_.push_back(created);
             lastLatestId_ = created.id;
+            renderTimeline();            // show mine immediately (no refetch)
             if (auto* a = Wt::WApplication::instance()) a->triggerUpdate();
             CommBus::instance().publish(created);  // push to other sessions
         },
@@ -407,6 +670,7 @@ void CommPanel::send() {
             if (toaster_)
                 toaster_->notify("Send failed", err, Toaster::Level::Danger);
         });
+    cancelReply();  // reply target captured in the call above; clear the banner
 }
 
 void CommPanel::exportBoard() {

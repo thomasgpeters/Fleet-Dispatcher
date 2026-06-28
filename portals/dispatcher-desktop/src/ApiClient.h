@@ -60,6 +60,8 @@ public:
     using MessagesCallback = std::function<void(std::vector<Message>)>;
     using MessageCallback = std::function<void(Message)>;
     using ChannelMembersCallback = std::function<void(std::vector<ChannelMember>)>;
+    using TopicsCallback = std::function<void(std::vector<Topic>)>;
+    using TopicCallback = std::function<void(Topic)>;
     using RawCallback = std::function<void(std::string)>;  // raw JSON:API doc text
     using TokenCallback = std::function<void(std::string)>;
     using UserCallback = std::function<void(AppUser)>;
@@ -97,8 +99,23 @@ public:
     // Members of a channel (role + standing) — drives composer gating (P1/P2).
     void fetchChannelMembers(const std::string& channelId,
                              ChannelMembersCallback onOk, ErrorCallback onErr);
+    // The current user's memberships across channels — drives directory badges
+    // (role/standing) + per-channel read state (last_read_at).
+    void fetchMyMemberships(const std::string& userId,
+                            ChannelMembersCallback onOk, ErrorCallback onErr);
+    // Stamp a membership's last_read_at = now (mark a channel read).
+    void markChannelRead(const std::string& membershipId, ErrorCallback onErr);
+    // Forum topics in a channel (P3); create restricted to admins/dispatchers
+    // server-side (LogicBank) — the UI also gates the action.
+    void fetchTopics(const std::string& channelId, TopicsCallback onOk,
+                     ErrorCallback onErr);
+    void createTopic(const std::string& channelId, const std::string& name,
+                     const std::string& createdBy, TopicCallback onOk,
+                     ErrorCallback onErr);
+    // Post a message; topicId empty = General stream, replyToId empty = top-level.
     void createMessage(const std::string& channelId, const std::string& authorId,
-                       const std::string& body, MessageCallback onOk,
+                       const std::string& body, const std::string& topicId,
+                       const std::string& replyToId, MessageCallback onOk,
                        ErrorCallback onErr);
 
     // Generic option fetch for form combos: GET /resource, label from labelAttr.
