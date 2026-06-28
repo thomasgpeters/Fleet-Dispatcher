@@ -32,3 +32,10 @@ for _name, _cls in _pyinspect.getmembers(models, _pyinspect.isclass):
 
 logger.info("Fleet Dispatcher security: read grants on %d entities for roles %s",
             _granted, ROLES)
+
+# ALS server_setup reads this module-level string and logs it at startup. The
+# generated declare_security.py defines it, so our replacement must too.
+declare_security_message = (
+    "Fleet Dispatcher security active — app_user JWT auth + read grants "
+    "for roles dispatcher/driver/updater (dev-permissive baseline)"
+)
