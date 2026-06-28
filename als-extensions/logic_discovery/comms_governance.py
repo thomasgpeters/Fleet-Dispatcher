@@ -32,7 +32,7 @@ import logging
 from datetime import datetime, timezone
 
 from logic_bank.exec_row_logic.logic_row import LogicRow
-from logic_bank.rule_bank.rule_bank import Rule
+from logic_bank.logic_bank import Rule  # Rule lives here (matches ALS declare_logic.py)
 
 from database import models
 
