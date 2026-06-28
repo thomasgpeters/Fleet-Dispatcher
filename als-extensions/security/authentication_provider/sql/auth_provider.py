@@ -44,15 +44,33 @@ class Authentication_Provider(Abstract_Authentication_Provider):
 
     @staticmethod
     def get_user(id: str, password: str = "") -> object:
-        """Look up the login in fleet.app_user (username = login id)."""
+        """Look up the login in fleet.app_user (username = login id).
+
+        Returns None on any failure (unknown user / inactive / bad password) so
+        ALS reports a clean auth failure rather than a 500. When `password` is
+        supplied (login) we verify it HERE — newer ALS validates via get_user and
+        treats None as "incorrect username or password". An empty password means
+        identity resolution from a JWT on later requests, so we skip the check
+        then. `check_password` below is kept for ALS versions that call it.
+        """
         from database import models  # lazy: avoid import cycles at module load
         global db, session
         if db is None:
             db = safrs.DB
             session = db.session
         user = session.query(models.AppUser).filter(models.AppUser.username == id).one_or_none()
-        if user is None or not user.active:
-            raise ALSError(f"User {id} is not authorized for this system")
+        if user is None:
+            logger.info("auth: no app_user for '%s'", id)
+            return None  # generic failure (don't reveal whether the user exists)
+        if not user.active:
+            logger.info("auth: inactive account '%s'", id)
+            raise ALSError(
+                "This account is no longer active. Contact your dispatcher.",
+                HTTPStatus.FORBIDDEN)
+        if password and not (user.password_hash and
+                             check_password_hash(user.password_hash, password)):
+            logger.info("auth: bad password for '%s'", id)
+            return None  # generic failure (same message as unknown user)
 
         rtn_user = DotMapX()
         rtn_user.id = user.username           # JWT identity / login id
