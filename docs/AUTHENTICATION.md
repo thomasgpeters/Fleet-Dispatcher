@@ -135,3 +135,40 @@ Storage / Preferences — tracked in [`TODO.md`](TODO.md).
 The mobile app and the API are different origins (and Capacitor uses
 `capacitor://`/`ionic://`). Ensure the ALS server allows the app's origin and the
 `Authorization` header (ALS ships permissive dev CORS; tighten for production).
+
+## Regenerate gotchas (als-extensions ↔ ALS version)
+
+Our auth + logic live in `als-extensions/` and are reinstalled over a freshly
+generated project (`make als-extensions`). A 2026-06 fresh standup surfaced four
+ALS-version-sensitive issues — all now fixed in the tracked files, so a clean
+regenerate + `make als-extensions` just works. Documented here so they're not a
+mystery if the behavior recurs on a newer ALS:
+
+1. **`Rule` import path.** Import as `from logic_bank.logic_bank import Rule`
+   (matches ALS's generated `declare_logic.py`), **not** from
+   `logic_bank.rule_bank.rule_bank` (that module exposes `RuleBank`). Wrong path
+   → `ImportError` at LogicBank activation.
+2. **`declare_security_message`.** `config/server_setup.py` reads a module-level
+   `declare_security.declare_security_message` string at startup; our replacement
+   `declare_security.py` must define it or startup throws `AttributeError`.
+3. **`get_user` validates the password.** Newer ALS `login()` validates via
+   `get_user(username, password)` and treats a `None` return as failure (it does
+   **not** rely on a separate `check_password`). So `get_user` verifies the
+   werkzeug hash inline and returns `None` on mismatch.
+4. **`get_user` is dual-purpose.** The SAME method is called for **login**
+   (`get_user(username, password_str)`) and for **JWT identity resolution on every
+   authenticated request** (`get_user(identity, jwt_claims_dict)`). The second arg
+   is a **dict** in the JWT path — guard the password check with
+   `isinstance(password, str)`, or `check_password_hash(hash, <dict>)` throws
+   `AttributeError` (500) on the first authed call after login.
+
+Operational reminders from the same standup:
+- **`SECURITY_ENABLED=true`** must be exported (defaults off) — the #1 cause of
+  "can't log in" after a regenerate.
+- **`add-auth` before `make als-extensions`** (the installer needs `security/`).
+- Restarting **PostgreSQL** invalidates ALS's pooled connections → restart ALS
+  too (or set `SQLALCHEMY_ENGINE_OPTIONS = {"pool_pre_ping": True}`).
+- ALS login requires a **JSON body with `Content-Type: application/json`**;
+  form-encoded posts return 401 (both our clients already send JSON correctly).
+- Never edit a werkzeug hash through the shell — the `$…$…` gets mangled. Write it
+  via `psql -v h=… -c "… :'h' …"` or `generate_password_hash` in Python.
