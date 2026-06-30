@@ -67,8 +67,11 @@ class Authentication_Provider(Abstract_Authentication_Provider):
             raise ALSError(
                 "This account is no longer active. Contact your dispatcher.",
                 HTTPStatus.FORBIDDEN)
-        if password and not (user.password_hash and
-                             check_password_hash(user.password_hash, password)):
+        # ALS reuses get_user for BOTH login and JWT identity resolution. On login
+        # the 2nd arg is the password (str); on token verification it's the JWT
+        # claims (a dict). Only validate when it's actually a login password.
+        if isinstance(password, str) and password and not (
+                user.password_hash and check_password_hash(user.password_hash, password)):
             logger.info("auth: bad password for '%s'", id)
             return None  # generic failure (same message as unknown user)
 
