@@ -3,6 +3,23 @@
 Newest first. One entry per meaningful change set; pair with the checklist in
 [`TODO.md`](TODO.md).
 
+## 2026-06-30
+
+### ALS auth: fix als-extensions for a fresh from-scratch regenerate
+Full ALS regenerate (project was deleted) surfaced four latent, version-sensitive
+bugs in our `als-extensions` — all fixed in the tracked files so future regens
+just work. Verified end to end: `dispatch1`/`fleet123` logs in (200 + JWT) and
+authenticated requests resolve the user.
+- `Rule` import → `logic_bank.logic_bank` (not `rule_bank.rule_bank`).
+- `declare_security.py` must define `declare_security_message` (ALS reads it).
+- `get_user` validates the werkzeug password inline (newer ALS validates via
+  `get_user`, treating `None` as failure) + a distinct 403 for inactive accounts.
+- `get_user` is dual-purpose (login `password` str vs JWT-verify `jwt_data` dict)
+  → guard the password check with `isinstance(password, str)` (else `dict.encode`
+  500 on the first authed call).
+- Documented the gotchas (+ SECURITY_ENABLED, add-auth order, PG-restart pooling,
+  JSON content-type, hash-via-shell) in `docs/AUTHENTICATION.md`.
+
 ## 2026-06-20
 
 ### Desktop parity run — step 2: reply/quote + emoji
