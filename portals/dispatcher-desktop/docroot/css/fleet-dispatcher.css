@@ -573,6 +573,18 @@ h1, h2, h3, h4, h5, .h4, .h5 { font-family: var(--fd-font); letter-spacing: 0.1p
     color: var(--fd-text-muted);
 }
 
+/* Saved archive view (cross-channel). */
+.fd-saved-item {
+    position: relative;
+    background: var(--fd-surface-2);
+    border-radius: var(--fd-radius);
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.5rem;
+}
+.fd-saved-body { margin-bottom: 0.2rem; overflow-wrap: anywhere; }
+.fd-saved-meta { font-size: 0.75rem; }
+.fd-saved-remove { position: absolute; top: 0.6rem; right: 0.6rem; }
+
 /* Composer: reply banner + emoji picker. */
 .fd-comm-reply-banner {
     display: flex;

@@ -5,6 +5,18 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-07-07
 
+### Desktop parity run — step 3: pins (scoped) + Saved archive
+- `CommPanel`: per-message hover actions (reply · pin · save). Pin opens a scope
+  picker (Only me / Channel / Everyone → `MessagePin.pin_scope_id`); a
+  visible-pins strip sits atop the conversation (own pins removable); inline
+  📌/🔖 markers. Pins visible to me = channel/everyone pins + my self-pins.
+- New **`SavedView`** (left-menu "Saved") — the cross-channel personal archive:
+  lists saved messages (resolves each body), remove inline. Registered in CMake +
+  wired into `Shell`.
+- `ApiClient`: `MessagePin`/`SavedMessage` models + CRUD (fetch/pin/repin/unpin,
+  fetch/save/unsave, fetchMessage) + a new `deleteReq` (Http::Method::Delete).
+- Closes the Feature-4 desktop parity run except step 4 (attachments).
+
 ### Desktop board: fix week-grid collapse on tablets
 - On narrower viewports (iPad Pro) the fixed 260px + 320px side panels squeezed
   the center work panel until the 7-column week board collapsed — day headers

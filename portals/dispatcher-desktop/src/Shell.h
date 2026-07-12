@@ -69,6 +69,7 @@ private:
     void showFleet();     // fleet list (drivers + equipment)
     void showMap();       // geo-positioning of fleet locations
     void showComms();     // communications take over the full center work area
+    void showSaved();     // personal Saved archive (cross-channel)
     void showSettings();  // appearance + app info
     void showProfile();
     void showPlaceholder(const std::string& title);
