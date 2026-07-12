@@ -311,9 +311,11 @@ h1, h2, h3, h4, h5, .h4, .h5 { font-family: var(--fd-font); letter-spacing: 0.1p
     }
     .fd-panel.fd-collapsed { display: none; }
 }
-/* Single-letter weekday labels on tablet + phone (all iPad orientations, iPhone,
- * Android) — full names return on desktop. Independent of the stacking cutoff. */
-@media (max-width: 1200px) {
+/* Single-letter weekday labels on TOUCH devices (iPad — both orientations,
+ * including the 13" at 1376 landscape — iPhone, Android). Keyed on `pointer:
+ * coarse` so laptops/desktops keep full names even at similar widths; the 1400
+ * cap excludes large touch displays. Independent of the stacking cutoff. */
+@media (max-width: 1400px) and (pointer: coarse) {
     .fd-week-board .fd-day-full { display: none; }
     .fd-week-board .fd-day-short { display: inline; }
 }
