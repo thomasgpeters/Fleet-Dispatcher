@@ -306,9 +306,10 @@ Sequenced cheapest→largest; each ships as its own commit (Wt builds on Linux).
       banner; the reply renders a quoted snippet in the timeline
       (`message.reply_to_id`; `createMessage` takes a replyToId). Composer **emoji**
       picker (toggle panel, trucking-relevant set, UTF-8). Wt builds on Linux.
-- [ ] **3 — Pins + Saved**. Pin a message with a scope (self/channel/everyone) +
-      a visible-pins strip; a personal **Saved** archive view. (`MessagePin`,
-      `SavedMessage` — already in the schema/mobile.)
+- [x] **3 — Pins + Saved**. Desktop `CommPanel`: per-message pin (scope picker:
+      self/channel/everyone) + a visible-pins strip + inline 📌/🔖 markers;
+      save/unsave. New `SavedView` (left-menu "Saved") = cross-channel archive.
+      ApiClient: MessagePin/SavedMessage CRUD + `deleteReq`. Mirrors mobile.
 - [ ] **4 — Attachments**. Upload a file (→ `document` + `message_document`),
       render attachment chips, open/preview. (Wt `WFileUpload`.)
 

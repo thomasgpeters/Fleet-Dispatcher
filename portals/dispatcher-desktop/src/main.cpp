@@ -9,6 +9,7 @@
 // http://localhost:5659/api); never touches PostgreSQL directly.
 // See docs/DISPATCHER_DESKTOP.md.
 
+#include <cstdlib>
 #include <iostream>
 #include <memory>
 
@@ -31,8 +32,29 @@ namespace {
 
 void applyChrome(Wt::WApplication* app) {
     app->setTheme(std::make_shared<Wt::WBootstrap5Theme>());
+    // Responsive on tablets/phones: without a viewport meta, Safari lays the page
+    // out at a default ~980px width in EVERY orientation, so the CSS media queries
+    // never see the real width (iPad landscape stayed "stacked"). Must be set
+    // before first render — applyChrome runs from the app constructor.
+    // VERSION-SENSITIVE: Wt name-based addMetaHeader signature.
+    app->addMetaHeader("viewport", "width=device-width, initial-scale=1");
     app->useStyleSheet(Wt::WLink("css/fleet-dispatcher.css"));
     app->enableUpdates(true);  // server push (async API + HUD command bus)
+
+    // Troubleshooting: set FLEET_UI_DEBUG=1 to show a live viewport-width readout
+    // (bottom-right) so responsive breakpoints can be tuned to the real window
+    // width — which, under iPadOS windowing (Stage Manager / Split View), is not
+    // the screen width. Off by default; remove the env var to hide.
+    if (std::getenv("FLEET_UI_DEBUG")) {
+        app->doJavaScript(
+            "(function(){var d=document.createElement('div');"
+            "d.style.cssText='position:fixed;bottom:4px;right:4px;z-index:99999;"
+            "font:11px monospace;background:rgba(0,0,0,.65);color:#fff;"
+            "padding:2px 6px;border-radius:4px;pointer-events:none';"
+            "function u(){d.textContent='vw '+window.innerWidth+' \\u00d7 '+window.innerHeight;}"
+            "u();window.addEventListener('resize',u);"
+            "(document.body||document.documentElement).appendChild(d);})();");
+    }
 }
 
 }  // namespace

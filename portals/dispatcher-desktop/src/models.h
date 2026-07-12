@@ -61,6 +61,26 @@ struct Message {
     std::string posted_at;   // ISO8601
 };
 
+// A pinned message. pin_scope_id controls who sees it: 1 self, 2 channel,
+// 3 everyone (see pin_scope seed). One pin per (message, user).
+struct MessagePin {
+    std::string id;
+    std::string message_id;
+    std::string channel_id;
+    std::string pinned_by;
+    int pin_scope_id = 0;
+    std::string pinned_at;
+};
+
+// A user's personal saved/archive entry for a message (cross-channel).
+struct SavedMessage {
+    std::string id;
+    std::string user_id;
+    std::string message_id;
+    std::string note;
+    std::string saved_at;
+};
+
 struct Load {
     std::string id;
     std::string driver_id;        // may be empty (unassigned)

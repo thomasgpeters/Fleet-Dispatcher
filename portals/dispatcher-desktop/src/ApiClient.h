@@ -62,6 +62,10 @@ public:
     using ChannelMembersCallback = std::function<void(std::vector<ChannelMember>)>;
     using TopicsCallback = std::function<void(std::vector<Topic>)>;
     using TopicCallback = std::function<void(Topic)>;
+    using PinsCallback = std::function<void(std::vector<MessagePin>)>;
+    using PinCallback = std::function<void(MessagePin)>;
+    using SavedListCallback = std::function<void(std::vector<SavedMessage>)>;
+    using SavedCallback = std::function<void(SavedMessage)>;
     using RawCallback = std::function<void(std::string)>;  // raw JSON:API doc text
     using TokenCallback = std::function<void(std::string)>;
     using UserCallback = std::function<void(AppUser)>;
@@ -117,6 +121,22 @@ public:
                        const std::string& body, const std::string& topicId,
                        const std::string& replyToId, MessageCallback onOk,
                        ErrorCallback onErr);
+
+    // --- Pins (message_pin) + personal Saved archive (saved_message) ---
+    void fetchPins(const std::string& channelId, PinsCallback onOk, ErrorCallback onErr);
+    void pinMessage(const std::string& messageId, const std::string& channelId,
+                    const std::string& pinnedBy, int scopeId, PinCallback onOk,
+                    ErrorCallback onErr);
+    void repinMessage(const std::string& pinId, int scopeId, PinCallback onOk,
+                      ErrorCallback onErr);           // change scope
+    void unpinMessage(const std::string& pinId, ErrorCallback onErr);
+    void fetchSaved(const std::string& userId, SavedListCallback onOk, ErrorCallback onErr);
+    void saveMessage(const std::string& userId, const std::string& messageId,
+                     SavedCallback onOk, ErrorCallback onErr);
+    void unsaveMessage(const std::string& savedId, ErrorCallback onErr);
+    // A single message by id (used by the cross-channel Saved view).
+    void fetchMessage(const std::string& messageId, MessageCallback onOk,
+                      ErrorCallback onErr);
 
     // Generic option fetch for form combos: GET /resource, label from labelAttr.
     void fetchOptions(const std::string& resource, const std::string& labelAttr,

@@ -522,20 +522,68 @@ h1, h2, h3, h4, h5, .h4, .h5 { font-family: var(--fd-font); letter-spacing: 0.1p
     margin-bottom: 0.2rem;
 }
 .fd-msg-mine .fd-msg-quote { color: rgba(255, 255, 255, 0.85); border-left-color: rgba(255,255,255,0.4); }
-.fd-msg-reply {
+/* Per-message hover action row: reply · pin · save. */
+.fd-msg-actions {
     position: absolute;
-    top: 0.15rem;
-    right: 0.3rem;
-    padding: 0 0.35rem;
+    top: 0.1rem;
+    right: 0.25rem;
+    display: flex;
+    gap: 0.05rem;
+    opacity: 0;
+    transition: opacity var(--fd-dur-fast) var(--fd-ease);
+}
+.fd-msg:hover .fd-msg-actions { opacity: 1; }
+.fd-msg-act {
+    padding: 0 0.3rem;
     font-size: 0.8rem;
     background: transparent;
     border: none;
     color: var(--fd-text-muted);
-    opacity: 0;
-    transition: opacity var(--fd-dur-fast) var(--fd-ease);
 }
-.fd-msg:hover .fd-msg-reply { opacity: 1; }
-.fd-msg-mine .fd-msg-reply { color: rgba(255, 255, 255, 0.85); }
+.fd-msg-mine .fd-msg-act { color: rgba(255, 255, 255, 0.85); }
+
+/* Pinned strip atop the conversation. */
+.fd-comm-pins { display: flex; flex-direction: column; gap: 0.2rem; margin-bottom: 0.4rem; }
+.fd-comm-pins:empty { display: none; }
+.fd-pins-title {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--fd-text-muted);
+}
+.fd-pin-item {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: var(--fd-surface-2);
+    border-radius: 8px;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.85rem;
+}
+.fd-pin-body {
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.fd-pin-remove {
+    padding: 0 0.35rem;
+    background: transparent;
+    border: none;
+    color: var(--fd-text-muted);
+}
+
+/* Saved archive view (cross-channel). */
+.fd-saved-item {
+    position: relative;
+    background: var(--fd-surface-2);
+    border-radius: var(--fd-radius);
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.5rem;
+}
+.fd-saved-body { margin-bottom: 0.2rem; overflow-wrap: anywhere; }
+.fd-saved-meta { font-size: 0.75rem; }
+.fd-saved-remove { position: absolute; top: 0.6rem; right: 0.6rem; }
 
 /* Composer: reply banner + emoji picker. */
 .fd-comm-reply-banner {

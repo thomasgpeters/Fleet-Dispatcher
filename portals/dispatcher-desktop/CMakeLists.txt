@@ -30,6 +30,7 @@ set(FD_SOURCES
     src/FleetView.cpp
     src/MapView.cpp
     src/SettingsView.cpp
+    src/SavedView.cpp
 )
 if(FD_REALTIME_CLIENT)
     list(APPEND FD_SOURCES src/RealtimeClient.cpp)

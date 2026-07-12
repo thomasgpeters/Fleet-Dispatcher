@@ -50,6 +50,9 @@ private:
     std::map<std::string, int> unread_;    // unread count per channel
     std::vector<Topic> topics_;            // topics of the selected channel
     std::vector<Message> allMessages_;     // the channel's full set (filtered per topic)
+    std::vector<MessagePin> pins_;         // pins in the channel visible to me
+    std::map<std::string, MessagePin> myPins_;     // message_id -> my pin
+    std::map<std::string, SavedMessage> saved_;    // message_id -> my saved entry
     std::string selectedChannelId_;
     std::string selectedChannelName_;
     std::string selectedTopicId_;          // empty = the General stream
@@ -59,6 +62,7 @@ private:
 
     Wt::WContainerWidget* channelList_ = nullptr;
     Wt::WContainerWidget* topicBar_ = nullptr;   // General + topic chips (P3)
+    Wt::WContainerWidget* pinsStrip_ = nullptr;  // visible-pins strip atop the convo
     Wt::WText* convoTitle_ = nullptr;
     Wt::WText* exportStatus_ = nullptr;  // Full layout only (export feedback)
     Wt::WContainerWidget* messageList_ = nullptr;
@@ -92,6 +96,12 @@ private:
     void renderTimeline();        // render allMessages_ filtered by topic
     bool inSelectedTopic(const Message& m) const;
     void renderOne(const Message& m);          // append a single message row
+    void loadPinsAndSaved();                   // fetch pins + saved for the channel
+    void renderPinsStrip();                    // visible-pins strip atop the convo
+    void promptPinScope(const std::string& messageId);  // scope picker -> pin
+    void pinWithScope(const std::string& messageId, int scopeId);
+    void unpin(const MessagePin& p);
+    void toggleSave(const Message& m);
     void startReply(const Message& m);         // begin a threaded reply
     void cancelReply();
     void buildEmojiPanel(Wt::WContainerWidget* parent);  // composer emoji picker

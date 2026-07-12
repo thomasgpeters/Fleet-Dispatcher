@@ -8,6 +8,7 @@
 #include "CommPanel.h"
 #include "FleetView.h"
 #include "HudControlBus.h"
+#include "SavedView.h"
 #include "MapView.h"
 #include "ProfileView.h"
 #include "SettingsView.h"
@@ -161,6 +162,7 @@ void Shell::buildLeftMenu() {
     addItem("New Load", [this] { showLoadForm(); });
     // Selecting Communications lets comms take over the full work area.
     addItem("Communications", [this] { showComms(); });
+    addItem("Saved", [this] { showSaved(); });
     addItem("Settings", [this] { showSettings(); });
 
     // Work-panel toggles: drive how the center renders.
@@ -333,6 +335,13 @@ void Shell::showMap() {
     board_ = nullptr;
     content_->clear();
     content_->addNew<MapView>(api_);
+}
+
+void Shell::showSaved() {
+    exitCommsMode();
+    board_ = nullptr;
+    content_->clear();
+    content_->addNew<SavedView>(api_, user_);
 }
 
 void Shell::showSettings() {

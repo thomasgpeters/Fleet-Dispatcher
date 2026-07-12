@@ -5,6 +5,18 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-07-07
 
+### Desktop parity run — step 3: pins (scoped) + Saved archive
+- `CommPanel`: per-message hover actions (reply · pin · save). Pin opens a scope
+  picker (Only me / Channel / Everyone → `MessagePin.pin_scope_id`); a
+  visible-pins strip sits atop the conversation (own pins removable); inline
+  📌/🔖 markers. Pins visible to me = channel/everyone pins + my self-pins.
+- New **`SavedView`** (left-menu "Saved") — the cross-channel personal archive:
+  lists saved messages (resolves each body), remove inline. Registered in CMake +
+  wired into `Shell`.
+- `ApiClient`: `MessagePin`/`SavedMessage` models + CRUD (fetch/pin/repin/unpin,
+  fetch/save/unsave, fetchMessage) + a new `deleteReq` (Http::Method::Delete).
+- Closes the Feature-4 desktop parity run except step 4 (attachments).
+
 ### Desktop board: fix week-grid collapse on tablets
 - On narrower viewports (iPad Pro) the fixed 260px + 320px side panels squeezed
   the center work panel until the 7-column week board collapsed — day headers
@@ -13,6 +25,10 @@ Newest first. One entry per meaningful change set; pair with the checklist in
   day headers `white-space: nowrap` (no mid-word breaks; only load cells wrap);
   and the responsive stack breakpoint raised 900px → 1200px so tablet widths give
   the center full width (panels flow full-width).
+- **Viewport meta** added (`main.cpp applyChrome`): without it Safari laid the
+  console out at ~980px in every orientation, so the responsive breakpoints never
+  saw the real width and the iPad **stacked even in landscape**. Now
+  `width=device-width, initial-scale=1` — the media queries get true widths.
 - `BoardView`: the week runs **Sunday→Saturday** (`currentWeekDays` back-offsets
   to Sunday). Weekday labels are **responsive** — full names on desktop, **single
   letters on tablet/phone** (both rendered; `.fd-day-full`/`.fd-day-short` toggle
