@@ -81,6 +81,26 @@ struct SavedMessage {
     std::string saved_at;
 };
 
+// A CMS document (attachment). `data` is base64 (bytea) — present only when the
+// full document is fetched; metadata fetches leave it empty.
+struct Document {
+    std::string id;
+    std::string title;
+    int document_type_id = 0;   // 1 document, 2 image, … (see document_type seed)
+    std::string filename;
+    std::string content_type;   // MIME
+    int byte_size = 0;
+    std::string data;           // base64 (empty in metadata-only fetches)
+    std::string uploaded_by;
+};
+
+// Link between a message and a CMS document.
+struct MessageDocument {
+    std::string id;
+    std::string message_id;
+    std::string document_id;
+};
+
 struct Load {
     std::string id;
     std::string driver_id;        // may be empty (unassigned)

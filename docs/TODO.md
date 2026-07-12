@@ -310,8 +310,11 @@ Sequenced cheapest→largest; each ships as its own commit (Wt builds on Linux).
       self/channel/everyone) + a visible-pins strip + inline 📌/🔖 markers;
       save/unsave. New `SavedView` (left-menu "Saved") = cross-channel archive.
       ApiClient: MessagePin/SavedMessage CRUD + `deleteReq`. Mirrors mobile.
-- [ ] **4 — Attachments**. Upload a file (→ `document` + `message_document`),
-      render attachment chips, open/preview. (Wt `WFileUpload`.)
+- [x] **4 — Attachments**. Desktop `CommPanel`: `WFileUpload` in the composer →
+      base64 → `createDocument` + `linkMessageDocument` (message → document →
+      link); attachment chips per message (metadata via sparse fieldset), click
+      opens the full document in a new tab (data URL). Mirrors mobile. DONE →
+      **desktop message-board parity run complete**.
 
 ### Message-board robustness (clarified 2026-06-20)
 

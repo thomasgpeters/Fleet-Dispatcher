@@ -5,6 +5,18 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-07-07
 
+### Desktop parity run — step 4: attachments (COMPLETE)
+- `CommPanel` composer gains a `WFileUpload`: on select it auto-uploads; we read
+  the spooled file, base64-encode (`Wt::Utils::base64Encode`), then message →
+  `createDocument` → `linkMessageDocument` (mirrors mobile). Attachment **chips**
+  render per message (metadata via sparse fieldset, `data` omitted); clicking a
+  chip fetches the full document and opens it in a new tab via a data URL.
+- ApiClient: `Document`/`MessageDocument` models + `attachmentsForMessage`,
+  `fetchDocumentMeta` (sparse), `fetchDocument` (full), `createDocument`,
+  `linkMessageDocument`.
+- **Feature-4 desktop message-board parity run is now complete** (steps 1–4:
+  badges/unread · reply/emoji · pins/Saved · attachments). Wt builds on Linux.
+
 ### Desktop parity run — step 3: pins (scoped) + Saved archive
 - `CommPanel`: per-message hover actions (reply · pin · save). Pin opens a scope
   picker (Only me / Channel / Everyone → `MessagePin.pin_scope_id`); a

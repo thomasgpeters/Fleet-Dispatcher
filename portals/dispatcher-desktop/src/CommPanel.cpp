@@ -3,16 +3,20 @@
 #include <algorithm>
 #include <cstdio>
 #include <ctime>
+#include <fstream>
+#include <iterator>
 #include <map>
 #include <sstream>
 
 #include <Wt/WApplication.h>
 #include <Wt/WDialog.h>
+#include <Wt/WFileUpload.h>
 #include <Wt/WLineEdit.h>
 #include <Wt/WPushButton.h>
 #include <Wt/WString.h>
 #include <Wt/WText.h>
 #include <Wt/WTimer.h>
+#include <Wt/Utils.h>
 
 #include "CommBus.h"
 #include "Toaster.h"
@@ -212,6 +216,16 @@ void CommPanel::buildComposer(Wt::WContainerWidget* parent) {
 
     composerRow_ = parent->addNew<Wt::WContainerWidget>();
     composerRow_->addStyleClass("fd-comm-composer");
+    // Attachment picker: auto-uploads on select, then we create the message +
+    // document + link. VERSION-SENSITIVE: Wt::WFileUpload accessors.
+    fileUpload_ = composerRow_->addNew<Wt::WFileUpload>();
+    fileUpload_->addStyleClass("fd-comm-attach");
+    fileUpload_->setToolTip("Attach a file");
+    fileUpload_->changed().connect(fileUpload_, &Wt::WFileUpload::upload);
+    fileUpload_->uploaded().connect(this, &CommPanel::handleUpload);
+    fileUpload_->fileTooLarge().connect([this] {
+        if (toaster_) toaster_->notify("File too large", "", Toaster::Level::Danger);
+    });
     auto* emojiBtn = composerRow_->addNew<Wt::WPushButton>(Wt::WString::fromUTF8("☺"));
     emojiBtn->addStyleClass("btn btn-sm fd-comm-emoji-btn");
     emojiBtn->setToolTip("Emoji");
@@ -400,6 +414,8 @@ void CommPanel::selectChannel(const Channel& c) {
     pins_.clear();
     myPins_.clear();
     saved_.clear();
+    docsByMessage_.clear();
+    attachFetched_.clear();
     if (pinsStrip_) pinsStrip_->clear();
     convoTitle_->setText(Wt::WString::fromUTF8("#" + c.name));
     // Entering a channel clears its unread + stamps it read.
@@ -591,6 +607,7 @@ void CommPanel::renderMessages(const std::vector<Message>& msgs, bool notifyOnNe
     allMessages_ = msgs;   // full channel set; the timeline filters by topic
     renderTimeline();
     renderPinsStrip();     // now that message bodies are available for the strip
+    fetchAttachmentsFor(msgs);  // populate chips for any not yet fetched
 }
 
 bool CommPanel::inSelectedTopic(const Message& m) const {
@@ -627,6 +644,19 @@ void CommPanel::renderOne(const Message& m) {
 
     row->addNew<Wt::WText>(Wt::WString::fromUTF8(
         "<div class=\"fd-msg-body\">" + esc(m.body) + "</div>"));
+
+    // Attachment chips (click to open in a new tab).
+    auto dit = docsByMessage_.find(m.id);
+    if (dit != docsByMessage_.end()) {
+        for (const Document& doc : dit->second) {
+            auto* chip = row->addNew<Wt::WPushButton>(
+                Wt::WString::fromUTF8("📄 " + esc(doc.filename)));
+            chip->addStyleClass("fd-msg-attach btn btn-sm");
+            Document dc = doc;
+            chip->clicked().connect([this, dc] { openDocument(dc); });
+        }
+    }
+
     const std::string when =
         m.posted_at.size() >= 16 ? m.posted_at.substr(0, 16) : m.posted_at;
     const bool pinned = myPins_.count(m.id) > 0;
@@ -795,6 +825,92 @@ void CommPanel::toggleSave(const Message& m) {
             });
     }
     if (auto* a = Wt::WApplication::instance()) a->triggerUpdate();
+}
+
+// --- Attachments -----------------------------------------------------------
+
+void CommPanel::handleUpload() {
+    if (!fileUpload_ || selectedChannelId_.empty()) return;
+    const std::string path = fileUpload_->spoolFileName();
+    const std::string filename = fileUpload_->clientFileName().toUTF8();
+    std::string contentType = fileUpload_->contentDescription();
+    if (contentType.empty()) contentType = "application/octet-stream";
+
+    // Read the spooled upload and base64-encode it (bytea over JSON:API).
+    std::ifstream in(path, std::ios::binary);
+    std::string bytes((std::istreambuf_iterator<char>(in)),
+                      std::istreambuf_iterator<char>());
+    if (bytes.empty()) return;
+    const std::string b64 = Wt::Utils::base64Encode(bytes, false);  // no line breaks
+    const int docType = (contentType.rfind("image/", 0) == 0) ? 2 : 1;  // image | document
+    const int size = static_cast<int>(bytes.size());
+    const std::string topic = selectedTopicId_;
+
+    // message → document → link (mirrors mobile).
+    api_->createMessage(
+        selectedChannelId_, user_.id, "📎 " + filename, topic, "",
+        [this, filename, docType, contentType, b64, size](Message msg) {
+            allMessages_.push_back(msg);
+            lastLatestId_ = msg.id;
+            renderTimeline();
+            CommBus::instance().publish(msg);
+            const std::string mid = msg.id;
+            api_->createDocument(
+                filename, docType, filename, contentType, size, b64, user_.id,
+                [this, mid](Document doc) {
+                    api_->linkMessageDocument(mid, doc.id, [](std::string) {});
+                    docsByMessage_[mid].push_back(doc);
+                    attachFetched_.insert(mid);
+                    renderTimeline();
+                    if (auto* a = Wt::WApplication::instance()) a->triggerUpdate();
+                },
+                [this](std::string e) {
+                    if (toaster_) toaster_->notify("Upload failed", e, Toaster::Level::Danger);
+                });
+        },
+        [this](std::string e) {
+            if (toaster_) toaster_->notify("Send failed", e, Toaster::Level::Danger);
+        });
+}
+
+void CommPanel::fetchAttachmentsFor(const std::vector<Message>& msgs) {
+    for (const Message& m : msgs) {
+        if (attachFetched_.count(m.id)) continue;
+        attachFetched_.insert(m.id);
+        const std::string mid = m.id;
+        api_->attachmentsForMessage(
+            mid,
+            [this, mid](std::vector<MessageDocument> links) {
+                for (const MessageDocument& l : links) {
+                    api_->fetchDocumentMeta(
+                        l.document_id,
+                        [this, mid](Document doc) {
+                            docsByMessage_[mid].push_back(doc);
+                            renderTimeline();
+                            if (auto* a = Wt::WApplication::instance()) a->triggerUpdate();
+                        },
+                        [](std::string) {});
+                }
+            },
+            [](std::string) {});
+    }
+}
+
+void CommPanel::openDocument(const Document& d) {
+    api_->fetchDocument(
+        d.id,
+        [this](Document full) {
+            if (full.data.empty()) return;
+            // Open the document in a new tab via a data: URL (as the mobile app
+            // does). Large files may hit URL limits — fine for images/PDFs.
+            const std::string url =
+                "data:" + full.content_type + ";base64," + full.data;
+            if (auto* app = Wt::WApplication::instance())
+                app->doJavaScript("window.open(" + jsStringLiteral(url) + ",'_blank');");
+        },
+        [this](std::string e) {
+            if (toaster_) toaster_->notify("Couldn't open", e, Toaster::Level::Danger);
+        });
 }
 
 void CommPanel::onPushed(const Message& m) {

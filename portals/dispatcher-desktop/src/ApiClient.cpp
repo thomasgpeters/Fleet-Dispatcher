@@ -381,6 +381,29 @@ fd::SavedMessage parseSaved(const Wt::Json::Object& res) {
     return s;
 }
 
+fd::Document parseDocument(const Wt::Json::Object& res) {
+    const Wt::Json::Object& a = res.get("attributes");
+    Document d;
+    d.id = jstr(res, "id");
+    d.title = jstr(a, "title");
+    d.document_type_id = jint(a, "document_type_id");
+    d.filename = jstr(a, "filename");
+    d.content_type = jstr(a, "content_type");
+    d.byte_size = jint(a, "byte_size");
+    d.data = jstr(a, "data");   // base64; present only on a full fetch
+    d.uploaded_by = jstr(a, "uploaded_by");
+    return d;
+}
+
+fd::MessageDocument parseMessageDocument(const Wt::Json::Object& res) {
+    const Wt::Json::Object& a = res.get("attributes");
+    MessageDocument md;
+    md.id = jstr(res, "id");
+    md.message_id = jstr(a, "message_id");
+    md.document_id = jstr(a, "document_id");
+    return md;
+}
+
 fd::Message parseMessage(const Wt::Json::Object& res) {
     const Wt::Json::Object& a = res.get("attributes");
     Message m;
@@ -659,6 +682,81 @@ void ApiClient::fetchMessage(const std::string& messageId, MessageCallback onOk,
             onOk(parseMessage(data[0]));
         },
         std::move(onErr));
+}
+
+// --- Attachments -----------------------------------------------------------
+
+void ApiClient::attachmentsForMessage(const std::string& messageId,
+                                      MessageDocsCallback onOk, ErrorCallback onErr) {
+    getCollection(
+        baseUrl_ + "/MessageDocument?filter%5Bmessage_id%5D=" + urlEncode(messageId),
+        authToken_,
+        [onOk](const Wt::Json::Array& data) {
+            std::vector<MessageDocument> out;
+            for (const Wt::Json::Value& v : data) out.push_back(parseMessageDocument(v));
+            onOk(std::move(out));
+        },
+        std::move(onErr));
+}
+
+void ApiClient::fetchDocumentMeta(const std::string& documentId,
+                                  DocumentCallback onOk, ErrorCallback onErr) {
+    // Sparse fieldset: skip the (potentially large) base64 `data`.
+    getCollection(
+        baseUrl_ + "/Document?filter%5Bid%5D=" + urlEncode(documentId) +
+            "&fields%5BDocument%5D=title,filename,content_type,byte_size,"
+            "document_type_id,uploaded_by",
+        authToken_,
+        [onOk, onErr](const Wt::Json::Array& data) {
+            if (data.empty()) { onErr("document not found"); return; }
+            onOk(parseDocument(data[0]));
+        },
+        std::move(onErr));
+}
+
+void ApiClient::fetchDocument(const std::string& documentId, DocumentCallback onOk,
+                              ErrorCallback onErr) {
+    getCollection(
+        baseUrl_ + "/Document?filter%5Bid%5D=" + urlEncode(documentId), authToken_,
+        [onOk, onErr](const Wt::Json::Array& data) {
+            if (data.empty()) { onErr("document not found"); return; }
+            onOk(parseDocument(data[0]));
+        },
+        std::move(onErr));
+}
+
+void ApiClient::createDocument(const std::string& title, int documentTypeId,
+                               const std::string& filename,
+                               const std::string& contentType, int byteSize,
+                               const std::string& dataBase64,
+                               const std::string& uploadedBy, DocumentCallback onOk,
+                               ErrorCallback onErr) {
+    // base64 uses only [A-Za-z0-9+/=] — JSON-safe, no escaping needed.
+    const std::string payload =
+        "{\"data\":{\"type\":\"Document\",\"attributes\":{"
+        "\"title\":\"" + jsonEscape(title) + "\","
+        "\"document_type_id\":" + std::to_string(documentTypeId) + ","
+        "\"filename\":\"" + jsonEscape(filename) + "\","
+        "\"content_type\":\"" + jsonEscape(contentType) + "\","
+        "\"byte_size\":" + std::to_string(byteSize) + ","
+        "\"data\":\"" + dataBase64 + "\","
+        "\"uploaded_by\":\"" + jsonEscape(uploadedBy) + "\"}}}";
+    postJson(
+        baseUrl_ + "/Document", payload, authToken_,
+        [onOk](const Wt::Json::Object& obj) { onOk(parseDocument(obj)); },
+        std::move(onErr));
+}
+
+void ApiClient::linkMessageDocument(const std::string& messageId,
+                                    const std::string& documentId,
+                                    ErrorCallback onErr) {
+    const std::string payload =
+        "{\"data\":{\"type\":\"MessageDocument\",\"attributes\":{"
+        "\"message_id\":\"" + jsonEscape(messageId) + "\","
+        "\"document_id\":\"" + jsonEscape(documentId) + "\"}}}";
+    postJson(
+        baseUrl_ + "/MessageDocument", payload, authToken_,
+        [](const Wt::Json::Object&) {}, std::move(onErr));
 }
 
 void ApiClient::fetchRaw(const std::string& path, RawCallback onOk,
