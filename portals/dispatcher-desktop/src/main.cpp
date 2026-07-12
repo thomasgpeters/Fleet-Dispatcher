@@ -31,6 +31,12 @@ namespace {
 
 void applyChrome(Wt::WApplication* app) {
     app->setTheme(std::make_shared<Wt::WBootstrap5Theme>());
+    // Responsive on tablets/phones: without a viewport meta, Safari lays the page
+    // out at a default ~980px width in EVERY orientation, so the CSS media queries
+    // never see the real width (iPad landscape stayed "stacked"). Must be set
+    // before first render — applyChrome runs from the app constructor.
+    // VERSION-SENSITIVE: Wt name-based addMetaHeader signature.
+    app->addMetaHeader("viewport", "width=device-width, initial-scale=1");
     app->useStyleSheet(Wt::WLink("css/fleet-dispatcher.css"));
     app->enableUpdates(true);  // server push (async API + HUD command bus)
 }

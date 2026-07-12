@@ -13,6 +13,10 @@ Newest first. One entry per meaningful change set; pair with the checklist in
   day headers `white-space: nowrap` (no mid-word breaks; only load cells wrap);
   and the responsive stack breakpoint raised 900px → 1200px so tablet widths give
   the center full width (panels flow full-width).
+- **Viewport meta** added (`main.cpp applyChrome`): without it Safari laid the
+  console out at ~980px in every orientation, so the responsive breakpoints never
+  saw the real width and the iPad **stacked even in landscape**. Now
+  `width=device-width, initial-scale=1` — the media queries get true widths.
 - `BoardView`: the week runs **Sunday→Saturday** (`currentWeekDays` back-offsets
   to Sunday). Weekday labels are **responsive** — full names on desktop, **single
   letters on tablet/phone** (both rendered; `.fd-day-full`/`.fd-day-short` toggle
