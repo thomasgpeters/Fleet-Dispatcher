@@ -300,13 +300,20 @@ h1, h2, h3, h4, h5, .h4, .h5 { font-family: var(--fd-font); letter-spacing: 0.1p
 .fd-footer a:hover { text-decoration: underline; }
 
 /* Narrow viewports: stack the panels under the center column. */
-@media (max-width: 900px) {
+/* Stack the panels below the tablet range so the center work panel gets full
+ * width. At ≤1200px the fixed 260px + 320px side panels would squeeze the center
+ * too far (e.g. iPad Pro portrait) — so the left menu + comms rail flow to full
+ * width and the board/work view takes the whole row. */
+@media (max-width: 1200px) {
     .fd-body { flex-direction: column; }
     .fd-panel, .fd-panel-right {
         width: auto;
         flex-basis: auto;
     }
     .fd-panel.fd-collapsed { display: none; }
+    /* Tablet/phone: single-letter weekday labels (iPad, iPhone, Android). */
+    .fd-week-board .fd-day-full { display: none; }
+    .fd-week-board .fd-day-short { display: inline; }
 }
 
 /* ===========================================================================
@@ -317,7 +324,8 @@ h1, h2, h3, h4, h5, .h4, .h5 { font-family: var(--fd-font); letter-spacing: 0.1p
 .fd-tablecard {
     background-color: var(--fd-surface);
     border-radius: var(--fd-radius);
-    overflow: hidden;        /* clip rows to the rounded corners */
+    overflow-x: auto;        /* wide boards (week grid) scroll instead of collapsing */
+    overflow-y: hidden;      /* rounded corners still clip; card grows with content */
 }
 .fd-tablecard table,
 .fd-work table {
@@ -353,17 +361,31 @@ h1, h2, h3, h4, h5, .h4, .h5 { font-family: var(--fd-font); letter-spacing: 0.1p
  * ======================================================================== */
 .fd-week-board {
     width: 100%;
+    min-width: 42rem;      /* keep day columns legible; the card scrolls (not
+                              collapses) when the center panel is narrower */
     table-layout: fixed;   /* equal day columns; it's a <table>, NOT a CSS grid */
 }
 .fd-week-board th,
-.fd-week-board td {
-    vertical-align: top;
-    overflow-wrap: anywhere;
-}
+.fd-week-board td { vertical-align: top; }
+/* Day headers (Mon / 06-05) must never break mid-word into vertical letters. */
+.fd-week-board th { white-space: nowrap; overflow-wrap: normal; }
+/* Only the load cells may wrap their content. */
+.fd-week-board td { overflow-wrap: anywhere; }
 .fd-week-board th:first-child,
 .fd-week-board td:first-child {
     width: 8.5rem;         /* the Driver column */
     white-space: nowrap;
+}
+/* Weekday label: full name on desktop, single letter on tablet/phone. Both are
+ * rendered; CSS picks by viewport (toggled in the ≤1200px media query below). */
+.fd-day-short { display: none; }
+/* Date beneath the weekday — readable on the darker header band (was too faint
+ * as text-muted): the normal text colour, lightly de-emphasised. */
+.fd-day-date {
+    font-size: 0.72rem;
+    color: var(--fd-text);
+    opacity: 0.8;
+    margin-top: 0.05rem;
 }
 .fd-load-card {
     border-left: 4px solid var(--fd-accent);  /* orange accent bar */

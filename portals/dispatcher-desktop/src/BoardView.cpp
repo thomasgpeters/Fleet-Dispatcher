@@ -24,16 +24,15 @@ std::string isoDate(std::time_t t) {
 
 std::string todayIso() { return isoDate(std::time(nullptr)); }
 
-// The seven "YYYY-MM-DD" dates of the current Monday→Sunday week.
+// The seven "YYYY-MM-DD" dates of the current Sunday→Saturday week.
 std::array<std::string, 7> currentWeekDays() {
     std::time_t now = std::time(nullptr);
     std::tm tm{};
     localtime_r(&now, &tm);
     int dow = tm.tm_wday;                  // 0=Sun … 6=Sat
-    int toMonday = (dow == 0) ? 6 : dow - 1;
-    std::time_t monday = now - static_cast<std::time_t>(toMonday) * 86400;
+    std::time_t sunday = now - static_cast<std::time_t>(dow) * 86400;  // back to Sunday
     std::array<std::string, 7> days;
-    for (int i = 0; i < 7; ++i) days[i] = isoDate(monday + static_cast<std::time_t>(i) * 86400);
+    for (int i = 0; i < 7; ++i) days[i] = isoDate(sunday + static_cast<std::time_t>(i) * 86400);
     return days;
 }
 
@@ -143,14 +142,19 @@ void BoardView::renderWeek() {
     table->setHeaderCount(1);                            // header row
     table->setHeaderCount(1, Wt::Orientation::Vertical); // header column
     table->elementAt(0, 0)->addNew<Wt::WText>("Driver");
-    static const char* dow[7] = {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"};
+    // Sunday-first. Full weekday on desktop, single letter on tablet/phone —
+    // CSS toggles .fd-day-full / .fd-day-short by viewport (≤1200px).
+    static const char* dowFull[7] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+    static const char* dowShort[7] = {"S", "M", "T", "W", "T", "F", "S"};
     for (int c = 0; c < 7; ++c) {
         auto* h = table->elementAt(0, c + 1);
-        // Weekday on top, short MM-DD beneath (avoids the full date wrapping).
         const std::string mmdd = days[c].size() >= 10 ? days[c].substr(5) : days[c];
         h->addNew<Wt::WText>(Wt::WString::fromUTF8(
-            "<div class=\"fw-semibold\">" + std::string(dow[c]) + "</div>"
-            "<div class=\"small text-muted\">" + mmdd + "</div>"));
+            "<div class=\"fw-semibold\">"
+            "<span class=\"fd-day-full\">" + std::string(dowFull[c]) + "</span>"
+            "<span class=\"fd-day-short\">" + std::string(dowShort[c]) + "</span>"
+            "</div>"
+            "<div class=\"fd-day-date\">" + mmdd + "</div>"));
     }
 
     int row = 0;
