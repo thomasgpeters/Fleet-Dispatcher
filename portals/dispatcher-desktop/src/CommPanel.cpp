@@ -138,6 +138,9 @@ void CommPanel::buildRail() {
     topicBar_ = addNew<Wt::WContainerWidget>();
     topicBar_->addStyleClass("fd-comm-topics");
 
+    pinsStrip_ = addNew<Wt::WContainerWidget>();
+    pinsStrip_->addStyleClass("fd-comm-pins");
+
     messageList_ = addNew<Wt::WContainerWidget>();
     messageList_->addStyleClass("fd-comm-messages");
 
@@ -158,6 +161,8 @@ void CommPanel::buildFull() {
     buildConvoHead(convo, /*full=*/true);  // title + full actions
     topicBar_ = convo->addNew<Wt::WContainerWidget>();
     topicBar_->addStyleClass("fd-comm-topics");
+    pinsStrip_ = convo->addNew<Wt::WContainerWidget>();
+    pinsStrip_->addStyleClass("fd-comm-pins");
     messageList_ = convo->addNew<Wt::WContainerWidget>();
     messageList_->addStyleClass("fd-comm-messages");
     buildComposer(convo);
@@ -392,6 +397,10 @@ void CommPanel::selectChannel(const Channel& c) {
     lastLatestId_.clear();
     allMessages_.clear();
     topics_.clear();
+    pins_.clear();
+    myPins_.clear();
+    saved_.clear();
+    if (pinsStrip_) pinsStrip_->clear();
     convoTitle_->setText(Wt::WString::fromUTF8("#" + c.name));
     // Entering a channel clears its unread + stamps it read.
     unread_[c.id] = 0;
@@ -404,6 +413,7 @@ void CommPanel::selectChannel(const Channel& c) {
     renderTopicBar();           // General-only until topics arrive
     refreshMessages(/*notifyOnNew=*/false);
     loadTopics();
+    loadPinsAndSaved();         // pins strip + inline pin/saved markers
 
     // Gate the composer by this user's role + standing in the channel (P1/P2).
     members_.clear();
@@ -580,6 +590,7 @@ void CommPanel::renderMessages(const std::vector<Message>& msgs, bool notifyOnNe
     }
     allMessages_ = msgs;   // full channel set; the timeline filters by topic
     renderTimeline();
+    renderPinsStrip();     // now that message bodies are available for the strip
 }
 
 bool CommPanel::inSelectedTopic(const Message& m) const {
@@ -618,16 +629,172 @@ void CommPanel::renderOne(const Message& m) {
         "<div class=\"fd-msg-body\">" + esc(m.body) + "</div>"));
     const std::string when =
         m.posted_at.size() >= 16 ? m.posted_at.substr(0, 16) : m.posted_at;
-    row->addNew<Wt::WText>(Wt::WString::fromUTF8(
-        "<div class=\"fd-msg-meta\">" + (mine ? std::string("You") : "—") + " · " +
-        esc(when) + "</div>"));
+    const bool pinned = myPins_.count(m.id) > 0;
+    const bool isSaved = saved_.count(m.id) > 0;
+    std::string meta = "<div class=\"fd-msg-meta\">" +
+                       (mine ? std::string("You") : "—") + " · " + esc(when);
+    if (pinned) meta += " · 📌";
+    if (isSaved) meta += " · 🔖";
+    meta += "</div>";
+    row->addNew<Wt::WText>(Wt::WString::fromUTF8(meta));
 
-    // Per-message reply action.
-    auto* reply = row->addNew<Wt::WPushButton>(Wt::WString::fromUTF8("↩"));
-    reply->addStyleClass("btn btn-sm fd-msg-reply");
-    reply->setToolTip("Reply");
+    // Per-message actions (hover): reply · pin/unpin · save/unsave.
+    auto* actions = row->addNew<Wt::WContainerWidget>();
+    actions->addStyleClass("fd-msg-actions");
     Message copy = m;
+
+    auto* reply = actions->addNew<Wt::WPushButton>(Wt::WString::fromUTF8("↩"));
+    reply->addStyleClass("btn btn-sm fd-msg-act");
+    reply->setToolTip("Reply");
     reply->clicked().connect([this, copy] { startReply(copy); });
+
+    auto* pin = actions->addNew<Wt::WPushButton>(Wt::WString::fromUTF8(pinned ? "📌" : "📍"));
+    pin->addStyleClass("btn btn-sm fd-msg-act");
+    pin->setToolTip(pinned ? "Unpin" : "Pin…");
+    const std::string mid = m.id;
+    pin->clicked().connect([this, mid] {
+        auto it = myPins_.find(mid);
+        if (it != myPins_.end()) unpin(it->second);
+        else promptPinScope(mid);
+    });
+
+    auto* save = actions->addNew<Wt::WPushButton>(Wt::WString::fromUTF8(isSaved ? "🔖" : "🏷"));
+    save->addStyleClass("btn btn-sm fd-msg-act");
+    save->setToolTip(isSaved ? "Remove from Saved" : "Save");
+    save->clicked().connect([this, copy] { toggleSave(copy); });
+}
+
+// --- Pins + Saved ----------------------------------------------------------
+
+void CommPanel::loadPinsAndSaved() {
+    const std::string forChannel = selectedChannelId_;
+    // Pins visible to me: all channel/everyone pins + my own self-pins.
+    api_->fetchPins(
+        forChannel,
+        [this, forChannel](std::vector<MessagePin> all) {
+            if (forChannel != selectedChannelId_) return;
+            pins_.clear();
+            myPins_.clear();
+            for (auto& p : all) {
+                const bool visible = p.pin_scope_id != 1 || p.pinned_by == user_.id;
+                if (visible) pins_.push_back(p);
+                if (p.pinned_by == user_.id) myPins_[p.message_id] = p;
+            }
+            renderPinsStrip();
+            renderTimeline();  // refresh inline pin markers
+            if (auto* a = Wt::WApplication::instance()) a->triggerUpdate();
+        },
+        [](std::string) {});
+    api_->fetchSaved(
+        user_.id,
+        [this, forChannel](std::vector<SavedMessage> ss) {
+            if (forChannel != selectedChannelId_) return;
+            saved_.clear();
+            for (auto& s : ss) saved_[s.message_id] = s;
+            renderTimeline();  // refresh inline saved markers
+            if (auto* a = Wt::WApplication::instance()) a->triggerUpdate();
+        },
+        [](std::string) {});
+}
+
+void CommPanel::renderPinsStrip() {
+    if (!pinsStrip_) return;
+    pinsStrip_->clear();
+    if (pins_.empty()) return;
+    pinsStrip_->addNew<Wt::WText>(
+        "<div class=\"fd-pins-title\">📌 Pinned</div>");
+    for (const MessagePin& p : pins_) {
+        std::string body = "message";
+        for (const Message& x : allMessages_)
+            if (x.id == p.message_id) { body = snippet(x.body); break; }
+        auto* item = pinsStrip_->addNew<Wt::WContainerWidget>();
+        item->addStyleClass("fd-pin-item");
+        item->addNew<Wt::WText>(Wt::WString::fromUTF8(
+            "<span class=\"fd-pin-body\">" + esc(body) + "</span>"));
+        if (p.pinned_by == user_.id) {
+            auto* x = item->addNew<Wt::WPushButton>(Wt::WString::fromUTF8("✕"));
+            x->addStyleClass("btn btn-sm fd-pin-remove");
+            x->setToolTip("Unpin");
+            MessagePin copy = p;
+            x->clicked().connect([this, copy] { unpin(copy); });
+        }
+    }
+}
+
+void CommPanel::promptPinScope(const std::string& messageId) {
+    auto* dialog = addChild(std::make_unique<Wt::WDialog>("Pin for…"));
+    struct Opt { const char* label; int scope; };
+    static const Opt opts[] = {
+        {"Only me", 1}, {"Everyone in this channel", 2}, {"Everyone", 3}};
+    for (const Opt& o : opts) {
+        auto* b = dialog->contents()->addNew<Wt::WPushButton>(o.label);
+        b->addStyleClass("btn btn-sm btn-outline-primary d-block w-100 mb-1");
+        const int scope = o.scope;
+        b->clicked().connect([this, messageId, scope, dialog] {
+            pinWithScope(messageId, scope);
+            dialog->accept();
+        });
+    }
+    auto* cancel = dialog->footer()->addNew<Wt::WPushButton>("Cancel");
+    cancel->addStyleClass("btn btn-sm");
+    cancel->clicked().connect([dialog] { dialog->reject(); });
+    dialog->finished().connect([this, dialog](Wt::DialogCode) { removeChild(dialog); });
+    dialog->show();
+}
+
+void CommPanel::pinWithScope(const std::string& messageId, int scopeId) {
+    auto existing = myPins_.find(messageId);
+    auto onPinned = [this](MessagePin saved) {
+        pins_.erase(std::remove_if(pins_.begin(), pins_.end(),
+                    [&](const MessagePin& x) { return x.id == saved.id; }), pins_.end());
+        pins_.push_back(saved);
+        myPins_[saved.message_id] = saved;
+        renderPinsStrip();
+        renderTimeline();
+        if (auto* a = Wt::WApplication::instance()) a->triggerUpdate();
+    };
+    if (existing != myPins_.end())
+        api_->repinMessage(existing->second.id, scopeId, onPinned,
+                           [](std::string) {});
+    else
+        api_->pinMessage(messageId, selectedChannelId_, user_.id, scopeId, onPinned,
+                         [this](std::string e) {
+                             if (toaster_) toaster_->notify("Pin failed", e,
+                                                            Toaster::Level::Danger);
+                         });
+}
+
+void CommPanel::unpin(const MessagePin& p) {
+    const std::string pinId = p.id, msgId = p.message_id;
+    api_->unpinMessage(pinId, [](std::string) {});
+    pins_.erase(std::remove_if(pins_.begin(), pins_.end(),
+                [&](const MessagePin& x) { return x.id == pinId; }), pins_.end());
+    myPins_.erase(msgId);
+    renderPinsStrip();
+    renderTimeline();
+    if (auto* a = Wt::WApplication::instance()) a->triggerUpdate();
+}
+
+void CommPanel::toggleSave(const Message& m) {
+    auto it = saved_.find(m.id);
+    if (it != saved_.end()) {
+        const std::string savedId = it->second.id;
+        api_->unsaveMessage(savedId, [](std::string) {});
+        saved_.erase(m.id);
+        renderTimeline();
+    } else {
+        api_->saveMessage(
+            user_.id, m.id,
+            [this](SavedMessage s) {
+                saved_[s.message_id] = s;
+                renderTimeline();
+                if (auto* a = Wt::WApplication::instance()) a->triggerUpdate();
+            },
+            [this](std::string e) {
+                if (toaster_) toaster_->notify("Save failed", e, Toaster::Level::Danger);
+            });
+    }
+    if (auto* a = Wt::WApplication::instance()) a->triggerUpdate();
 }
 
 void CommPanel::onPushed(const Message& m) {

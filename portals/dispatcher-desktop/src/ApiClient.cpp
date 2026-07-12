@@ -290,6 +290,33 @@ void patchJson(const std::string& url, const std::string& body,
     }
 }
 
+// DELETE a resource; success = 200/202/204. NOTE (Wt version): uses
+// Http::Method::Delete (like Patch above).
+void deleteReq(const std::string& url, const std::string& bearer,
+               std::function<void()> onOk, ApiClient::ErrorCallback onErr) {
+    auto client = std::make_shared<Wt::Http::Client>();
+    client->setTimeout(std::chrono::seconds(15));
+    client->done().connect(
+        [client, onOk, onErr](Wt::AsioWrapper::error_code err,
+                              const Wt::Http::Message& response) {
+            if (err) {
+                onErr(err.message());
+            } else if (response.status() != 200 && response.status() != 202 &&
+                       response.status() != 204) {
+                onErr("HTTP " + std::to_string(response.status()));
+            } else {
+                onOk();
+            }
+            if (auto* app = Wt::WApplication::instance()) app->triggerUpdate();
+        });
+    Wt::Http::Message msg;
+    msg.addHeader("Accept", "application/vnd.api+json");
+    if (!bearer.empty()) msg.addHeader("Authorization", "Bearer " + bearer);
+    if (!client->request(Wt::Http::Method::Delete, url, msg)) {
+        onErr("could not start DELETE to " + url);
+    }
+}
+
 // Minimal percent-encoding for query values (usernames are simple, but be safe).
 std::string urlEncode(const std::string& s) {
     static const char* hex = "0123456789ABCDEF";
@@ -329,6 +356,29 @@ fd::Channel parseChannel(const Wt::Json::Object& res) {
     c.name = jstr(a, "name");
     c.channel_type_id = jint(a, "channel_type_id");
     return c;
+}
+
+fd::MessagePin parsePin(const Wt::Json::Object& res) {
+    const Wt::Json::Object& a = res.get("attributes");
+    MessagePin p;
+    p.id = jstr(res, "id");
+    p.message_id = jstr(a, "message_id");
+    p.channel_id = jstr(a, "channel_id");
+    p.pinned_by = jstr(a, "pinned_by");
+    p.pin_scope_id = jint(a, "pin_scope_id");
+    p.pinned_at = jstr(a, "pinned_at");
+    return p;
+}
+
+fd::SavedMessage parseSaved(const Wt::Json::Object& res) {
+    const Wt::Json::Object& a = res.get("attributes");
+    SavedMessage s;
+    s.id = jstr(res, "id");
+    s.user_id = jstr(a, "user_id");
+    s.message_id = jstr(a, "message_id");
+    s.note = jstr(a, "note");
+    s.saved_at = jstr(a, "saved_at");
+    return s;
 }
 
 fd::Message parseMessage(const Wt::Json::Object& res) {
@@ -523,6 +573,91 @@ void ApiClient::createMessage(const std::string& channelId,
     postJson(
         baseUrl_ + "/Message", payload, authToken_,
         [onOk](const Wt::Json::Object& obj) { onOk(parseMessage(obj)); },
+        std::move(onErr));
+}
+
+// --- Pins + Saved ----------------------------------------------------------
+
+void ApiClient::fetchPins(const std::string& channelId, PinsCallback onOk,
+                          ErrorCallback onErr) {
+    getCollection(
+        baseUrl_ + "/MessagePin?filter%5Bchannel_id%5D=" + urlEncode(channelId),
+        authToken_,
+        [onOk](const Wt::Json::Array& data) {
+            std::vector<MessagePin> out;
+            for (const Wt::Json::Value& v : data) out.push_back(parsePin(v));
+            onOk(std::move(out));
+        },
+        std::move(onErr));
+}
+
+void ApiClient::pinMessage(const std::string& messageId, const std::string& channelId,
+                           const std::string& pinnedBy, int scopeId,
+                           PinCallback onOk, ErrorCallback onErr) {
+    const std::string payload =
+        "{\"data\":{\"type\":\"MessagePin\",\"attributes\":{"
+        "\"message_id\":\"" + jsonEscape(messageId) + "\","
+        "\"channel_id\":\"" + jsonEscape(channelId) + "\","
+        "\"pinned_by\":\"" + jsonEscape(pinnedBy) + "\","
+        "\"pin_scope_id\":" + std::to_string(scopeId) + "}}}";
+    postJson(
+        baseUrl_ + "/MessagePin", payload, authToken_,
+        [onOk](const Wt::Json::Object& obj) { onOk(parsePin(obj)); },
+        std::move(onErr));
+}
+
+void ApiClient::repinMessage(const std::string& pinId, int scopeId,
+                             PinCallback onOk, ErrorCallback onErr) {
+    const std::string body =
+        "{\"data\":{\"type\":\"MessagePin\",\"id\":\"" + jsonEscape(pinId) +
+        "\",\"attributes\":{\"pin_scope_id\":" + std::to_string(scopeId) + "}}}";
+    patchJson(
+        baseUrl_ + "/MessagePin/" + pinId, body, authToken_,
+        [onOk](const Wt::Json::Object& obj) { onOk(parsePin(obj)); },
+        std::move(onErr));
+}
+
+void ApiClient::unpinMessage(const std::string& pinId, ErrorCallback onErr) {
+    deleteReq(baseUrl_ + "/MessagePin/" + pinId, authToken_, [] {}, std::move(onErr));
+}
+
+void ApiClient::fetchSaved(const std::string& userId, SavedListCallback onOk,
+                           ErrorCallback onErr) {
+    getCollection(
+        baseUrl_ + "/SavedMessage?filter%5Buser_id%5D=" + urlEncode(userId),
+        authToken_,
+        [onOk](const Wt::Json::Array& data) {
+            std::vector<SavedMessage> out;
+            for (const Wt::Json::Value& v : data) out.push_back(parseSaved(v));
+            onOk(std::move(out));
+        },
+        std::move(onErr));
+}
+
+void ApiClient::saveMessage(const std::string& userId, const std::string& messageId,
+                            SavedCallback onOk, ErrorCallback onErr) {
+    const std::string payload =
+        "{\"data\":{\"type\":\"SavedMessage\",\"attributes\":{"
+        "\"user_id\":\"" + jsonEscape(userId) + "\","
+        "\"message_id\":\"" + jsonEscape(messageId) + "\"}}}";
+    postJson(
+        baseUrl_ + "/SavedMessage", payload, authToken_,
+        [onOk](const Wt::Json::Object& obj) { onOk(parseSaved(obj)); },
+        std::move(onErr));
+}
+
+void ApiClient::unsaveMessage(const std::string& savedId, ErrorCallback onErr) {
+    deleteReq(baseUrl_ + "/SavedMessage/" + savedId, authToken_, [] {}, std::move(onErr));
+}
+
+void ApiClient::fetchMessage(const std::string& messageId, MessageCallback onOk,
+                             ErrorCallback onErr) {
+    getCollection(
+        baseUrl_ + "/Message?filter%5Bid%5D=" + urlEncode(messageId), authToken_,
+        [onOk, onErr](const Wt::Json::Array& data) {
+            if (data.empty()) { onErr("message not found"); return; }
+            onOk(parseMessage(data[0]));
+        },
         std::move(onErr));
 }
 
