@@ -3,6 +3,23 @@
 Newest first. One entry per meaningful change set; pair with the checklist in
 [`TODO.md`](TODO.md).
 
+## 2026-07-07
+
+### Desktop board: fix week-grid collapse on tablets
+- On narrower viewports (iPad Pro) the fixed 260px + 320px side panels squeezed
+  the center work panel until the 7-column week board collapsed — day headers
+  word-wrapped into vertical `M-o-n` letters. Fixes: `.fd-week-board` gets a
+  `min-width` and the `.fd-tablecard` scrolls horizontally instead of collapsing;
+  day headers `white-space: nowrap` (no mid-word breaks; only load cells wrap);
+  and the responsive stack breakpoint raised 900px → 1200px so tablet widths give
+  the center full width (panels flow full-width).
+- `BoardView`: the week runs **Sunday→Saturday** (`currentWeekDays` back-offsets
+  to Sunday). Weekday labels are **responsive** — full names on desktop, **single
+  letters on tablet/phone** (both rendered; `.fd-day-full`/`.fd-day-short` toggle
+  at ≤1200px). Date under each day (`.fd-day-date`) restyled to the normal text
+  colour at 0.8 opacity so it's **readable on the darker header band** (was
+  washed-out `text-muted`).
+
 ## 2026-06-30
 
 ### ALS auth: fix als-extensions for a fresh from-scratch regenerate
