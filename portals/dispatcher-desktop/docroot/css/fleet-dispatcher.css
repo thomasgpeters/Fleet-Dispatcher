@@ -300,18 +300,20 @@ h1, h2, h3, h4, h5, .h4, .h5 { font-family: var(--fd-font); letter-spacing: 0.1p
 .fd-footer a:hover { text-decoration: underline; }
 
 /* Narrow viewports: stack the panels under the center column. */
-/* Stack the panels below the tablet range so the center work panel gets full
- * width. At ≤1200px the fixed 260px + 320px side panels would squeeze the center
- * too far (e.g. iPad Pro portrait) — so the left menu + comms rail flow to full
- * width and the board/work view takes the whole row. */
-@media (max-width: 1200px) {
+/* Stack the panels only when the width is too narrow for three columns — phones
+ * and tablet PORTRAIT (iPad Pro portrait ≤ 1024). Tablet LANDSCAPE (11" ≈ 1194,
+ * 12.9" ≈ 1366) stays three-panel; the cutoff at 1100 sits between the two. */
+@media (max-width: 1100px) {
     .fd-body { flex-direction: column; }
     .fd-panel, .fd-panel-right {
         width: auto;
         flex-basis: auto;
     }
     .fd-panel.fd-collapsed { display: none; }
-    /* Tablet/phone: single-letter weekday labels (iPad, iPhone, Android). */
+}
+/* Single-letter weekday labels on tablet + phone (all iPad orientations, iPhone,
+ * Android) — full names return on desktop. Independent of the stacking cutoff. */
+@media (max-width: 1200px) {
     .fd-week-board .fd-day-full { display: none; }
     .fd-week-board .fd-day-short { display: inline; }
 }
@@ -361,8 +363,8 @@ h1, h2, h3, h4, h5, .h4, .h5 { font-family: var(--fd-font); letter-spacing: 0.1p
  * ======================================================================== */
 .fd-week-board {
     width: 100%;
-    min-width: 42rem;      /* keep day columns legible; the card scrolls (not
-                              collapses) when the center panel is narrower */
+    min-width: 34rem;      /* keep day columns legible; the card scrolls (not
+                              collapses) if the center panel is narrower still */
     table-layout: fixed;   /* equal day columns; it's a <table>, NOT a CSS grid */
 }
 .fd-week-board th,
