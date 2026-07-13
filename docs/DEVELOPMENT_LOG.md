@@ -5,6 +5,16 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-07-13
 
+### Docs: role-based manual test plan
+- New **`docs/TEST_PLAN.md`** — hand-executable acceptance tests per role.
+  Hierarchical numbering (section → case `x.y` → step `x.y.z`), hard page breaks
+  before each section for printing/hand-out, and a Pass/Fail/Blocked line per
+  case. Sections: Auth (all roles) · Dispatcher · Driver · Updater · Comms
+  member-role & standing (orthogonal axis) · cross-client parity/regression.
+  Negative cases exercise the server-side governance (broadcast lock, mute/ban,
+  topic gating) via API, not just the UI. Appendices: traceability + SQL setup
+  helpers.
+
 ### Deploy: Feature-4 shipped to the shared host + update runbook captured
 - **Desktop build fix**: `WFileUpload::contentDescription()` returns `Wt::WString`
   in the host's Wt version — appended `.toUTF8()` (matches `clientFileName()`),
