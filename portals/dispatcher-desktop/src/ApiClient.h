@@ -66,6 +66,8 @@ public:
     using PinCallback = std::function<void(MessagePin)>;
     using SavedListCallback = std::function<void(std::vector<SavedMessage>)>;
     using SavedCallback = std::function<void(SavedMessage)>;
+    using DocumentCallback = std::function<void(Document)>;
+    using MessageDocsCallback = std::function<void(std::vector<MessageDocument>)>;
     using RawCallback = std::function<void(std::string)>;  // raw JSON:API doc text
     using TokenCallback = std::function<void(std::string)>;
     using UserCallback = std::function<void(AppUser)>;
@@ -137,6 +139,23 @@ public:
     // A single message by id (used by the cross-channel Saved view).
     void fetchMessage(const std::string& messageId, MessageCallback onOk,
                       ErrorCallback onErr);
+
+    // --- Attachments (document + message_document) ---
+    void attachmentsForMessage(const std::string& messageId,
+                               MessageDocsCallback onOk, ErrorCallback onErr);
+    // Metadata only (no base64 `data`) — light, for chip rendering.
+    void fetchDocumentMeta(const std::string& documentId, DocumentCallback onOk,
+                           ErrorCallback onErr);
+    // Full document including base64 `data` (for open/preview).
+    void fetchDocument(const std::string& documentId, DocumentCallback onOk,
+                       ErrorCallback onErr);
+    void createDocument(const std::string& title, int documentTypeId,
+                        const std::string& filename, const std::string& contentType,
+                        int byteSize, const std::string& dataBase64,
+                        const std::string& uploadedBy, DocumentCallback onOk,
+                        ErrorCallback onErr);
+    void linkMessageDocument(const std::string& messageId, const std::string& documentId,
+                             ErrorCallback onErr);
 
     // Generic option fetch for form combos: GET /resource, label from labelAttr.
     void fetchOptions(const std::string& resource, const std::string& labelAttr,

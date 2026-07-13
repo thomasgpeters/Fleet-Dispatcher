@@ -612,8 +612,27 @@ h1, h2, h3, h4, h5, .h4, .h5 { font-family: var(--fd-font); letter-spacing: 0.1p
 .fd-emoji:hover { background: rgba(44, 111, 179, 0.10); }
 .fd-comm-emoji-btn { background: transparent; border: none; color: var(--fd-text-muted); font-size: 1.1rem; }
 
-.fd-comm-composer { display: flex; gap: 0.35rem; margin-top: 0.5rem; }
+.fd-comm-composer { display: flex; align-items: center; gap: 0.35rem; margin-top: 0.5rem; }
 .fd-comm-composer .form-control { flex: 1 1 auto; }
+/* Attachment picker (WFileUpload native input) — keep it compact in the row. */
+.fd-comm-attach { max-width: 7.5rem; flex: 0 0 auto; }
+.fd-comm-attach input[type="file"] { max-width: 7.5rem; font-size: 0.72rem; }
+/* Attachment chip on a message. */
+.fd-msg-attach {
+    display: inline-block;
+    margin: 0.25rem 0.25rem 0 0;
+    padding: 0.1rem 0.55rem;
+    font-size: 0.8rem;
+    background: var(--fd-surface);
+    border: 1px solid var(--fd-border);
+    border-radius: 999px;
+    color: var(--fd-link);
+}
+.fd-msg-mine .fd-msg-attach {
+    background: rgba(255, 255, 255, 0.15);
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.3);
+}
 /* Shown instead of the composer when the user can't post (P1/P2 governance). */
 .fd-comm-post-notice {
     margin-top: 0.5rem;

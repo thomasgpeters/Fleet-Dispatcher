@@ -18,6 +18,7 @@
 #include "models.h"
 
 namespace Wt {
+class WFileUpload;
 class WLineEdit;
 class WText;
 class WTimer;
@@ -53,6 +54,8 @@ private:
     std::vector<MessagePin> pins_;         // pins in the channel visible to me
     std::map<std::string, MessagePin> myPins_;     // message_id -> my pin
     std::map<std::string, SavedMessage> saved_;    // message_id -> my saved entry
+    std::map<std::string, std::vector<Document>> docsByMessage_;  // attachments
+    std::set<std::string> attachFetched_;  // message ids whose attachments we fetched
     std::string selectedChannelId_;
     std::string selectedChannelName_;
     std::string selectedTopicId_;          // empty = the General stream
@@ -72,6 +75,7 @@ private:
     Wt::WText* replyBannerText_ = nullptr;
     Wt::WContainerWidget* emojiPanel_ = nullptr;   // emoji picker (hidden by default)
     Wt::WLineEdit* composer_ = nullptr;
+    Wt::WFileUpload* fileUpload_ = nullptr;         // composer attachment picker
     Wt::WTimer* poll_ = nullptr;
     std::string replyToId_;                        // pending reply target (empty = none)
 
@@ -102,6 +106,9 @@ private:
     void pinWithScope(const std::string& messageId, int scopeId);
     void unpin(const MessagePin& p);
     void toggleSave(const Message& m);
+    void handleUpload();                        // WFileUpload -> message + document + link
+    void fetchAttachmentsFor(const std::vector<Message>& msgs);  // populate docsByMessage_
+    void openDocument(const Document& d);       // fetch full doc + open in a new tab
     void startReply(const Message& m);         // begin a threaded reply
     void cancelReply();
     void buildEmojiPanel(Wt::WContainerWidget* parent);  // composer emoji picker
