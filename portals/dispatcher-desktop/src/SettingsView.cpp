@@ -53,14 +53,21 @@ SettingsView::SettingsView(ApiClient* api, AppUser user)
 void SettingsView::setTheme(const std::string& mode) {
     // Mirrors the header toggle: explicit light/dark sets data-fd-theme +
     // localStorage; "system" clears both so the OS preference decides.
+    // Both attributes move together: data-fd-theme (our tokens) + data-bs-theme
+    // (Bootstrap 5.3 native components). "system" clears our override and points
+    // Bootstrap at the OS preference (Bootstrap doesn't auto-follow the OS).
     if (mode == "system") {
         Wt::WApplication::instance()->doJavaScript(
-            "document.documentElement.removeAttribute('data-fd-theme');"
-            "localStorage.removeItem('fd-theme');");
+            "(function(){var d=document.documentElement;"
+            "d.removeAttribute('data-fd-theme');localStorage.removeItem('fd-theme');"
+            "var sysDark=window.matchMedia('(prefers-color-scheme: dark)').matches;"
+            "d.setAttribute('data-bs-theme',sysDark?'dark':'light');})();");
     } else {
         Wt::WApplication::instance()->doJavaScript(
-            "document.documentElement.setAttribute('data-fd-theme','" + mode + "');"
-            "localStorage.setItem('fd-theme','" + mode + "');");
+            "(function(){var d=document.documentElement;"
+            "d.setAttribute('data-fd-theme','" + mode + "');"
+            "d.setAttribute('data-bs-theme','" + mode + "');"
+            "localStorage.setItem('fd-theme','" + mode + "');})();");
     }
 }
 

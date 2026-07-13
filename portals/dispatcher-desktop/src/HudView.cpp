@@ -32,7 +32,8 @@ HudView::HudView(ApiClient* api) : api_(api) {
     // The HUD is a wall display: force the dark theme regardless of OS setting
     // (shared design system — docs/DESIGN_SYSTEM.md).
     Wt::WApplication::instance()->doJavaScript(
-        "document.documentElement.setAttribute('data-fd-theme','dark');");
+        "document.documentElement.setAttribute('data-fd-theme','dark');"
+        "document.documentElement.setAttribute('data-bs-theme','dark');");
 
     auto* header = addNew<Wt::WContainerWidget>();
     header->addStyleClass("d-flex justify-content-between align-items-center mb-3");

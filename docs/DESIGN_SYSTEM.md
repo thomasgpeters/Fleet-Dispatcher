@@ -100,9 +100,15 @@ animations/transitions for users who opt out).
 
 - **Default = follow the OS** via `@media (prefers-color-scheme: dark)`.
 - **Manual override** wins over the OS:
-  - Desktop/HUD: `data-fd-theme="light|dark"` on `<html>` (toggle in the header;
-    persisted in `localStorage` as `fd-theme`). The HUD forces `dark` (wall
-    display).
+  - Desktop/HUD: `data-fd-theme="light|dark"` on `<html>` (toggle in the header
+    **and** Settings → Appearance; persisted in `localStorage` as `fd-theme`).
+    The HUD forces `dark` (wall display). **We also set Bootstrap 5.3's
+    `data-bs-theme` in lock-step** so Bootstrap-native components (tables, inputs,
+    dropdowns, modals) follow the mode instead of staying light — without it,
+    dark mode leaks white component chrome (e.g. the old Fleet table). For
+    `system` we resolve `data-bs-theme` from `prefers-color-scheme` since
+    Bootstrap doesn't auto-follow the OS. (Needs Bootstrap ≥ 5.3; harmless no-op
+    below that, where the `fd-theme` tokens still cover custom surfaces.)
   - Mobile: `.fd-dark` / `.fd-light` class on `<html>` (Appearance picker in
     Profile; persisted as `fd.theme`).
 

@@ -32,10 +32,20 @@ Shell::Shell(ApiClient* api, AppUser user, std::function<void()> onLogout)
     // The shell IS the app frame (full-height flex column): header / body / footer.
     addStyleClass("fd-app");
 
-    // Apply any saved theme override (data-fd-theme) before painting.
+    // Apply any saved theme override before painting. We set BOTH our own
+    // data-fd-theme (our CSS tokens) AND Bootstrap 5.3's data-bs-theme so the
+    // Bootstrap-native components (tables, inputs, dropdowns, modals) follow the
+    // same mode instead of staying light. "system" (no saved value) resolves
+    // data-bs-theme from the OS since Bootstrap doesn't auto-follow it.
+    // NOTE (version-sensitive): data-bs-theme colour modes need Bootstrap ≥ 5.3
+    // (bundled by WBootstrap5Theme); on older Wt it's a harmless no-op and our
+    // fd-theme tokens still cover the custom surfaces.
     Wt::WApplication::instance()->doJavaScript(
-        "(function(){var t=localStorage.getItem('fd-theme');"
-        "if(t){document.documentElement.setAttribute('data-fd-theme',t);}})();");
+        "(function(){var d=document.documentElement;"
+        "var t=localStorage.getItem('fd-theme');"
+        "var sysDark=window.matchMedia('(prefers-color-scheme: dark)').matches;"
+        "if(t){d.setAttribute('data-fd-theme',t);d.setAttribute('data-bs-theme',t);}"
+        "else{d.setAttribute('data-bs-theme',sysDark?'dark':'light');}})();");
 
     // Top-right toaster lives above the frame (CSS pins it fixed). Create it
     // first — the comms panel built below takes a pointer to it.
@@ -240,6 +250,7 @@ void Shell::toggleTheme() {
         "var isDark=cur?(cur==='dark'):sys;"
         "var next=isDark?'light':'dark';"
         "d.setAttribute('data-fd-theme',next);"
+        "d.setAttribute('data-bs-theme',next);"   // keep Bootstrap in step
         "localStorage.setItem('fd-theme',next);})();");
 }
 
