@@ -833,7 +833,8 @@ void CommPanel::handleUpload() {
     if (!fileUpload_ || selectedChannelId_.empty()) return;
     const std::string path = fileUpload_->spoolFileName();
     const std::string filename = fileUpload_->clientFileName().toUTF8();
-    std::string contentType = fileUpload_->contentDescription();
+    // contentDescription() returns Wt::WString in this Wt version -> .toUTF8().
+    std::string contentType = fileUpload_->contentDescription().toUTF8();
     if (contentType.empty()) contentType = "application/octet-stream";
 
     // Read the spooled upload and base64-encode it (bytea over JSON:API).
