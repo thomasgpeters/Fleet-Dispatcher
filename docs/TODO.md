@@ -349,6 +349,77 @@ Additional requirements for a robust board. Decisions captured from the user:
       client queries; admin-only "Archived" view with unarchive. Enforce
       visibility server-side (LogicBank/ALS grants), not just client filtering.
 
+## Feature 5 — Load-board ingestion (dispatcher load capture)
+
+Dispatchers spend their day **searching load boards** (DAT, Truckstop, 123Loadboard,
+broker portals) and pulling matching loads into the dispatch board. Today that's
+manual re-keying. This feature automates the "board → our `load`" hop. Researched
+2026-07-13.
+
+**How loads actually get pulled in (the mechanisms, cheapest → most integrated):**
+
+1. **Manual copy/paste (baseline).** Dispatcher reads a posting (origin, dest,
+   equipment, weight, rate, miles, broker + reference #, pickup/delivery dates)
+   and re-keys it into the TMS. This is what our existing **New Load** form does.
+   Universal, works with any board, but slow and error-prone.
+2. **Paste / document parse (no partner account needed).** Dispatcher pastes the
+   raw posting text — or drops the broker's **rate-confirmation PDF / email** —
+   and we parse it into a structured **draft load**. Works across *every* source,
+   needs no API partnership, and fits what we already have (the `assistant/` AI
+   provider for extraction + the CMS `document` store for the source artifact).
+   Best first automation.
+3. **Load-board partner APIs (real integration).** The big boards expose REST
+   APIs for **load search + import + book**, gated by a paid account/keys:
+   - **DAT** — `developer.dat.com` REST APIs (Load Board, **BookNow**, Tracking,
+     Freight Posting). Any subscription tier allows REST; production needs a
+     service account (company + MC#) and a setup fee (~$500–$1,000).
+   - **Truckstop** — `developer.truckstop.com` **Load Search** + Load Management,
+     with **Book It Now**; offered as TMS integrations.
+   - **123Loadboard** — documented post/find/move API.
+   These let us search the board *inside* our console and one-click import (and,
+   with BookNow/Book-It-Now, book) — subscription + partner onboarding required.
+4. **EDI 204 load tender (established broker relationships).** For contracted
+   freight, brokers/shippers **tender** loads via ANSI X12 **EDI 204** (pickup,
+   drop, equipment, schedule); the carrier replies **EDI 990** accept/reject.
+   Fully programmatic, no "searching" — the loads come to us. Heavier (EDI VAN /
+   AS2 + trading-partner setup); worthwhile once we have direct broker accounts.
+
+**Architecture fit (our rules):** the ingestion/parse logic is a **new adapter**
+(a thin `intake/` service, or a route on the existing `assistant/` FastAPI which
+already carries a pluggable AI provider) — but it must **write through the ALS
+JSON:API** like every other client (never straight to Postgres). Imports land as
+`load_status = draft` for the dispatcher to review/confirm before dispatch, and
+must **dedup** shipper/receiver/location/commodity against existing rows.
+
+Sequenced plan:
+
+- [ ] **P1 — Paste-to-load intake (mechanism 2).** A console **"Import load"**
+      action: paste posting text → parse (regex for the stable fields + the
+      `assistant/` AI provider for the messy free-text) → prefilled **draft**
+      New-Load form for confirm → `POST /Load` (+ dedup lookups for
+      shipper/receiver/location/commodity). No partner account needed.
+- [ ] **P2 — Rate-con document parse.** Same pipeline seeded from an uploaded
+      **PDF/email** (store the artifact via the CMS `document`, link it to the
+      created load via `load_document`); OCR/text-extract → AI structured extract.
+- [ ] **P3 — Schema for provenance.** `load_source` lookup (manual · paste ·
+      rate_con · dat · truckstop · edi_204) + `load.source_id`,
+      `load.external_ref` (broker load/reference #), `load.broker_name`
+      (or a `broker` party table if it grows). `/verify-db` on PG16; regen ALS.
+      Lets us trace where a load came from and avoid re-importing duplicates.
+- [ ] **P4 — Load-board API search + import (mechanism 3).** Start with **one**
+      board (DAT *or* Truckstop) behind a provider interface mirroring the
+      `assistant/` provider pattern: search from the console, preview results,
+      one-click import to a draft load. Keys/subscription are deployment config
+      (env), never committed. Add **Book It Now / BookNow** as a follow-on.
+- [ ] **P5 — EDI 204 intake (mechanism 4).** Accept broker load tenders (204) →
+      draft loads; respond 990. Requires an EDI VAN/AS2 + trading-partner setup;
+      revisit when direct broker relationships exist.
+
+> Decision needed from the user before P4: **which board(s)** we hold accounts
+> with (drives DAT vs Truckstop first) and whether we want **auto-book** or
+> **import-then-book-manually**. P1–P3 need no external accounts and deliver the
+> bulk of the day-to-day time savings, so they lead.
+
 ## Cross-cutting
 
 - [x] **DB schema separation (DECIDED + done):** shared instance with
