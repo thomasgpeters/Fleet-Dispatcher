@@ -59,7 +59,7 @@
         --fd-surface: #16212e;
         --fd-surface-2: #1b2937;
         --fd-text: #e6edf4;
-        --fd-text-muted: #9fb1c2;
+        --fd-text-muted: #b4c2d0;
         --fd-border: #29384a;
         --fd-primary: #4a90d9;
         --fd-primary-strong: #6aa6e0;
@@ -80,7 +80,7 @@
     --fd-surface: #16212e;
     --fd-surface-2: #1b2937;
     --fd-text: #e6edf4;
-    --fd-text-muted: #9fb1c2;
+    --fd-text-muted: #b4c2d0;
     --fd-border: #29384a;
     --fd-primary: #4a90d9;
     --fd-primary-strong: #6aa6e0;
@@ -259,6 +259,31 @@ h1, h2, h3, h4, h5, .h4, .h5 { font-family: var(--fd-font); letter-spacing: 0.1p
 }
 .fd-muted { color: var(--fd-text-muted); }
 
+/* Bootstrap's .text-muted uses its OWN grey (#6c757d), which is low-contrast on
+ * our dark panels. Remap it to the theme-aware token so muted copy stays legible
+ * in both themes (Board status line, Fleet lists, Profile, HUD empty states). */
+.text-muted { color: var(--fd-text-muted) !important; }
+
+/* Bootstrap tables inside our views (Fleet drivers list, etc.): Bootstrap's
+ * default table colours + striping are computed for a light body and render
+ * dark-on-dark / near-invisible on our dark work panel. Bind the Bootstrap table
+ * CSS vars to our theme tokens so text and zebra striping follow light/dark. */
+.fd-fleet .table,
+.fd-board .table,
+.fd-work .table {
+    --bs-table-color: var(--fd-text);
+    --bs-table-bg: transparent;
+    --bs-table-striped-color: var(--fd-text);
+    --bs-table-striped-bg: var(--fd-surface-2);
+    --bs-table-hover-color: var(--fd-text);
+    --bs-table-hover-bg: var(--fd-surface-2);
+    --bs-table-border-color: var(--fd-border);
+    color: var(--fd-text);
+}
+.fd-fleet .table > :not(caption) > * > *,
+.fd-board .table > :not(caption) > * > *,
+.fd-work .table > :not(caption) > * > * { color: var(--fd-text); }
+
 /* Panel hide/show toggle bar — sits directly above the three-column body. The
  * two toggles anchor to opposite edges (aligned to the panel outer edges via
  * the same 1rem inset as .fd-body) and are fixed-width, so the disclosure glyph
@@ -388,7 +413,7 @@ h1, h2, h3, h4, h5, .h4, .h5 { font-family: var(--fd-font); letter-spacing: 0.1p
 .fd-day-date {
     font-size: 0.72rem;
     color: var(--fd-text);
-    opacity: 0.8;
+    opacity: 0.92;   /* legible on the darker header band (0.8 read too faint) */
     margin-top: 0.05rem;
 }
 .fd-load-card {

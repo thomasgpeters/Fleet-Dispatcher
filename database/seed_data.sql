@@ -140,6 +140,124 @@ INSERT INTO load (
 );
 
 -- ===========================================================================
+-- Board demo fleet — a fuller roster so the desktop week board is populated.
+-- The week board (portals/dispatcher-desktop) rows drivers and places each load
+-- in the column matching its pickup_date within the CURRENT (Sunday→Saturday)
+-- week. So the loads below use pickup dates computed relative to CURRENT_DATE —
+-- they always land in the visible week, no matter when the seed is applied.
+-- (Static dates would fall outside the week and the board would look empty.)
+--
+-- 10 drivers total (2 above + 8 here). Eight carry loads this week; two —
+-- Sam Hauler and Nadia Petrov — are intentionally left load-free to show the
+-- "available driver" case.
+-- ===========================================================================
+
+-- 8 more drivers (→ 10 total). Mix of company + owner-operator. --------------
+INSERT INTO driver (id, name, driver_type_id, phone, home_base, user_id) VALUES
+  ('aaaaaaaa-0000-0000-0000-000000000003', 'Marcus Reyes',   1, '555-0110', 'Oklahoma City, OK', NULL),
+  ('aaaaaaaa-0000-0000-0000-000000000004', 'Dwayne Kolb',    2, '555-0111', 'El Paso, TX',       NULL),
+  ('aaaaaaaa-0000-0000-0000-000000000005', 'Tanya Brooks',   1, '555-0112', 'Denver, CO',        NULL),
+  ('aaaaaaaa-0000-0000-0000-000000000006', 'Hector Alvarez', 2, '555-0113', 'El Paso, TX',       NULL),
+  ('aaaaaaaa-0000-0000-0000-000000000007', 'Jill Sorensen',  1, '555-0114', 'Wichita, KS',       NULL),
+  ('aaaaaaaa-0000-0000-0000-000000000008', 'Ravi Nair',      1, '555-0115', 'Lubbock, TX',       NULL),
+  ('aaaaaaaa-0000-0000-0000-000000000009', 'Bill Tran',      2, '555-0116', 'Houston, TX',       NULL),
+  ('aaaaaaaa-0000-0000-0000-00000000000a', 'Nadia Petrov',   1, '555-0117', 'Salt Lake City, UT',NULL);
+
+-- 6 more rigs (→ 10 total). Power units 1=tractor, 2=RAM; trailer types match. -
+INSERT INTO equipment (id, unit_number, power_unit_id, trailer_type_id, has_ramps, deck_length_ft, weight_capacity_lbs, has_duals) VALUES
+  ('bbbbbbbb-0000-0000-0000-000000000005', 'T-104', 1, 1, TRUE,  52, 48000, FALSE),  -- step-deck 52 w/ ramps
+  ('bbbbbbbb-0000-0000-0000-000000000006', 'T-105', 1, 3, FALSE, 52, 48000, FALSE),  -- flatbed 52
+  ('bbbbbbbb-0000-0000-0000-000000000007', 'T-106', 1, 2, FALSE, 29, 80000, FALSE),  -- RGN low-boy
+  ('bbbbbbbb-0000-0000-0000-000000000008', 'T-107', 1, 1, TRUE,  48, 45000, FALSE),  -- step-deck 48 w/ ramps
+  ('bbbbbbbb-0000-0000-0000-000000000009', 'T-108', 1, 3, FALSE, 48, 45000, FALSE),  -- flatbed 48
+  ('bbbbbbbb-0000-0000-0000-00000000000a', 'R-202', 2, 4, FALSE, 24, 12000, TRUE);   -- RAM 3500 + car carrier
+
+INSERT INTO driver_equipment (id, driver_id, equipment_id) VALUES
+  ('a1a1a1a1-0000-0000-0000-000000000003', 'aaaaaaaa-0000-0000-0000-000000000003', 'bbbbbbbb-0000-0000-0000-000000000005'),
+  ('a1a1a1a1-0000-0000-0000-000000000004', 'aaaaaaaa-0000-0000-0000-000000000004', 'bbbbbbbb-0000-0000-0000-000000000006'),
+  ('a1a1a1a1-0000-0000-0000-000000000005', 'aaaaaaaa-0000-0000-0000-000000000005', 'bbbbbbbb-0000-0000-0000-000000000007'),
+  ('a1a1a1a1-0000-0000-0000-000000000006', 'aaaaaaaa-0000-0000-0000-000000000006', 'bbbbbbbb-0000-0000-0000-00000000000a'),
+  ('a1a1a1a1-0000-0000-0000-000000000007', 'aaaaaaaa-0000-0000-0000-000000000007', 'bbbbbbbb-0000-0000-0000-000000000008'),
+  ('a1a1a1a1-0000-0000-0000-000000000008', 'aaaaaaaa-0000-0000-0000-000000000008', 'bbbbbbbb-0000-0000-0000-000000000009'),
+  ('a1a1a1a1-0000-0000-0000-000000000009', 'aaaaaaaa-0000-0000-0000-000000000009', 'bbbbbbbb-0000-0000-0000-000000000003');
+
+-- More locations for lane variety. ------------------------------------------
+INSERT INTO location (id, line1, city, state, postal_code) VALUES
+  ('cccccccc-0000-0000-0000-000000000004', '200 Rail Yard', 'Oklahoma City', 'OK', '73102'),
+  ('cccccccc-0000-0000-0000-000000000005', '55 Depot Ave',  'Amarillo',      'TX', '79101'),
+  ('cccccccc-0000-0000-0000-000000000006', '12 Logistics Pkwy', 'Kansas City','MO', '64106'),
+  ('cccccccc-0000-0000-0000-000000000007', '8 Mesa Rd',     'Albuquerque',   'NM', '87102'),
+  ('cccccccc-0000-0000-0000-000000000008', '77 Sunbelt Dr', 'Phoenix',       'AZ', '85004'),
+  ('cccccccc-0000-0000-0000-000000000009', '400 Bayport',   'Houston',       'TX', '77002'),
+  ('cccccccc-0000-0000-0000-00000000000a', '19 Wasatch Way','Salt Lake City','UT', '84101'),
+  ('cccccccc-0000-0000-0000-00000000000b', '3 Border Blvd', 'El Paso',       'TX', '79901');
+
+-- More shippers / receivers. -------------------------------------------------
+INSERT INTO shipper (id, name, location_id, contact) VALUES
+  ('dddddddd-0000-0000-0000-000000000002', 'Permian Machinery',   'cccccccc-0000-0000-0000-000000000005', '555-0210'),
+  ('dddddddd-0000-0000-0000-000000000003', 'Sooner Equipment',    'cccccccc-0000-0000-0000-000000000004', '555-0211'),
+  ('dddddddd-0000-0000-0000-000000000004', 'Rio Grande Motors',   'cccccccc-0000-0000-0000-00000000000b', '555-0212'),
+  ('dddddddd-0000-0000-0000-000000000005', 'Front Range Rentals', 'cccccccc-0000-0000-0000-000000000002', '555-0213'),
+  ('dddddddd-0000-0000-0000-000000000006', 'Gulf Coast Supply',   'cccccccc-0000-0000-0000-000000000009', '555-0214');
+
+INSERT INTO receiver (id, name, location_id, contact) VALUES
+  ('eeeeeeee-0000-0000-0000-000000000002', 'Desert Logistics', 'cccccccc-0000-0000-0000-000000000008', '555-0310'),
+  ('eeeeeeee-0000-0000-0000-000000000003', 'Prairie Dealers',  'cccccccc-0000-0000-0000-000000000006', '555-0311'),
+  ('eeeeeeee-0000-0000-0000-000000000004', 'Wasatch Rentals',  'cccccccc-0000-0000-0000-00000000000a', '555-0312'),
+  ('eeeeeeee-0000-0000-0000-000000000005', 'Llano Farms',      'cccccccc-0000-0000-0000-000000000003', '555-0313'),
+  ('eeeeeeee-0000-0000-0000-000000000006', 'Bayou Haul',       'cccccccc-0000-0000-0000-000000000009', '555-0314');
+
+-- More commodities across categories. ---------------------------------------
+INSERT INTO commodity (id, description, commodity_category_id, weight_lbs) VALUES
+  ('ffffffff-0000-0000-0000-000000000003', 'Excavator',            2, 34000),  -- heavy_equipment
+  ('ffffffff-0000-0000-0000-000000000004', 'Skid steer',           2,  9000),  -- heavy_equipment
+  ('ffffffff-0000-0000-0000-000000000005', 'Diesel generator 500kW',4, 16000),  -- generators
+  ('ffffffff-0000-0000-0000-000000000006', 'Scissor lift x2',      5,  8000),  -- lifts
+  ('ffffffff-0000-0000-0000-000000000007', 'Combine harvester',    3, 28000),  -- farm_equipment
+  ('ffffffff-0000-0000-0000-000000000008', 'Pickup trucks x3',     1, 15000);  -- vehicles
+
+-- A dispatch week anchored to the CURRENT week's Monday (schema requires a
+-- Monday). date_trunc('week', …) is Monday-based, so this is always valid.
+INSERT INTO dispatch_week (id, week_start) VALUES
+  ('99999999-0000-0000-0000-000000000002', date_trunc('week', CURRENT_DATE)::date)
+ON CONFLICT (week_start) DO NOTHING;
+
+-- Loads for the current week. pickup_date = this week's Sunday + <offset> days
+-- (Sunday=0 … Saturday=6), matching the board's Sunday-first columns. Each row
+-- carries an <offset> and <transit> (delivery = pickup + transit). Eight drivers
+-- get work; Sam Hauler (…0002) and Nadia Petrov (…000a) are left free.
+WITH wk AS (
+  -- Sunday of the current week (mirrors the desktop board's currentWeekDays()).
+  SELECT (CURRENT_DATE - EXTRACT(DOW FROM CURRENT_DATE)::int) AS sun,
+         '99999999-0000-0000-0000-000000000002'::uuid          AS week_id
+)
+INSERT INTO load (
+  id, dispatch_week_id, driver_id, equipment_id, shipper_id, receiver_id,
+  commodity_id, pickup_id, dropoff_id, run_type_id, load_status_id,
+  deadhead_miles, loaded_miles, rate, deck_feet, weight_lbs, pickup_date, delivery_date
+)
+SELECT v.id, wk.week_id, v.driver_id, v.equipment_id, v.shipper_id, v.receiver_id,
+       v.commodity_id, v.pickup_id, v.dropoff_id, v.run_type_id, v.load_status_id,
+       v.deadhead_miles, v.loaded_miles, v.rate, v.deck_feet, v.weight_lbs,
+       (wk.sun + v.day_offset),
+       (wk.sun + v.day_offset + v.transit)
+FROM wk, (VALUES
+  -- id, driver, equipment, shipper, receiver, commodity, pickup, dropoff, run, status, deadhead, loaded, rate, deck_ft, wt, day_offset, transit
+  ('88888888-0000-0000-0000-000000000101'::uuid, 'aaaaaaaa-0000-0000-0000-000000000001'::uuid, 'bbbbbbbb-0000-0000-0000-000000000002'::uuid, 'dddddddd-0000-0000-0000-000000000001'::uuid, 'eeeeeeee-0000-0000-0000-000000000001'::uuid, 'ffffffff-0000-0000-0000-000000000001'::uuid, 'cccccccc-0000-0000-0000-000000000003'::uuid, 'cccccccc-0000-0000-0000-000000000002'::uuid, 1, 2, 85.0, 780.0, 4200.00, 29.0, 42000, 1, 2),
+  ('88888888-0000-0000-0000-000000000102'::uuid, 'aaaaaaaa-0000-0000-0000-000000000001'::uuid, 'bbbbbbbb-0000-0000-0000-000000000002'::uuid, 'dddddddd-0000-0000-0000-000000000002'::uuid, 'eeeeeeee-0000-0000-0000-000000000002'::uuid, 'ffffffff-0000-0000-0000-000000000003'::uuid, 'cccccccc-0000-0000-0000-000000000005'::uuid, 'cccccccc-0000-0000-0000-000000000008'::uuid, 1, 3, 40.0, 610.0, 5200.00, 29.0, 34000, 4, 2),
+  ('88888888-0000-0000-0000-000000000103'::uuid, 'aaaaaaaa-0000-0000-0000-000000000003'::uuid, 'bbbbbbbb-0000-0000-0000-000000000005'::uuid, 'dddddddd-0000-0000-0000-000000000003'::uuid, 'eeeeeeee-0000-0000-0000-000000000003'::uuid, 'ffffffff-0000-0000-0000-000000000004'::uuid, 'cccccccc-0000-0000-0000-000000000004'::uuid, 'cccccccc-0000-0000-0000-000000000006'::uuid, 2, 2, 30.0, 350.0, 2100.00, 20.0,  9000, 1, 1),
+  ('88888888-0000-0000-0000-000000000104'::uuid, 'aaaaaaaa-0000-0000-0000-000000000003'::uuid, 'bbbbbbbb-0000-0000-0000-000000000005'::uuid, 'dddddddd-0000-0000-0000-000000000001'::uuid, 'eeeeeeee-0000-0000-0000-000000000005'::uuid, 'ffffffff-0000-0000-0000-000000000007'::uuid, 'cccccccc-0000-0000-0000-000000000003'::uuid, 'cccccccc-0000-0000-0000-000000000005'::uuid, 2, 4, 25.0, 120.0, 1500.00, 40.0, 28000, 3, 1),
+  ('88888888-0000-0000-0000-000000000105'::uuid, 'aaaaaaaa-0000-0000-0000-000000000004'::uuid, 'bbbbbbbb-0000-0000-0000-000000000006'::uuid, 'dddddddd-0000-0000-0000-000000000004'::uuid, 'eeeeeeee-0000-0000-0000-000000000006'::uuid, 'ffffffff-0000-0000-0000-000000000008'::uuid, 'cccccccc-0000-0000-0000-00000000000b'::uuid, 'cccccccc-0000-0000-0000-000000000009'::uuid, 1, 2, 60.0, 750.0, 3900.00, 45.0, 15000, 2, 2),
+  ('88888888-0000-0000-0000-000000000106'::uuid, 'aaaaaaaa-0000-0000-0000-000000000005'::uuid, 'bbbbbbbb-0000-0000-0000-000000000007'::uuid, 'dddddddd-0000-0000-0000-000000000005'::uuid, 'eeeeeeee-0000-0000-0000-000000000004'::uuid, 'ffffffff-0000-0000-0000-000000000005'::uuid, 'cccccccc-0000-0000-0000-000000000002'::uuid, 'cccccccc-0000-0000-0000-00000000000a'::uuid, 1, 3, 50.0, 520.0, 4600.00, 29.0, 16000, 2, 2),
+  ('88888888-0000-0000-0000-000000000107'::uuid, 'aaaaaaaa-0000-0000-0000-000000000005'::uuid, 'bbbbbbbb-0000-0000-0000-000000000007'::uuid, 'dddddddd-0000-0000-0000-000000000005'::uuid, 'eeeeeeee-0000-0000-0000-000000000001'::uuid, 'ffffffff-0000-0000-0000-000000000006'::uuid, 'cccccccc-0000-0000-0000-000000000002'::uuid, 'cccccccc-0000-0000-0000-000000000007'::uuid, 2, 2, 20.0, 440.0, 2800.00, 24.0,  8000, 5, 1),
+  ('88888888-0000-0000-0000-000000000108'::uuid, 'aaaaaaaa-0000-0000-0000-000000000006'::uuid, 'bbbbbbbb-0000-0000-0000-00000000000a'::uuid, 'dddddddd-0000-0000-0000-000000000004'::uuid, 'eeeeeeee-0000-0000-0000-000000000002'::uuid, 'ffffffff-0000-0000-0000-000000000002'::uuid, 'cccccccc-0000-0000-0000-00000000000b'::uuid, 'cccccccc-0000-0000-0000-000000000008'::uuid, 2, 2, 35.0, 400.0, 2600.00, 24.0, 12000, 3, 1),
+  ('88888888-0000-0000-0000-000000000109'::uuid, 'aaaaaaaa-0000-0000-0000-000000000007'::uuid, 'bbbbbbbb-0000-0000-0000-000000000008'::uuid, 'dddddddd-0000-0000-0000-000000000003'::uuid, 'eeeeeeee-0000-0000-0000-000000000003'::uuid, 'ffffffff-0000-0000-0000-000000000003'::uuid, 'cccccccc-0000-0000-0000-000000000004'::uuid, 'cccccccc-0000-0000-0000-000000000006'::uuid, 1, 1, 45.0, 330.0, 3100.00, 20.0, 34000, 4, 1),
+  ('88888888-0000-0000-0000-00000000010a'::uuid, 'aaaaaaaa-0000-0000-0000-000000000008'::uuid, 'bbbbbbbb-0000-0000-0000-000000000009'::uuid, 'dddddddd-0000-0000-0000-000000000002'::uuid, 'eeeeeeee-0000-0000-0000-000000000005'::uuid, 'ffffffff-0000-0000-0000-000000000008'::uuid, 'cccccccc-0000-0000-0000-000000000005'::uuid, 'cccccccc-0000-0000-0000-000000000003'::uuid, 2, 4, 15.0, 120.0, 1400.00, 45.0, 15000, 2, 1),
+  ('88888888-0000-0000-0000-00000000010b'::uuid, 'aaaaaaaa-0000-0000-0000-000000000008'::uuid, 'bbbbbbbb-0000-0000-0000-000000000009'::uuid, 'dddddddd-0000-0000-0000-000000000001'::uuid, 'eeeeeeee-0000-0000-0000-000000000006'::uuid, 'ffffffff-0000-0000-0000-000000000007'::uuid, 'cccccccc-0000-0000-0000-000000000003'::uuid, 'cccccccc-0000-0000-0000-000000000009'::uuid, 1, 2, 30.0, 540.0, 3600.00, 40.0, 28000, 5, 2),
+  ('88888888-0000-0000-0000-00000000010c'::uuid, 'aaaaaaaa-0000-0000-0000-000000000009'::uuid, 'bbbbbbbb-0000-0000-0000-000000000003'::uuid, 'dddddddd-0000-0000-0000-000000000006'::uuid, 'eeeeeeee-0000-0000-0000-000000000002'::uuid, 'ffffffff-0000-0000-0000-000000000006'::uuid, 'cccccccc-0000-0000-0000-000000000009'::uuid, 'cccccccc-0000-0000-0000-000000000008'::uuid, 1, 3, 55.0, 680.0, 4100.00, 24.0,  8000, 3, 2)
+) AS v(id, driver_id, equipment_id, shipper_id, receiver_id, commodity_id, pickup_id, dropoff_id, run_type_id, load_status_id, deadhead_miles, loaded_miles, rate, deck_feet, weight_lbs, day_offset, transit);
+
+-- ===========================================================================
 -- Messaging (lookups + a sample group channel with messages and an attachment)
 -- ===========================================================================
 INSERT INTO channel_type (id, code, name) VALUES
