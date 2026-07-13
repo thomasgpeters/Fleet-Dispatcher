@@ -3,6 +3,24 @@
 Newest first. One entry per meaningful change set; pair with the checklist in
 [`TODO.md`](TODO.md).
 
+## 2026-07-13
+
+### Deploy: Feature-4 shipped to the shared host + update runbook captured
+- **Desktop build fix**: `WFileUpload::contentDescription()` returns `Wt::WString`
+  in the host's Wt version — appended `.toUTF8()` (matches `clientFileName()`),
+  clearing the last attachments compile blocker. Desktop console rebuilt clean.
+- **Production redeploy verified** on `mycloud-server-01` (shared host: three ALS
+  apps + nginx): ALS regenerated from the Feature-4 schema, `als-extensions`
+  re-installed (`Logic Bank … 14 rules loaded`, `discovered logic:
+  [comms_governance.py, fleet_events.py, …]`), login 200, `ChannelTopic` reflected
+  (200). Server-side comms governance (broadcast lock · mute/ban · topic gating)
+  is now live and enforcing.
+- **`docs/DEPLOYMENT.md`**: new major section **"Redeploying after a change (update
+  runbook)"** — the repeat path (pull → regen ALS + re-install extensions → rebuild
+  Wt → mobile build → restart services → verify), a change→steps matrix, the Wt
+  `.toUTF8()` gotcha, the quiet-governance verification, and a redeploy
+  troubleshooting table distilled from this deploy.
+
 ## 2026-07-07
 
 ### Desktop parity run — step 4: attachments (COMPLETE)

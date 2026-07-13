@@ -297,3 +297,151 @@ psql "$DATABASE_URL" -c "SET search_path = gis, fleet, public;
 | `permission denied for table <fleet lookup>`        | grant `fleet_gis` SELECT on the table its views/queries need.         |
 | `could not open extension control file … postgis`   | PostGIS package not installed (step 0) / wrong Docker image.           |
 | ALS can't connect                                   | Check `DATABASE_URL`, role/password, `pg_hba.conf`.                   |
+
+---
+
+## Redeploying after a change (update runbook)
+
+Sections 1–8 are the **first** standup. This section is the **repeat** path: you
+pulled new code (and maybe a schema change) onto a host that's already running,
+and you need to get the change live without a full rebuild-the-world. This is the
+sequence verified in production on the shared `mycloud-server-01` host (three ALS
+apps + nginx; systemd units run as the `thomas` user).
+
+**When each step is needed** — skip what a given change doesn't touch:
+
+| You changed…                                   | Run steps          |
+| ---------------------------------------------- | ------------------ |
+| `database/schema.sql` / `seed_data.sql`        | 1 → **2** → 5 → 6  |
+| `als-extensions/` (governance, Kafka, auth)    | 1 → **2** → 5 → 6  |
+| `portals/dispatcher-desktop/` (C++/Wt)         | 1 → **3** → 5 → 6  |
+| `portals/mobile/` (Ionic/React)                | 1 → **4** → 5 → 6  |
+
+A schema change **implies** an ALS regenerate (step 2) — ALS reflects the DB, so
+new tables/columns don't appear in the API until it regenerates. After any
+regenerate you **must** re-install `als-extensions/` (a fresh generate wipes
+`logic/` + `security/`).
+
+### 1. Pull the branch
+
+```bash
+cd ~/Fleet-Dispatcher
+git fetch origin && git checkout <feature-branch> && git pull
+```
+
+### 2. Schema / middleware: regenerate ALS + reinstall our customizations
+
+Only when `schema.sql`, `seed_data.sql`, or anything under `als-extensions/`
+changed. Apply the DB change first (a full-create `schema.sql` re-applies
+cleanly; see the step-4 reset note above), then rebuild the API **from** the
+database and re-install the extensions:
+
+```bash
+# (a) apply the DB change (throwaway-verify first via /verify-db)
+psql "$DATABASE_URL" -f database/schema.sql
+psql "$DATABASE_URL" -f database/seed_data.sql
+
+# (b) regenerate ALS from the updated DB (database-first)
+cd /home/thomas/fleet-dispatcher-api
+als rebuild-from-database --db_url="$DATABASE_URL"   # or: ApiLogicServer rebuild-from-database
+
+# (c) re-install our customizations — a fresh generate wipes logic/ + security/.
+#     Use the ABSOLUTE project path; make als-extensions copies the Kafka
+#     producers (fleet_events.py), comms governance (comms_governance.py) and the
+#     SQL auth provider + grants back into the generated tree.
+cd ~/Fleet-Dispatcher
+make als-extensions ALS_PROJECT=/home/thomas/fleet-dispatcher-api
+```
+
+> **Auth regenerate gotchas** (full detail in
+> [`AUTHENTICATION.md`](AUTHENTICATION.md#regenerate)): `add-auth` must target the
+> **absolute** project path; `Rule` imports from `logic_bank.logic_bank`;
+> `declare_security.py` needs the module-level `declare_security_message` string;
+> and `get_user(id, arg)` is dual-purpose (login = password `str`, JWT verify =
+> claims `dict`) — guard the password check with `isinstance(password, str)`.
+
+### 3. Desktop console: rebuild the Wt binary
+
+```bash
+cmake --build portals/dispatcher-desktop/build -j
+```
+
+> **Wt is version-sensitive and not compiled in the sandbox** — expect the odd
+> accessor mismatch on a real build. The pattern: Wt accessors that return
+> `Wt::WString` need `.toUTF8()` when you want a `std::string` (e.g.
+> `WFileUpload::contentDescription().toUTF8()`, `clientFileName().toUTF8()`). Other
+> flagged spots: `Http::Method::Patch`/`Delete`, `Json::Type::Null`, and the
+> `Http::Client::done()` `error_code` signature. These are called out in code
+> comments — fix at the flagged line and rebuild.
+
+### 4. Mobile: build (tsc is strict)
+
+```bash
+cd portals/mobile && npm run build      # tsc && vite build — must be clean, no unused vars
+```
+
+Deployed to VCP from the standalone repo via `make publish-mobile` (see step 7).
+
+### 5. Restart services + reload nginx
+
+```bash
+sudo systemctl restart fleet-dispatcher-api        # picks up regen + als-extensions
+sudo systemctl restart fleet-dispatcher-desktop    # picks up the new Wt binary
+sudo nginx -t && sudo systemctl reload nginx       # only if proxy config changed
+```
+
+> Restarting the **API** clears a stale connection pool too — the classic
+> "`SSL connection closed`" 500 after a **PostgreSQL** restart is fixed by
+> restarting `fleet-dispatcher-api`, not by touching the DB again.
+
+### 6. Verify the redeploy
+
+```bash
+# services + ports (api :5659, desktop :8089, nginx :8080)
+systemctl is-active fleet-dispatcher-api fleet-dispatcher-desktop
+sudo ss -ltnp | grep -E ':5659|:8089|:8080'
+
+# ALS booted clean with security + logic?
+journalctl -u fleet-dispatcher-api -n 200 --no-pager \
+  | grep -Ei 'security|discovered logic|rules loaded|error'
+#   expect: "..discovered logic: ['comms_governance.py', 'fleet_events.py', …]"
+#           "Logic Bank <ver> - N rules loaded"
+#           "Fleet Dispatcher security: read grants on 42 entities …"
+
+# login returns 200 + a token
+TOKEN=$(curl -sS -X POST http://localhost:5659/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"dispatch1","password":"fleet123"}' \
+  | sed -n 's/.*"access_token":"\([^"]*\)".*/\1/p')
+echo "${TOKEN:+login OK}"
+
+# a schema-change smoke test: the new resource is reflected (expect 200)
+curl -sS -o /dev/null -w 'ChannelTopic %{http_code}\n' \
+  -H "Authorization: Bearer $TOKEN" http://localhost:5659/api/ChannelTopic
+```
+
+**Governance is loaded but quiet.** LogicBank doesn't print a per-rule "activated"
+line, so confirm the *module* was discovered (the `discovered logic` grep above)
+and, if you want behavioral proof, post to the **Fleet Announcements** broadcast
+channel as a plain member (`driver1`) via the API — the P1 broadcast lock rejects
+it server-side, while `dispatch1` (owner/admin) succeeds.
+
+**If `comms_governance.py` is *missing* from the discovered-logic list**, the
+regenerate didn't re-install our customizations — re-run step 2(c) then restart:
+
+```bash
+make als-extensions ALS_PROJECT=/home/thomas/fleet-dispatcher-api
+sudo systemctl restart fleet-dispatcher-api
+```
+
+### Redeploy troubleshooting
+
+| Symptom                                                    | Cause / fix                                                                 |
+| ---------------------------------------------------------- | --------------------------------------------------------------------------- |
+| Desktop build: `conversion from 'Wt::WString' to … std::string` | A Wt accessor returns `WString`; append `.toUTF8()` (see step 3).          |
+| New table/column absent from the API (404 on the resource)| ALS wasn't regenerated after the schema change — run step 2.                |
+| `comms_governance.py` not in `discovered logic`           | `als-extensions` not re-installed after regen — step 2(c) + restart.        |
+| `ImportError: cannot import name 'Rule'`                  | Import from `logic_bank.logic_bank`, not `…rule_bank.rule_bank`.             |
+| Login 500 `'dict' object has no attribute 'encode'`       | `get_user` reused for JWT verify — guard with `isinstance(password, str)`.  |
+| Login 500 `SSL connection closed` after a PG restart      | Stale ALS pool — `systemctl restart fleet-dispatcher-api`.                   |
+| Sibling app (Smitty/Student) white screen                 | Its ALS API unit is down — `systemctl start als-smitty` / the student unit. |
