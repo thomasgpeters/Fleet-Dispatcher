@@ -33,12 +33,13 @@ INSERT INTO power_unit (id, code, name) VALUES
   (2, 'ram_3500', 'Dodge RAM 3500'),
   (3, 'ram_4500', 'Dodge RAM 4500');
 
-INSERT INTO trailer_type (id, code, name) VALUES
-  (1, 'step_deck_52', 'Step-deck 52ft'),
-  (2, 'rgn_lowboy',   'RGN low-boy'),
-  (3, 'flatbed_52',   'Flatbed 52ft'),
-  (4, 'car_carrier',  'Car carrier'),
-  (5, 'none',         'None (power unit only)');
+-- Trailer types carry a colour so rigs are colour-coded by type on the board.
+INSERT INTO trailer_type (id, code, name, color_hex) VALUES
+  (1, 'step_deck_52', 'Step-deck 52ft',         '#3b82c4'),  -- blue
+  (2, 'rgn_lowboy',   'RGN low-boy',            '#8a5cf6'),  -- violet
+  (3, 'flatbed_52',   'Flatbed 52ft',           '#3fa66a'),  -- green
+  (4, 'car_carrier',  'Car carrier',            '#e07b39'),  -- orange
+  (5, 'none',         'None (power unit only)', '#6b7a90');  -- steel
 
 INSERT INTO app_role (id, code, name) VALUES
   (1, 'dispatcher', 'Dispatcher'),
@@ -52,7 +53,22 @@ INSERT INTO commodity_category (id, code, name) VALUES
   (4, 'generators',      'Power generators'),
   (5, 'lifts',           'Lifts');
 
+-- Avatar palette — curated, accessible on both light and dark panels. Users
+-- self-pick in their profile; admins assign colours to login-less drivers.
+INSERT INTO avatar_color (id, code, name, hex) VALUES
+  (1,  'steel',  'Steel',  '#6b7a90'),
+  (2,  'red',    'Red',    '#d9534f'),
+  (3,  'orange', 'Orange', '#e07b39'),
+  (4,  'gold',   'Gold',   '#c9a227'),
+  (5,  'green',  'Green',  '#3fa66a'),
+  (6,  'teal',   'Teal',   '#2f9e94'),
+  (7,  'sky',    'Sky',    '#3b82c4'),
+  (8,  'indigo', 'Indigo', '#5b6bd6'),
+  (9,  'violet', 'Violet', '#8a5cf6'),
+  (10, 'rose',   'Rose',   '#d6608f');
+
 -- Keep IDENTITY sequences ahead of the explicit ids inserted above.
+SELECT setval(pg_get_serial_sequence('avatar_color', 'id'),        (SELECT max(id) FROM avatar_color));
 SELECT setval(pg_get_serial_sequence('driver_type', 'id'),         (SELECT max(id) FROM driver_type));
 SELECT setval(pg_get_serial_sequence('run_type', 'id'),            (SELECT max(id) FROM run_type));
 SELECT setval(pg_get_serial_sequence('load_status', 'id'),         (SELECT max(id) FROM load_status));
@@ -69,21 +85,21 @@ SELECT setval(pg_get_serial_sequence('commodity_category', 'id'),  (SELECT max(i
 -- DEV CREDENTIALS: all three demo users have password 'fleet123'. The hashes are
 -- werkzeug pbkdf2:sha256 (ALS's default check_password_hash verifies them).
 -- Regenerate / change for any real deployment — see docs/AUTHENTICATION.md.
-INSERT INTO app_user (id, username, full_name, email, app_role_id, password_hash, phone, title) VALUES
+INSERT INTO app_user (id, username, full_name, email, app_role_id, password_hash, phone, title, avatar_color_id) VALUES
   ('11111111-1111-1111-1111-111111111111', 'dispatch1', 'Dana Dispatcher', 'dana@example.com', 1,
    'pbkdf2:sha256:600000$711621b8ed38739b$1bcab2036eda81044bb0e6841a19f09683bedcb97f0c27dacb6e52db981e9d34',
-   '555-0100', 'Lead Dispatcher'),
+   '555-0100', 'Lead Dispatcher', 8),   -- indigo
   ('22222222-2222-2222-2222-222222222222', 'driver1',   'Pat Diesel',      'pat@example.com',  2,
    'pbkdf2:sha256:600000$3d4791e76e547105$b5a2b998f49605430828ad1adc0f76458546d255111d8378fe2ca13bf7f4d33b',
-   '555-0101', 'Owner-Operator'),
+   '555-0101', 'Owner-Operator', 6),    -- teal
   ('33333333-3333-3333-3333-333333333333', 'updater1',  'Uma Updater',     'uma@example.com',  3,
    'pbkdf2:sha256:600000$f99fb81bfd5651ff$05475d4d2da19ccbfc98bf1164fce3afb830fe1ed07c7495323da703c27000f8',
-   '555-0102', 'Dispatch Updater');
+   '555-0102', 'Dispatch Updater', 4);  -- gold
 
 -- Drivers (company + owner-operator) ----------------------------------------
-INSERT INTO driver (id, name, driver_type_id, phone, home_base, user_id) VALUES
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Pat Diesel', 2, '555-0101', 'Dallas, TX', '22222222-2222-2222-2222-222222222222'),
-  ('aaaaaaaa-0000-0000-0000-000000000002', 'Sam Hauler', 1, '555-0102', 'Denver, CO', NULL);
+INSERT INTO driver (id, name, driver_type_id, phone, home_base, user_id, avatar_color_id) VALUES
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Pat Diesel', 2, '555-0101', 'Dallas, TX', '22222222-2222-2222-2222-222222222222', 6),   -- teal (matches login)
+  ('aaaaaaaa-0000-0000-0000-000000000002', 'Sam Hauler', 1, '555-0102', 'Denver, CO', NULL, 2);                                     -- red (admin-assigned)
 
 -- Equipment (varied rigs) ---------------------------------------------------
 INSERT INTO equipment (id, unit_number, power_unit_id, trailer_type_id, has_ramps, deck_length_ft, weight_capacity_lbs, has_duals) VALUES
@@ -153,15 +169,15 @@ INSERT INTO load (
 -- ===========================================================================
 
 -- 8 more drivers (→ 10 total). Mix of company + owner-operator. --------------
-INSERT INTO driver (id, name, driver_type_id, phone, home_base, user_id) VALUES
-  ('aaaaaaaa-0000-0000-0000-000000000003', 'Marcus Reyes',   1, '555-0110', 'Oklahoma City, OK', NULL),
-  ('aaaaaaaa-0000-0000-0000-000000000004', 'Dwayne Kolb',    2, '555-0111', 'El Paso, TX',       NULL),
-  ('aaaaaaaa-0000-0000-0000-000000000005', 'Tanya Brooks',   1, '555-0112', 'Denver, CO',        NULL),
-  ('aaaaaaaa-0000-0000-0000-000000000006', 'Hector Alvarez', 2, '555-0113', 'El Paso, TX',       NULL),
-  ('aaaaaaaa-0000-0000-0000-000000000007', 'Jill Sorensen',  1, '555-0114', 'Wichita, KS',       NULL),
-  ('aaaaaaaa-0000-0000-0000-000000000008', 'Ravi Nair',      1, '555-0115', 'Lubbock, TX',       NULL),
-  ('aaaaaaaa-0000-0000-0000-000000000009', 'Bill Tran',      2, '555-0116', 'Houston, TX',       NULL),
-  ('aaaaaaaa-0000-0000-0000-00000000000a', 'Nadia Petrov',   1, '555-0117', 'Salt Lake City, UT',NULL);
+INSERT INTO driver (id, name, driver_type_id, phone, home_base, user_id, avatar_color_id) VALUES
+  ('aaaaaaaa-0000-0000-0000-000000000003', 'Marcus Reyes',   1, '555-0110', 'Oklahoma City, OK', NULL, 7),   -- sky
+  ('aaaaaaaa-0000-0000-0000-000000000004', 'Dwayne Kolb',    2, '555-0111', 'El Paso, TX',       NULL, 9),   -- violet
+  ('aaaaaaaa-0000-0000-0000-000000000005', 'Tanya Brooks',   1, '555-0112', 'Denver, CO',        NULL, 10),  -- rose
+  ('aaaaaaaa-0000-0000-0000-000000000006', 'Hector Alvarez', 2, '555-0113', 'El Paso, TX',       NULL, 3),   -- orange
+  ('aaaaaaaa-0000-0000-0000-000000000007', 'Jill Sorensen',  1, '555-0114', 'Wichita, KS',       NULL, 5),   -- green
+  ('aaaaaaaa-0000-0000-0000-000000000008', 'Ravi Nair',      1, '555-0115', 'Lubbock, TX',       NULL, 4),   -- gold
+  ('aaaaaaaa-0000-0000-0000-000000000009', 'Bill Tran',      2, '555-0116', 'Houston, TX',       NULL, 8),   -- indigo
+  ('aaaaaaaa-0000-0000-0000-00000000000a', 'Nadia Petrov',   1, '555-0117', 'Salt Lake City, UT',NULL, 1);   -- steel
 
 -- 6 more rigs (→ 10 total). Power units 1=tractor, 2=RAM; trailer types match. -
 INSERT INTO equipment (id, unit_number, power_unit_id, trailer_type_id, has_ramps, deck_length_ft, weight_capacity_lbs, has_duals) VALUES

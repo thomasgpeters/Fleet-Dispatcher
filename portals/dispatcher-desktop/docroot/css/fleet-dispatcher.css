@@ -402,9 +402,11 @@ h1, h2, h3, h4, h5, .h4, .h5 { font-family: var(--fd-font); letter-spacing: 0.1p
 .fd-week-board td { overflow-wrap: anywhere; }
 .fd-week-board th:first-child,
 .fd-week-board td:first-child {
-    width: 8.5rem;         /* the Driver column */
+    width: 10.5rem;        /* the Driver column (avatar + name) */
     white-space: nowrap;
 }
+/* Driver name/avatar sits vertically centred in the row (load cells stay top). */
+.fd-week-board td:first-child { vertical-align: middle; }
 /* Weekday label: full name on desktop, single letter on tablet/phone. Both are
  * rendered; CSS picks by viewport (toggled in the ≤1200px media query below). */
 .fd-day-short { display: none; }
@@ -419,6 +421,131 @@ h1, h2, h3, h4, h5, .h4, .h5 { font-family: var(--fd-font); letter-spacing: 0.1p
 .fd-load-card {
     border-left: 4px solid var(--fd-accent);  /* orange accent bar */
     background-color: var(--fd-surface);
+}
+
+/* ===========================================================================
+ * Person avatars (colour-coded people) + fleet roster + vehicle colour coding
+ * ======================================================================== */
+
+/* Circular colour avatar: white initials on the person's palette colour, with an
+ * optional role badge. Colour comes from an inline `background:` (set per person
+ * in C++ from the avatar palette). Used on the board, fleet roster, and profile. */
+.fd-avatar {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.9rem;
+    height: 1.9rem;
+    border-radius: 50%;
+    flex: 0 0 auto;
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+}
+.fd-avatar-txt { line-height: 1; text-shadow: 0 1px 1px rgba(0, 0, 0, 0.25); }
+.fd-avatar-badge {
+    position: absolute;
+    right: -3px;
+    bottom: -3px;
+    font-size: 0.6rem;
+    line-height: 1;
+    background: var(--fd-surface);
+    border-radius: 50%;
+    padding: 1px;
+}
+
+/* Board driver cell: avatar + name on one centred line. */
+.fd-board-driver { display: inline-flex; align-items: center; gap: 0.5rem; }
+.fd-board-driver-name { font-weight: 500; }
+
+/* Fleet roster — a clean list (replaces the Bootstrap zebra table). */
+.fd-roster { display: flex; flex-direction: column; }
+.fd-roster-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0.25rem;
+    border-bottom: 1px solid var(--fd-border);
+}
+.fd-roster-row:hover { background: var(--fd-surface-2); }
+.fd-roster-main { flex: 1 1 auto; min-width: 0; }
+.fd-roster-name { font-weight: 600; color: var(--fd-text); }
+.fd-roster-sub { font-size: 0.78rem; color: var(--fd-text-muted); }
+.fd-badge {
+    font-size: 0.72rem;
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+    background: var(--fd-surface-2);
+    color: var(--fd-text-muted);
+    border: 1px solid var(--fd-border);
+    white-space: nowrap;
+}
+.fd-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.8rem;
+    color: var(--fd-text-muted);
+    min-width: 4.5rem;
+}
+.fd-status::before {
+    content: "";
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background: var(--fd-text-muted);
+}
+.fd-status.is-active { color: var(--fd-text); }
+.fd-status.is-active::before { background: #3fa66a; }
+
+/* Vehicles colour-coded by trailer type: a legend + chips with a colour swatch. */
+.fd-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+    margin-bottom: 0.6rem;
+    font-size: 0.78rem;
+    color: var(--fd-text-muted);
+}
+.fd-legend-item { display: inline-flex; align-items: center; gap: 0.35rem; }
+.fd-fleet-equip { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.fd-equip-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+    background: var(--fd-surface-2);
+    border: 1px solid var(--fd-border);
+    color: var(--fd-text);
+    font-size: 0.8rem;
+}
+.fd-equip-swatch {
+    width: 0.7rem;
+    height: 0.7rem;
+    border-radius: 3px;
+    flex: 0 0 auto;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
+}
+
+/* Profile: header avatar block + the colour-swatch picker. */
+.fd-profile-head { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; }
+.fd-profile-head .fd-avatar { width: 2.6rem; height: 2.6rem; font-size: 0.95rem; }
+.fd-swatches { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.fd-swatch {
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+    transition: transform var(--fd-dur-fast) var(--fd-ease);
+}
+.fd-swatch:hover { transform: scale(1.12); }
+.fd-swatch.is-selected {
+    box-shadow: 0 0 0 2px var(--fd-surface), 0 0 0 4px var(--fd-primary);
 }
 
 /* The HUD forces the dark theme (HudView sets data-fd-theme="dark"); higher

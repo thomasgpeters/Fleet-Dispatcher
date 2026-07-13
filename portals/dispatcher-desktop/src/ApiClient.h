@@ -21,6 +21,13 @@ struct Option {
     std::string label;
 };
 
+// A rig, with its trailer type (drives the fleet colour-by-type coding).
+struct EquipmentInfo {
+    std::string id;
+    std::string unit_number;
+    int trailer_type_id = 0;
+};
+
 // Field values for creating a load. FK ids are strings; lookups are ints.
 struct LoadDraft {
     std::string dispatch_week_id;
@@ -47,6 +54,7 @@ struct ProfileEdit {
     std::string phone;
     std::string title;
     std::string timezone;
+    int avatar_color_id = 0;   // person-icon colour (0 = leave unchanged)
 };
 
 class ApiClient {
@@ -95,6 +103,10 @@ public:
                     UserCallback onOk, ErrorCallback onErr);
 
     void fetchDrivers(DriversCallback onOk, ErrorCallback onErr);
+    // Rigs with their trailer type (fleet colour-by-type). Uses a typed struct
+    // rather than fetchOptions so the view gets trailer_type_id, not just a label.
+    using EquipmentCallback = std::function<void(std::vector<EquipmentInfo>)>;
+    void fetchEquipment(EquipmentCallback onOk, ErrorCallback onErr);
     void fetchLoads(LoadsCallback onOk, ErrorCallback onErr);
     void fetchPositions(PositionsCallback onOk, ErrorCallback onErr);
 

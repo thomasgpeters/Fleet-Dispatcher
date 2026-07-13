@@ -1,8 +1,11 @@
 #include "FleetView.h"
 
+#include <string>
+
 #include <Wt/WString.h>
-#include <Wt/WTable.h>
 #include <Wt/WText.h>
+
+#include "icons.h"
 
 namespace fd {
 
@@ -12,6 +15,17 @@ const char* driverType(int id) {
         case 1: return "Company";
         case 2: return "Owner-Operator";
         default: return "—";
+    }
+}
+// trailer_type name by id (matches seed) — for the colour legend.
+const char* trailerName(int id) {
+    switch (id) {
+        case 1: return "Step-deck";
+        case 2: return "RGN low-boy";
+        case 3: return "Flatbed";
+        case 4: return "Car carrier";
+        case 5: return "Power only";
+        default: return "Other";
     }
 }
 }  // namespace
@@ -40,20 +54,27 @@ void FleetView::loadDrivers() {
                 driversBody_->addNew<Wt::WText>("<p class=\"fd-muted\">No drivers.</p>");
                 return;
             }
-            auto* table = driversBody_->addNew<Wt::WTable>();
-            table->addStyleClass("table table-sm table-striped");
-            table->setHeaderCount(1);
-            table->elementAt(0, 0)->addNew<Wt::WText>("Driver");
-            table->elementAt(0, 1)->addNew<Wt::WText>("Type");
-            table->elementAt(0, 2)->addNew<Wt::WText>("Status");
-            int row = 0;
+            // A clean custom roster (not a Bootstrap table): colour avatar +
+            // name/home-base, a type badge, and a status dot. Reads professionally
+            // on the dark panel and shows each driver's palette colour.
+            auto* list = driversBody_->addNew<Wt::WContainerWidget>();
+            list->addStyleClass("fd-roster");
             for (const Driver& d : drivers) {
-                ++row;
-                table->elementAt(row, 0)->addNew<Wt::WText>(
-                    Wt::WString::fromUTF8(d.name));
-                table->elementAt(row, 1)->addNew<Wt::WText>(driverType(d.driver_type_id));
-                table->elementAt(row, 2)
-                    ->addNew<Wt::WText>(d.active ? "Active" : "Inactive");
+                const std::string status =
+                    d.active ? "<span class=\"fd-status is-active\">Active</span>"
+                             : "<span class=\"fd-status\">Inactive</span>";
+                const std::string sub =
+                    d.home_base.empty() ? "" :
+                    "<div class=\"fd-roster-sub\">" + d.home_base + "</div>";
+                list->addNew<Wt::WText>(Wt::WString::fromUTF8(
+                    "<div class=\"fd-roster-row\">" +
+                    personAvatar(d.name, d.avatar_color_id) +
+                    "<div class=\"fd-roster-main\">"
+                    "<div class=\"fd-roster-name\">" + d.name + "</div>" + sub +
+                    "</div>"
+                    "<span class=\"fd-badge\">" + driverType(d.driver_type_id) + "</span>" +
+                    status +
+                    "</div>"));
             }
         },
         [this](std::string err) {
@@ -64,22 +85,38 @@ void FleetView::loadDrivers() {
 }
 
 void FleetView::loadEquipment() {
-    // Equipment shown by unit number (generic option fetch — no extra model).
-    api_->fetchOptions(
-        "Equipment", "unit_number",
-        [this](std::vector<Option> equip) {
+    api_->fetchEquipment(
+        [this](std::vector<EquipmentInfo> equip) {
             equipBody_->clear();
             if (equip.empty()) {
                 equipBody_->addNew<Wt::WText>(
                     "<p class=\"fd-muted\">No equipment.</p>");
                 return;
             }
+            // Legend: the trailer-type colour key (the types actually present).
+            std::string legend = "<div class=\"fd-legend\">";
+            bool seen[6] = {false, false, false, false, false, false};
+            for (const EquipmentInfo& e : equip) {
+                int t = e.trailer_type_id;
+                if (t >= 1 && t <= 5 && !seen[t]) {
+                    seen[t] = true;
+                    legend += "<span class=\"fd-legend-item\">"
+                              "<span class=\"fd-equip-swatch\" style=\"background:" +
+                              trailerHex(t) + "\"></span>" + trailerName(t) + "</span>";
+                }
+            }
+            legend += "</div>";
+            equipBody_->addNew<Wt::WText>(Wt::WString::fromUTF8(legend));
+
+            // Chips coloured by trailer type.
             auto* list = equipBody_->addNew<Wt::WContainerWidget>();
             list->addStyleClass("fd-fleet-equip");
-            for (const Option& e : equip) {
-                auto* chip = list->addNew<Wt::WText>(
-                    Wt::WString::fromUTF8(e.label));
-                chip->addStyleClass("badge bg-primary me-1 mb-1");
+            for (const EquipmentInfo& e : equip) {
+                list->addNew<Wt::WText>(Wt::WString::fromUTF8(
+                    "<span class=\"fd-equip-chip\">"
+                    "<span class=\"fd-equip-swatch\" style=\"background:" +
+                    trailerHex(e.trailer_type_id) + "\"></span>" +
+                    e.unit_number + "</span>"));
             }
         },
         [this](std::string err) {

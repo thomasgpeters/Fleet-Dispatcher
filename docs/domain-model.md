@@ -158,7 +158,13 @@ resources). Codes shown below match the `code` column in
   `default_percent` and `owner_bears_costs`.
 - `run_type`: `long_haul`, `regional`.
 - `power_unit`: `tractor`, `ram_3500`, `ram_4500`.
-- `trailer_type`: `step_deck_52`, `rgn_lowboy`, `flatbed_52`, `car_carrier`, `none`.
+- `trailer_type`: `step_deck_52`, `rgn_lowboy`, `flatbed_52`, `car_carrier`, `none`
+  — also carries `color_hex`, so rigs are **colour-coded by trailer type** on the
+  board/fleet views.
+- `avatar_color`: curated 10-colour person palette (`steel`, `red`, `orange`,
+  `gold`, `green`, `teal`, `sky`, `indigo`, `violet`, `rose`) with a `hex`. Users
+  self-pick (`app_user.avatar_color_id`); drivers can be assigned one
+  (`driver.avatar_color_id`), falling back to a colour derived from the name.
 - `load_status`: `draft`, `dispatched`, `in_transit`, `delivered`, `settled`,
   `cancelled`.
 - `app_role`: `dispatcher`, `driver`, `updater`.

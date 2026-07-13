@@ -31,11 +31,15 @@ private:
     Wt::WLineEdit* phone_ = nullptr;
     Wt::WLineEdit* title_ = nullptr;
     Wt::WLineEdit* timezone_ = nullptr;
+    Wt::WContainerWidget* swatches_ = nullptr;   // avatar-colour picker
+    int selectedColorId_ = 0;                    // chosen palette id (0 = none)
     Wt::WPushButton* save_ = nullptr;
     Wt::WText* status_ = nullptr;
 
     Wt::WLineEdit* addField(Wt::WContainerWidget* parent, const std::string& label,
                             const std::string& value);
+    void buildColorPicker(Wt::WContainerWidget* parent);  // 10 palette swatches
+    void renderSwatches();                                // reflect the selection
     void save();
 };
 

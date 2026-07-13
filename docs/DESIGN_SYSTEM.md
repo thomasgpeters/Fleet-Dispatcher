@@ -22,7 +22,7 @@ mirrors every token.
 | Surface / panel (bright white) | `#ffffff` | `#16212e` |
 | Surface 2 (chips, bubbles) | `#f3f4f6` | `#1b2937` |
 | Text | `#1b2430` | `#e6edf4` |
-| Muted text | `#5f6a78` | `#9fb1c2` |
+| Muted text | `#5f6a78` | `#b4c2d0` |
 | Border (rarely used) | `#dcdfe5` | `#29384a` |
 | **Primary blue** | `#2c6fb3` | `#4a90d9` |
 | Primary strong | `#1f4e79` | `#6aa6e0` |
@@ -33,6 +33,27 @@ mirrors every token.
 Use orange only for highlights: the load-card accent bar, toast status bars,
 small status/CTA emphasis. Keep semantic colors (success/danger/warning) at their
 framework defaults.
+
+### Avatar palette (colour-coded people)
+
+A curated 10-colour palette tints person avatars (drivers/users) across all
+clients. Source of truth = the `avatar_color` lookup (`database/seed_data.sql`);
+the desktop mirrors it in `src/icons.h`. All ten read on both light and dark
+panels (white initials sit on the colour).
+
+`steel #6b7a90` · `red #d9534f` · `orange #e07b39` · `gold #c9a227` ·
+`green #3fa66a` · `teal #2f9e94` · `sky #3b82c4` · `indigo #5b6bd6` ·
+`violet #8a5cf6` · `rose #d6608f`
+
+A person with no colour set gets a **deterministic** palette entry hashed from
+their name, so every driver always has a stable colour.
+
+### Vehicle colours (by trailer type)
+
+Rigs are colour-coded by trailer type via `trailer_type.color_hex`:
+step-deck `#3b82c4` · RGN low-boy `#8a5cf6` · flatbed `#3fa66a` ·
+car-carrier `#e07b39` · power-only `#6b7a90`. Shown as a swatch on fleet
+equipment chips with a legend.
 
 ## Typography & panels
 

@@ -5,6 +5,23 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-07-13
 
+### Colour-coded people + vehicles; Fleet view redesign
+- **Schema**: `avatar_color` palette lookup (10 curated colours) + `app_user`
+  .avatar_color_id (self-picked) + `driver.avatar_color_id` (admin-assignable;
+  render precedence explicit → linked user → derived-from-name) +
+  `trailer_type.color_hex` (rigs colour-coded by type). Seed assigns colours to
+  the 10 drivers/3 users + the 5 trailer types. Verified on PG16 (43 fleet tables).
+- **Desktop**: shared `icons.h` (palette/trailer hex by id — stable seed lookups,
+  hardcoded like `statusName()`; person-avatar HTML builder, deterministic name
+  fallback, role badge). **Fleet view redesigned** off the Bootstrap zebra table
+  (white-on-dark stripes) into a clean roster: colour avatar + name/home-base,
+  type badge, active-status dot; **equipment colour-coded by trailer type with a
+  legend** (`fetchEquipment` typed fetch). **Board**: colour avatar before each
+  driver name, vertically centred in the row. **Profile**: 10-swatch colour
+  picker → `avatar_color_id` (PATCH). Wt builds on Linux; palette maps are
+  version-neutral pure C++.
+- Mobile (profile picker + directory avatars) is the follow-up.
+
 ### Docs: role-based manual test plan
 - New **`docs/TEST_PLAN.md`** — hand-executable acceptance tests per role.
   Hierarchical numbering (section → case `x.y` → step `x.y.z`), hard page breaks

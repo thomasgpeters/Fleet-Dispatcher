@@ -10,6 +10,8 @@
 #include <Wt/WTable.h>
 #include <Wt/WTableCell.h>
 
+#include "icons.h"
+
 namespace fd {
 
 namespace {
@@ -160,7 +162,12 @@ void BoardView::renderWeek() {
     int row = 0;
     for (const auto& d : drivers_) {
         ++row;
-        table->elementAt(row, 0)->addNew<Wt::WText>(Wt::WString::fromUTF8(d.name));
+        // Colour avatar + name, vertically centred in the row (see CSS
+        // .fd-week-board td vertical-align + .fd-board-driver).
+        table->elementAt(row, 0)->addNew<Wt::WText>(Wt::WString::fromUTF8(
+            "<span class=\"fd-board-driver\">" +
+            personAvatar(d.name, d.avatar_color_id) +
+            "<span class=\"fd-board-driver-name\">" + d.name + "</span></span>"));
         for (int c = 0; c < 7; ++c) {
             auto* cell = table->elementAt(row, c + 1);
             for (const auto& l : loads_) {
