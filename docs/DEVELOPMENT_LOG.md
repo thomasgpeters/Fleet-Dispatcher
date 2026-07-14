@@ -5,6 +5,18 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-07-13
 
+### Board: click a load → stacking load-info toasts
+- Clicking a load on the board pops a **bottom-right toast** with that load's
+  detail (driver · status, rate, run type, pickup→delivery, loaded/deadhead
+  miles). Selecting several **stacks** them (sticky until the × closes each),
+  matching the dispatcher "collect a few loads" flow. Works from both the Week
+  grid chips and the Today list rows.
+- `Toaster` gains a `Position` (TopRight default = message notifications;
+  **BottomRight** = the board stack); the board owns its own bottom-right
+  instance (fixed-positioned, survives body re-renders). Toast accent follows
+  status (delivered = success, cancelled = danger). New CSS `.fd-toaster-bottom`
+  / `.fd-toast-sub`; load chips get a click affordance. Wt builds on Linux.
+
 ### Colour-coded people + vehicles; Fleet view redesign
 - **Schema**: `avatar_color` palette lookup (10 curated colours) + `app_user`
   .avatar_color_id (self-picked) + `driver.avatar_color_id` (admin-assignable;

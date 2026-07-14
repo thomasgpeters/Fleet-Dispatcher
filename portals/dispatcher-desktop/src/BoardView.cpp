@@ -1,6 +1,8 @@
 #include "BoardView.h"
 
+#include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdio>
 #include <ctime>
 #include <map>
@@ -10,6 +12,7 @@
 #include <Wt/WTable.h>
 #include <Wt/WTableCell.h>
 
+#include "Toaster.h"
 #include "icons.h"
 
 namespace fd {
@@ -56,6 +59,41 @@ std::string statusName(int id) {
     }
 }
 
+const char* runTypeName(int id) {
+    switch (id) {
+        case 1: return "Long-haul";
+        case 2: return "Regional";
+        default: return "Run";
+    }
+}
+
+// "$4,200" (whole dollars, thousands-grouped). Non-USD keeps its code prefix.
+std::string dollars(const std::string& currency, double v) {
+    long long n = std::llround(v);
+    const bool neg = n < 0;
+    std::string digits = std::to_string(neg ? -n : n);
+    std::string grouped;
+    int c = 0;
+    for (int i = static_cast<int>(digits.size()) - 1; i >= 0; --i) {
+        grouped.push_back(digits[i]);
+        if (++c % 3 == 0 && i > 0) grouped.push_back(',');
+    }
+    std::reverse(grouped.begin(), grouped.end());
+    const std::string sym =
+        (currency.empty() || currency == "USD") ? "$" : (currency + " ");
+    return (neg ? "-" : "") + sym + grouped;
+}
+
+// Toast accent from load status: delivered = success, cancelled = danger,
+// in-transit = info, else info.
+Toaster::Level levelForStatus(int statusId) {
+    switch (statusId) {
+        case 4: return Toaster::Level::Success;   // delivered
+        case 6: return Toaster::Level::Danger;    // cancelled
+        default: return Toaster::Level::Info;
+    }
+}
+
 }  // namespace
 
 BoardView::BoardView(ApiClient* api, BoardMode mode) : api_(api), mode_(mode) {
@@ -63,7 +101,33 @@ BoardView::BoardView(ApiClient* api, BoardMode mode) : api_(api), mode_(mode) {
     status_ = addNew<Wt::WText>();
     status_->addStyleClass("text-muted");
     body_ = addNew<Wt::WContainerWidget>();
+    // Bottom-right stack for load selections. Fixed-positioned (CSS), so it lives
+    // outside body_ and survives the body re-renders on reload / mode switch.
+    loadToasts_ = addNew<Toaster>(Toaster::Position::BottomRight);
     reload();
+}
+
+void BoardView::showLoadToast(const std::string& driverName, const Load& l) {
+    const std::string title =
+        driverName + " · " + statusName(l.load_status_id);
+
+    std::string body = "<div>" + dollars(l.currency, l.rate) + " · " +
+                       runTypeName(l.run_type_id) + "</div>";
+    if (!l.pickup_date.empty()) {
+        std::string dates = "Pickup " + l.pickup_date;
+        if (!l.delivery_date.empty()) dates += " → Delivery " + l.delivery_date;
+        body += "<div class=\"fd-toast-sub\">" + dates + "</div>";
+    }
+    const long long loaded = std::llround(l.loaded_miles);
+    const long long dead = std::llround(l.deadhead_miles);
+    if (loaded > 0 || dead > 0) {
+        body += "<div class=\"fd-toast-sub\">" + std::to_string(loaded) +
+                " mi loaded · " + std::to_string(dead) + " mi deadhead</div>";
+    }
+
+    // Sticky (0) so collected loads keep stacking until the dispatcher closes
+    // them (× on each). Matches the "collect several" flow.
+    loadToasts_->notify(title, body, levelForStatus(l.load_status_id), 0);
 }
 
 void BoardView::setMode(BoardMode mode) {
@@ -128,6 +192,11 @@ void BoardView::renderToday() {
         table->elementAt(row, 0)->addNew<Wt::WText>(Wt::WString::fromUTF8(driver));
         table->elementAt(row, 1)->addNew<Wt::WText>(statusName(l.load_status_id));
         table->elementAt(row, 2)->addNew<Wt::WText>(money(l.currency, l.rate));
+        // Whole row is clickable → the same load-info toast as the week grid.
+        auto* rowCell = table->elementAt(row, 0);
+        rowCell->addStyleClass("fd-row-click");
+        rowCell->clicked().connect(
+            [this, driver, l]() { showLoadToast(driver, l); });
     }
     if (row == 0) {
         body_->addNew<Wt::WText>("<p class=\"text-muted\">No runs scheduled today.</p>");
@@ -176,6 +245,11 @@ void BoardView::renderWeek() {
                         Wt::WString::fromUTF8(statusName(l.load_status_id) + " · " +
                                               money(l.currency, l.rate)));
                     chip->addStyleClass("fd-load-card d-block small");
+                    // Click → bottom-right load toast (stacks on repeat). Capture
+                    // the load + driver name by value (the vectors may re-render).
+                    const std::string driverName = d.name;
+                    chip->clicked().connect(
+                        [this, driverName, l]() { showLoadToast(driverName, l); });
                 }
             }
         }

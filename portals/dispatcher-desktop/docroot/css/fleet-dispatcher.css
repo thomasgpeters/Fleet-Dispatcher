@@ -421,7 +421,10 @@ h1, h2, h3, h4, h5, .h4, .h5 { font-family: var(--fd-font); letter-spacing: 0.1p
 .fd-load-card {
     border-left: 4px solid var(--fd-accent);  /* orange accent bar */
     background-color: var(--fd-surface);
+    cursor: pointer;                           /* click → load-info toast */
+    transition: filter var(--fd-dur-fast) var(--fd-ease);
 }
+.fd-load-card:hover { filter: brightness(1.08); }
 
 /* ===========================================================================
  * Person avatars (colour-coded people) + fleet roster + vehicle colour coding
@@ -887,6 +890,20 @@ h1, h2, h3, h4, h5, .h4, .h5 { font-family: var(--fd-font); letter-spacing: 0.1p
     gap: 0.5rem;
     max-width: 320px;
 }
+/* Board load-selection stack: pinned bottom-right. The base column layout + a
+ * bottom anchor means each newly-added toast appends nearest the corner and the
+ * stack grows upward. Scrolls if many loads are collected (never runs off-screen). */
+.fd-toaster-bottom {
+    top: auto;
+    bottom: 1rem;
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
+}
+/* Secondary lines in a load toast (dates, mileage). */
+.fd-toast-sub { font-size: 0.78rem; color: var(--fd-text-muted); margin-top: 0.15rem; }
+/* Clickable Today-view driver cell. */
+.fd-row-click { cursor: pointer; }
+.fd-row-click:hover { text-decoration: underline; }
 .fd-toast {
     background: var(--fd-surface);
     color: var(--fd-text);
