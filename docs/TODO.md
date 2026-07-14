@@ -420,6 +420,52 @@ Sequenced plan:
 > **import-then-book-manually**. P1–P3 need no external accounts and deliver the
 > bulk of the day-to-day time savings, so they lead.
 
+## Feature 6 — Vehicle detail & lifecycle (asset management)
+
+Turn each rig from a name-on-a-chip into a managed **asset**: a full detail page
+with valuation, scheduled maintenance, mileage, and a for-sale flow. Requested
+2026-07-13.
+
+DONE (2026-07-13):
+- [x] **Fleet vehicle toast** — clicking a rig on the Fleet page pops the same
+      bottom-right info toast as the board loads (unit · trailer type, power unit,
+      deck length + weight capacity, ramps/duals). Stacks when several are picked.
+      (`FleetView` owns a bottom-right `Toaster`; `fetchEquipment` enriched with
+      the spec fields.) No schema change.
+
+Proposed data model (needs a quick confirm — see open questions):
+- [ ] **Schema — equipment asset fields**: extend `equipment` with `year`,
+      `make`, `model`, `vin`, `odometer_miles`, `in_service_date`,
+      `purchase_price`, `current_value` (valuation), `status_id`
+      (→ new `equipment_status` lookup: in_service / in_maintenance / for_sale /
+      retired), `for_sale` (bool) + `for_sale_price`. `/verify-db` on PG16; regen ALS.
+- [ ] **Schema — maintenance**: `maintenance_record` (equipment_id, service_type,
+      performed_on, odometer_miles, cost, vendor, notes) for **history**, and
+      `maintenance_schedule` (equipment_id, service_type, interval_miles and/or
+      interval_days, next_due_on, next_due_odometer) for **upcoming** service.
+      Optionally a `service_type` lookup (oil, DOT inspection, tires, brakes…).
+- [ ] **Schema — valuation history** (optional): `valuation_entry` (equipment_id,
+      as_of, value, source) so `current_value` has a trend, not just a point.
+- [ ] **Desktop `VehicleDetailView`** — a full-page center view opened from the
+      Fleet page (chip "Details" action or the toast), with tabs:
+      **Overview** (specs + status + assigned driver) · **Valuation** (purchase
+      price, current value, depreciation, **for-sale toggle + for-sale price**) ·
+      **Maintenance** (upcoming schedule with due/overdue flags + service history) ·
+      **Mileage** (odometer + recent trend, tie into `position_report` later) ·
+      **Documents** (title/registration via the CMS `document` + a new
+      `equipment_document` link).
+- [ ] **Mobile** parity later (read-only vehicle detail for drivers).
+
+Open questions (blocking the schema build — answer any time):
+1. **Valuation source** — manual `current_value` you set, or auto-depreciate from
+   `purchase_price` + a rate/useful-life? (Start manual, add depreciation later?)
+2. **Maintenance trigger** — schedule by **mileage interval**, **time interval**,
+   or **both** (whichever comes first)?
+3. **For-sale** — just a price + flag on the rig, or a fuller listing (photos,
+   description, contact) that could feed a public/marketplace view down the road?
+4. Any **specific data points** you want on the Overview tab beyond year/make/
+   model/VIN/odometer/specs (e.g. plate, DOT #, insurance policy/expiry, fuel type)?
+
 ## Cross-cutting
 
 - [x] **DB schema separation (DECIDED + done):** shared instance with

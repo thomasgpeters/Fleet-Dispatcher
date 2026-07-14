@@ -5,6 +5,7 @@
 #include <Wt/WString.h>
 #include <Wt/WText.h>
 
+#include "Toaster.h"
 #include "icons.h"
 
 namespace fd {
@@ -28,6 +29,26 @@ const char* trailerName(int id) {
         default: return "Other";
     }
 }
+// power_unit name by id (matches seed).
+const char* powerUnitName(int id) {
+    switch (id) {
+        case 1: return "Tractor";
+        case 2: return "RAM 3500";
+        case 3: return "RAM 4500";
+        default: return "Power unit";
+    }
+}
+// Thousands-grouped integer ("48000" → "48,000").
+std::string commas(int v) {
+    std::string d = std::to_string(v < 0 ? -v : v), out;
+    int c = 0;
+    for (int i = static_cast<int>(d.size()) - 1; i >= 0; --i) {
+        out.push_back(d[i]);
+        if (++c % 3 == 0 && i > 0) out.push_back(',');
+    }
+    std::string r(out.rbegin(), out.rend());
+    return (v < 0 ? "-" : "") + r;
+}
 }  // namespace
 
 FleetView::FleetView(ApiClient* api) : api_(api) {
@@ -42,8 +63,29 @@ FleetView::FleetView(ApiClient* api) : api_(api) {
     equipBody_ = addNew<Wt::WContainerWidget>();
     equipBody_->addNew<Wt::WText>("<p class=\"fd-muted\">Loading…</p>");
 
+    // Bottom-right stack for vehicle-info toasts (same UX as the board loads).
+    vehicleToasts_ = addNew<Toaster>(Toaster::Position::BottomRight);
+
     loadDrivers();
     loadEquipment();
+}
+
+void FleetView::showVehicleToast(const EquipmentInfo& e) {
+    const std::string title =
+        e.unit_number + " · " + trailerName(e.trailer_type_id);
+    std::string body = "<div>" + std::string(powerUnitName(e.power_unit_id)) + "</div>";
+    if (e.deck_length_ft > 0 || e.weight_capacity_lbs > 0) {
+        body += "<div class=\"fd-toast-sub\">Deck " +
+                std::to_string(e.deck_length_ft) + " ft · " +
+                commas(e.weight_capacity_lbs) + " lb capacity</div>";
+    }
+    std::string feats;
+    if (e.has_ramps) feats += "ramps";
+    if (e.has_duals) feats += (feats.empty() ? "" : " · ") + std::string("duals");
+    if (!feats.empty())
+        body += "<div class=\"fd-toast-sub\">" + feats + "</div>";
+    // Sticky so the dispatcher can line several rigs up side by side.
+    vehicleToasts_->notify(title, body, Toaster::Level::Info, 0);
 }
 
 void FleetView::loadDrivers() {
@@ -112,11 +154,12 @@ void FleetView::loadEquipment() {
             auto* list = equipBody_->addNew<Wt::WContainerWidget>();
             list->addStyleClass("fd-fleet-equip");
             for (const EquipmentInfo& e : equip) {
-                list->addNew<Wt::WText>(Wt::WString::fromUTF8(
-                    "<span class=\"fd-equip-chip\">"
+                auto* chip = list->addNew<Wt::WText>(Wt::WString::fromUTF8(
+                    "<span class=\"fd-equip-chip is-clickable\">"
                     "<span class=\"fd-equip-swatch\" style=\"background:" +
                     trailerHex(e.trailer_type_id) + "\"></span>" +
                     e.unit_number + "</span>"));
+                chip->clicked().connect([this, e]() { showVehicleToast(e); });
             }
         },
         [this](std::string err) {

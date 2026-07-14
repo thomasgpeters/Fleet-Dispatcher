@@ -476,6 +476,13 @@ void ApiClient::fetchEquipment(EquipmentCallback onOk, ErrorCallback onErr) {
                 e.id = jstr(res, "id");
                 e.unit_number = jstr(a, "unit_number");
                 e.trailer_type_id = jint(a, "trailer_type_id");
+                e.power_unit_id = jint(a, "power_unit_id");
+                e.deck_length_ft = jint(a, "deck_length_ft");
+                e.weight_capacity_lbs = jint(a, "weight_capacity_lbs");
+                auto rampsIt = a.find("has_ramps");
+                e.has_ramps = (rampsIt != a.end()) && static_cast<bool>(rampsIt->second);
+                auto dualsIt = a.find("has_duals");
+                e.has_duals = (dualsIt != a.end()) && static_cast<bool>(dualsIt->second);
                 out.push_back(std::move(e));
             }
             onOk(std::move(out));

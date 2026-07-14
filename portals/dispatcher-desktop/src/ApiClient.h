@@ -21,11 +21,17 @@ struct Option {
     std::string label;
 };
 
-// A rig, with its trailer type (drives the fleet colour-by-type coding).
+// A rig, with its trailer type (drives the fleet colour-by-type coding) and the
+// spec fields shown in the fleet vehicle toast.
 struct EquipmentInfo {
     std::string id;
     std::string unit_number;
     int trailer_type_id = 0;
+    int power_unit_id = 0;
+    int deck_length_ft = 0;
+    int weight_capacity_lbs = 0;
+    bool has_ramps = false;
+    bool has_duals = false;
 };
 
 // Field values for creating a load. FK ids are strings; lookups are ints.

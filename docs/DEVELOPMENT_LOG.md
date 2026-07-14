@@ -5,6 +5,18 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-07-13
 
+### Fleet: click a vehicle → info toast (+ detail-page spec)
+- Clicking a rig on the Fleet page pops the same **bottom-right toast** as the
+  board loads: unit · trailer type, power unit, deck length + weight capacity,
+  ramps/duals; stacks when several are selected. `FleetView` owns a bottom-right
+  `Toaster`; `fetchEquipment`/`EquipmentInfo` enriched with the spec fields. No
+  schema change.
+- Captured **Feature 6 — Vehicle detail & lifecycle** in TODO (full detail page:
+  Valuation incl. for-sale price · scheduled Maintenance · Mileage · Overview),
+  with a proposed schema (equipment asset fields + `maintenance_record`/
+  `maintenance_schedule` + optional valuation history) and four open questions
+  gating the schema build.
+
 ### Avatar palette → natural skin tones
 - Reworked the person palette from arbitrary UI colours to a **natural skin-tone
   spectrum** (ivory → espresso, 10 steps), so avatars represent real people.
