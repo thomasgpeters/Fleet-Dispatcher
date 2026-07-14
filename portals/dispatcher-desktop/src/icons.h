@@ -11,13 +11,24 @@
 
 namespace fd {
 
-// avatar_color.hex by id (1..10). 0/unknown → "" (caller derives a fallback).
+// avatar_color.hex by id (1..10) — a natural skin-tone spectrum (light → deep).
+// 0/unknown → "" (caller derives a fallback). Keep in sync with the avatar_color
+// seed (database/seed_data.sql).
 inline std::string avatarHex(int colorId) {
     static const char* P[11] = {
         "",
-        "#6b7a90", "#d9534f", "#e07b39", "#c9a227", "#3fa66a",   // 1..5
-        "#2f9e94", "#3b82c4", "#5b6bd6", "#8a5cf6", "#d6608f"};  // 6..10
+        "#f7d8c0", "#efc6a6", "#e6b48f", "#d9a074", "#c88a5a",   // 1..5 ivory→tan
+        "#b47444", "#9a5f37", "#7d4a2b", "#5b3420", "#3c2216"};  // 6..10 honey→espresso
     return (colorId >= 1 && colorId <= 10) ? std::string(P[colorId]) : std::string();
+}
+
+// Legible initials colour for a tone: dark ink on light tones, white on deep
+// ones (by perceived luminance). hex is "#rrggbb".
+inline std::string contrastText(const std::string& hex) {
+    if (hex.size() < 7) return "#ffffff";
+    auto hx = [&](int i) { return std::stoi(hex.substr(i, 2), nullptr, 16); };
+    const double lum = 0.299 * hx(1) + 0.587 * hx(3) + 0.114 * hx(5);  // 0..255
+    return (lum > 150.0) ? std::string("#2a1a0c") : std::string("#ffffff");
 }
 
 // Deterministic palette id (1..10) from a name (FNV-1a) — every person always
@@ -72,18 +83,19 @@ inline std::string roleBadge(int appRoleId) {
     }
 }
 
-// Inline HTML for a circular colour avatar: white initials on the person's
-// palette colour, with an optional role badge. Safe to embed via WText /
-// WString::fromUTF8 (raw HTML, like the rest of the board markup). `roleId`=0
-// omits the badge (fleet/board rows, where everyone is a driver).
+// Inline HTML for a circular skin-tone avatar: initials (dark or white per the
+// tone's luminance) on the person's tone, with an optional role badge. Safe to
+// embed via WText / WString::fromUTF8 (raw HTML, like the rest of the board
+// markup). `roleId`=0 omits the badge (fleet/board rows, where everyone's a driver).
 inline std::string personAvatar(const std::string& name, int colorId,
                                 int roleId = 0) {
     const std::string hex = personHex(colorId, name);
+    const std::string ink = contrastText(hex);
     std::string badge;
     if (!roleBadge(roleId).empty())
         badge = "<span class=\"fd-avatar-badge\">" + roleBadge(roleId) + "</span>";
-    return "<span class=\"fd-avatar\" style=\"background:" + hex + "\">"
-           "<span class=\"fd-avatar-txt\">" + initials(name) + "</span>" +
+    return "<span class=\"fd-avatar\" style=\"background:" + hex + ";color:" + ink +
+           "\"><span class=\"fd-avatar-txt\">" + initials(name) + "</span>" +
            badge + "</span>";
 }
 

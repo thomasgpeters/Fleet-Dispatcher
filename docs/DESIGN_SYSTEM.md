@@ -34,19 +34,20 @@ Use orange only for highlights: the load-card accent bar, toast status bars,
 small status/CTA emphasis. Keep semantic colors (success/danger/warning) at their
 framework defaults.
 
-### Avatar palette (colour-coded people)
+### Avatar palette (natural skin tones)
 
-A curated 10-colour palette tints person avatars (drivers/users) across all
-clients. Source of truth = the `avatar_color` lookup (`database/seed_data.sql`);
-the desktop mirrors it in `src/icons.h`. All ten read on both light and dark
-panels (white initials sit on the colour).
+Person avatars (drivers/users) use a **natural human skin-tone spectrum** (light →
+deep), so the icons represent real people. Source of truth = the `avatar_color`
+lookup (`database/seed_data.sql`); the desktop mirrors it in `src/icons.h`.
+Initials switch between **dark ink and white** by the tone's luminance
+(`contrastText()`), so they stay legible on both light and deep tones.
 
-`steel #6b7a90` · `red #d9534f` · `orange #e07b39` · `gold #c9a227` ·
-`green #3fa66a` · `teal #2f9e94` · `sky #3b82c4` · `indigo #5b6bd6` ·
-`violet #8a5cf6` · `rose #d6608f`
+`ivory #f7d8c0` · `fair #efc6a6` · `light #e6b48f` · `beige #d9a074` ·
+`tan #c88a5a` · `honey #b47444` · `bronze #9a5f37` · `brown #7d4a2b` ·
+`deep #5b3420` · `espresso #3c2216`
 
-A person with no colour set gets a **deterministic** palette entry hashed from
-their name, so every driver always has a stable colour.
+A person with no tone set gets a **deterministic** tone hashed from their name,
+so every driver always has a stable one.
 
 ### Vehicle colours (by trailer type)
 

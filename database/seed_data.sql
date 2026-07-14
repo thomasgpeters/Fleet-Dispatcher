@@ -53,19 +53,21 @@ INSERT INTO commodity_category (id, code, name) VALUES
   (4, 'generators',      'Power generators'),
   (5, 'lifts',           'Lifts');
 
--- Avatar palette — curated, accessible on both light and dark panels. Users
--- self-pick in their profile; admins assign colours to login-less drivers.
+-- Avatar palette — a natural human SKIN-TONE spectrum (light → deep), so the
+-- person icons represent real people. Users self-pick in their profile; admins
+-- assign a tone to login-less drivers. The client picks dark/light initials by
+-- the tone's luminance so they stay legible (see icons.h contrastText()).
 INSERT INTO avatar_color (id, code, name, hex) VALUES
-  (1,  'steel',  'Steel',  '#6b7a90'),
-  (2,  'red',    'Red',    '#d9534f'),
-  (3,  'orange', 'Orange', '#e07b39'),
-  (4,  'gold',   'Gold',   '#c9a227'),
-  (5,  'green',  'Green',  '#3fa66a'),
-  (6,  'teal',   'Teal',   '#2f9e94'),
-  (7,  'sky',    'Sky',    '#3b82c4'),
-  (8,  'indigo', 'Indigo', '#5b6bd6'),
-  (9,  'violet', 'Violet', '#8a5cf6'),
-  (10, 'rose',   'Rose',   '#d6608f');
+  (1,  'ivory',    'Ivory',    '#f7d8c0'),
+  (2,  'fair',     'Fair',     '#efc6a6'),
+  (3,  'light',    'Light',    '#e6b48f'),
+  (4,  'beige',    'Beige',    '#d9a074'),
+  (5,  'tan',      'Tan',      '#c88a5a'),
+  (6,  'honey',    'Honey',    '#b47444'),
+  (7,  'bronze',   'Bronze',   '#9a5f37'),
+  (8,  'brown',    'Brown',    '#7d4a2b'),
+  (9,  'deep',     'Deep',     '#5b3420'),
+  (10, 'espresso', 'Espresso', '#3c2216');
 
 -- Keep IDENTITY sequences ahead of the explicit ids inserted above.
 SELECT setval(pg_get_serial_sequence('avatar_color', 'id'),        (SELECT max(id) FROM avatar_color));
@@ -88,18 +90,18 @@ SELECT setval(pg_get_serial_sequence('commodity_category', 'id'),  (SELECT max(i
 INSERT INTO app_user (id, username, full_name, email, app_role_id, password_hash, phone, title, avatar_color_id) VALUES
   ('11111111-1111-1111-1111-111111111111', 'dispatch1', 'Dana Dispatcher', 'dana@example.com', 1,
    'pbkdf2:sha256:600000$711621b8ed38739b$1bcab2036eda81044bb0e6841a19f09683bedcb97f0c27dacb6e52db981e9d34',
-   '555-0100', 'Lead Dispatcher', 8),   -- indigo
+   '555-0100', 'Lead Dispatcher', 8),   -- brown
   ('22222222-2222-2222-2222-222222222222', 'driver1',   'Pat Diesel',      'pat@example.com',  2,
    'pbkdf2:sha256:600000$3d4791e76e547105$b5a2b998f49605430828ad1adc0f76458546d255111d8378fe2ca13bf7f4d33b',
-   '555-0101', 'Owner-Operator', 6),    -- teal
+   '555-0101', 'Owner-Operator', 6),    -- honey
   ('33333333-3333-3333-3333-333333333333', 'updater1',  'Uma Updater',     'uma@example.com',  3,
    'pbkdf2:sha256:600000$f99fb81bfd5651ff$05475d4d2da19ccbfc98bf1164fce3afb830fe1ed07c7495323da703c27000f8',
-   '555-0102', 'Dispatch Updater', 4);  -- gold
+   '555-0102', 'Dispatch Updater', 4);  -- beige
 
 -- Drivers (company + owner-operator) ----------------------------------------
 INSERT INTO driver (id, name, driver_type_id, phone, home_base, user_id, avatar_color_id) VALUES
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Pat Diesel', 2, '555-0101', 'Dallas, TX', '22222222-2222-2222-2222-222222222222', 6),   -- teal (matches login)
-  ('aaaaaaaa-0000-0000-0000-000000000002', 'Sam Hauler', 1, '555-0102', 'Denver, CO', NULL, 2);                                     -- red (admin-assigned)
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Pat Diesel', 2, '555-0101', 'Dallas, TX', '22222222-2222-2222-2222-222222222222', 6),   -- honey (matches login)
+  ('aaaaaaaa-0000-0000-0000-000000000002', 'Sam Hauler', 1, '555-0102', 'Denver, CO', NULL, 2);                                     -- fair (admin-assigned)
 
 -- Equipment (varied rigs) ---------------------------------------------------
 INSERT INTO equipment (id, unit_number, power_unit_id, trailer_type_id, has_ramps, deck_length_ft, weight_capacity_lbs, has_duals) VALUES
@@ -170,14 +172,14 @@ INSERT INTO load (
 
 -- 8 more drivers (→ 10 total). Mix of company + owner-operator. --------------
 INSERT INTO driver (id, name, driver_type_id, phone, home_base, user_id, avatar_color_id) VALUES
-  ('aaaaaaaa-0000-0000-0000-000000000003', 'Marcus Reyes',   1, '555-0110', 'Oklahoma City, OK', NULL, 7),   -- sky
-  ('aaaaaaaa-0000-0000-0000-000000000004', 'Dwayne Kolb',    2, '555-0111', 'El Paso, TX',       NULL, 9),   -- violet
-  ('aaaaaaaa-0000-0000-0000-000000000005', 'Tanya Brooks',   1, '555-0112', 'Denver, CO',        NULL, 10),  -- rose
-  ('aaaaaaaa-0000-0000-0000-000000000006', 'Hector Alvarez', 2, '555-0113', 'El Paso, TX',       NULL, 3),   -- orange
-  ('aaaaaaaa-0000-0000-0000-000000000007', 'Jill Sorensen',  1, '555-0114', 'Wichita, KS',       NULL, 5),   -- green
-  ('aaaaaaaa-0000-0000-0000-000000000008', 'Ravi Nair',      1, '555-0115', 'Lubbock, TX',       NULL, 4),   -- gold
-  ('aaaaaaaa-0000-0000-0000-000000000009', 'Bill Tran',      2, '555-0116', 'Houston, TX',       NULL, 8),   -- indigo
-  ('aaaaaaaa-0000-0000-0000-00000000000a', 'Nadia Petrov',   1, '555-0117', 'Salt Lake City, UT',NULL, 1);   -- steel
+  ('aaaaaaaa-0000-0000-0000-000000000003', 'Marcus Reyes',   1, '555-0110', 'Oklahoma City, OK', NULL, 7),   -- bronze
+  ('aaaaaaaa-0000-0000-0000-000000000004', 'Dwayne Kolb',    2, '555-0111', 'El Paso, TX',       NULL, 9),   -- deep
+  ('aaaaaaaa-0000-0000-0000-000000000005', 'Tanya Brooks',   1, '555-0112', 'Denver, CO',        NULL, 10),  -- espresso
+  ('aaaaaaaa-0000-0000-0000-000000000006', 'Hector Alvarez', 2, '555-0113', 'El Paso, TX',       NULL, 3),   -- light
+  ('aaaaaaaa-0000-0000-0000-000000000007', 'Jill Sorensen',  1, '555-0114', 'Wichita, KS',       NULL, 5),   -- tan
+  ('aaaaaaaa-0000-0000-0000-000000000008', 'Ravi Nair',      1, '555-0115', 'Lubbock, TX',       NULL, 4),   -- beige
+  ('aaaaaaaa-0000-0000-0000-000000000009', 'Bill Tran',      2, '555-0116', 'Houston, TX',       NULL, 8),   -- brown
+  ('aaaaaaaa-0000-0000-0000-00000000000a', 'Nadia Petrov',   1, '555-0117', 'Salt Lake City, UT',NULL, 1);   -- ivory
 
 -- 6 more rigs (→ 10 total). Power units 1=tractor, 2=RAM; trailer types match. -
 INSERT INTO equipment (id, unit_number, power_unit_id, trailer_type_id, has_ramps, deck_length_ft, weight_capacity_lbs, has_duals) VALUES

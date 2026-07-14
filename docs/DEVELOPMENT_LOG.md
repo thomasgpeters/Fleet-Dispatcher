@@ -5,6 +5,13 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-07-13
 
+### Avatar palette → natural skin tones
+- Reworked the person palette from arbitrary UI colours to a **natural skin-tone
+  spectrum** (ivory → espresso, 10 steps), so avatars represent real people.
+  Initials now switch dark/white by tone luminance (`icons.h contrastText()`) to
+  stay legible; light-tone avatars get a neutral hairline. Seed + `icons.h` +
+  DESIGN_SYSTEM/domain-model updated; verified on PG16.
+
 ### Board: click a load → stacking load-info toasts
 - Clicking a load on the board pops a **bottom-right toast** with that load's
   detail (driver · status, rate, run type, pickup→delivery, loaded/deadhead
