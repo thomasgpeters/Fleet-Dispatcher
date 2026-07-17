@@ -5,6 +5,16 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-07-13
 
+### Integration spec: Fleet ⇄ Smitty Services (vehicle sync)
+- New **`docs/INTEGRATION_SMITTY.md`** — a hand-off spec for syncing vehicle +
+  service/repair data with Smitty Services. Canonical **VIN** key with per-app id
+  correlation; **system-of-record per field** (Fleet owns identity/specs/odometer/
+  operational status, Smitty owns work orders/maintenance schedule/in-shop status);
+  recommended **Kafka event contract** (`vehicle.v1` + `vehicle-service.v1`,
+  VIN-keyed, idempotent envelope) mirroring Fleet's existing topic strategy, plus
+  JSON:API backfill/reconcile; neutral canonical schema sketch; six open decisions
+  for the Smitty side; phased P1–P4 rollout. Linked from TODO Feature 6.
+
 ### Fleet: click a vehicle → info toast (+ detail-page spec)
 - Clicking a rig on the Fleet page pops the same **bottom-right toast** as the
   board loads: unit · trailer type, power unit, deck length + weight capacity,

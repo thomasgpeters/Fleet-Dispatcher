@@ -455,6 +455,12 @@ Proposed data model (needs a quick confirm — see open questions):
       **Documents** (title/registration via the CMS `document` + a new
       `equipment_document` link).
 - [ ] **Mobile** parity later (read-only vehicle detail for drivers).
+- [ ] **Smitty Services integration** — share vehicle identity/specs/mileage/status
+      and consume service/repair data (work orders, maintenance schedule, in-shop
+      status) from Smitty. Full spec in
+      [`INTEGRATION_SMITTY.md`](INTEGRATION_SMITTY.md) (canonical VIN key, per-field
+      system-of-record, Kafka event contract + JSON:API reconcile). The Feature-6
+      asset fields (VIN, odometer, status) are the Fleet side of this contract.
 
 Open questions (blocking the schema build — answer any time):
 1. **Valuation source** — manual `current_value` you set, or auto-depreciate from
