@@ -13,6 +13,8 @@
 
 namespace fd {
 
+class Toaster;
+
 enum class BoardMode { Today, Week };
 
 class BoardView : public Wt::WContainerWidget {
@@ -32,11 +34,14 @@ private:
 
     Wt::WText* status_ = nullptr;
     Wt::WContainerWidget* body_ = nullptr;
+    Toaster* loadToasts_ = nullptr;   // bottom-right load-selection stack
 
     void renderWhenReady();
     void render();
     void renderToday();
     void renderWeek();
+    // Pop a bottom-right toast describing a selected load (stacks on repeat).
+    void showLoadToast(const std::string& driverName, const Load& l);
 };
 
 }  // namespace fd

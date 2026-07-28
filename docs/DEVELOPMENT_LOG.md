@@ -5,6 +5,64 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-07-13
 
+### Integration spec: Fleet ⇄ Smitty Services (vehicle sync)
+- New **`docs/INTEGRATION_SMITTY.md`** — a hand-off spec for syncing vehicle +
+  service/repair data with Smitty Services. Canonical **VIN** key with per-app id
+  correlation; **system-of-record per field** (Fleet owns identity/specs/odometer/
+  operational status, Smitty owns work orders/maintenance schedule/in-shop status);
+  recommended **Kafka event contract** (`vehicle.v1` + `vehicle-service.v1`,
+  VIN-keyed, idempotent envelope) mirroring Fleet's existing topic strategy, plus
+  JSON:API backfill/reconcile; neutral canonical schema sketch; six open decisions
+  for the Smitty side; phased P1–P4 rollout. Linked from TODO Feature 6.
+
+### Fleet: click a vehicle → info toast (+ detail-page spec)
+- Clicking a rig on the Fleet page pops the same **bottom-right toast** as the
+  board loads: unit · trailer type, power unit, deck length + weight capacity,
+  ramps/duals; stacks when several are selected. `FleetView` owns a bottom-right
+  `Toaster`; `fetchEquipment`/`EquipmentInfo` enriched with the spec fields. No
+  schema change.
+- Captured **Feature 6 — Vehicle detail & lifecycle** in TODO (full detail page:
+  Valuation incl. for-sale price · scheduled Maintenance · Mileage · Overview),
+  with a proposed schema (equipment asset fields + `maintenance_record`/
+  `maintenance_schedule` + optional valuation history) and four open questions
+  gating the schema build.
+
+### Avatar palette → natural skin tones
+- Reworked the person palette from arbitrary UI colours to a **natural skin-tone
+  spectrum** (ivory → espresso, 10 steps), so avatars represent real people.
+  Initials now switch dark/white by tone luminance (`icons.h contrastText()`) to
+  stay legible; light-tone avatars get a neutral hairline. Seed + `icons.h` +
+  DESIGN_SYSTEM/domain-model updated; verified on PG16.
+
+### Board: click a load → stacking load-info toasts
+- Clicking a load on the board pops a **bottom-right toast** with that load's
+  detail (driver · status, rate, run type, pickup→delivery, loaded/deadhead
+  miles). Selecting several **stacks** them (sticky until the × closes each),
+  matching the dispatcher "collect a few loads" flow. Works from both the Week
+  grid chips and the Today list rows.
+- `Toaster` gains a `Position` (TopRight default = message notifications;
+  **BottomRight** = the board stack); the board owns its own bottom-right
+  instance (fixed-positioned, survives body re-renders). Toast accent follows
+  status (delivered = success, cancelled = danger). New CSS `.fd-toaster-bottom`
+  / `.fd-toast-sub`; load chips get a click affordance. Wt builds on Linux.
+
+### Colour-coded people + vehicles; Fleet view redesign
+- **Schema**: `avatar_color` palette lookup (10 curated colours) + `app_user`
+  .avatar_color_id (self-picked) + `driver.avatar_color_id` (admin-assignable;
+  render precedence explicit → linked user → derived-from-name) +
+  `trailer_type.color_hex` (rigs colour-coded by type). Seed assigns colours to
+  the 10 drivers/3 users + the 5 trailer types. Verified on PG16 (43 fleet tables).
+- **Desktop**: shared `icons.h` (palette/trailer hex by id — stable seed lookups,
+  hardcoded like `statusName()`; person-avatar HTML builder, deterministic name
+  fallback, role badge). **Fleet view redesigned** off the Bootstrap zebra table
+  (white-on-dark stripes) into a clean roster: colour avatar + name/home-base,
+  type badge, active-status dot; **equipment colour-coded by trailer type with a
+  legend** (`fetchEquipment` typed fetch). **Board**: colour avatar before each
+  driver name, vertically centred in the row. **Profile**: 10-swatch colour
+  picker → `avatar_color_id` (PATCH). Wt builds on Linux; palette maps are
+  version-neutral pure C++.
+- Mobile (profile picker + directory avatars) is the follow-up.
+
 ### Docs: role-based manual test plan
 - New **`docs/TEST_PLAN.md`** — hand-executable acceptance tests per role.
   Hierarchical numbering (section → case `x.y` → step `x.y.z`), hard page breaks

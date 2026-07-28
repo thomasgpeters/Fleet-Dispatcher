@@ -22,7 +22,7 @@ mirrors every token.
 | Surface / panel (bright white) | `#ffffff` | `#16212e` |
 | Surface 2 (chips, bubbles) | `#f3f4f6` | `#1b2937` |
 | Text | `#1b2430` | `#e6edf4` |
-| Muted text | `#5f6a78` | `#9fb1c2` |
+| Muted text | `#5f6a78` | `#b4c2d0` |
 | Border (rarely used) | `#dcdfe5` | `#29384a` |
 | **Primary blue** | `#2c6fb3` | `#4a90d9` |
 | Primary strong | `#1f4e79` | `#6aa6e0` |
@@ -33,6 +33,28 @@ mirrors every token.
 Use orange only for highlights: the load-card accent bar, toast status bars,
 small status/CTA emphasis. Keep semantic colors (success/danger/warning) at their
 framework defaults.
+
+### Avatar palette (natural skin tones)
+
+Person avatars (drivers/users) use a **natural human skin-tone spectrum** (light →
+deep), so the icons represent real people. Source of truth = the `avatar_color`
+lookup (`database/seed_data.sql`); the desktop mirrors it in `src/icons.h`.
+Initials switch between **dark ink and white** by the tone's luminance
+(`contrastText()`), so they stay legible on both light and deep tones.
+
+`ivory #f7d8c0` · `fair #efc6a6` · `light #e6b48f` · `beige #d9a074` ·
+`tan #c88a5a` · `honey #b47444` · `bronze #9a5f37` · `brown #7d4a2b` ·
+`deep #5b3420` · `espresso #3c2216`
+
+A person with no tone set gets a **deterministic** tone hashed from their name,
+so every driver always has a stable one.
+
+### Vehicle colours (by trailer type)
+
+Rigs are colour-coded by trailer type via `trailer_type.color_hex`:
+step-deck `#3b82c4` · RGN low-boy `#8a5cf6` · flatbed `#3fa66a` ·
+car-carrier `#e07b39` · power-only `#6b7a90`. Shown as a swatch on fleet
+equipment chips with a legend.
 
 ## Typography & panels
 
@@ -79,9 +101,15 @@ animations/transitions for users who opt out).
 
 - **Default = follow the OS** via `@media (prefers-color-scheme: dark)`.
 - **Manual override** wins over the OS:
-  - Desktop/HUD: `data-fd-theme="light|dark"` on `<html>` (toggle in the header;
-    persisted in `localStorage` as `fd-theme`). The HUD forces `dark` (wall
-    display).
+  - Desktop/HUD: `data-fd-theme="light|dark"` on `<html>` (toggle in the header
+    **and** Settings → Appearance; persisted in `localStorage` as `fd-theme`).
+    The HUD forces `dark` (wall display). **We also set Bootstrap 5.3's
+    `data-bs-theme` in lock-step** so Bootstrap-native components (tables, inputs,
+    dropdowns, modals) follow the mode instead of staying light — without it,
+    dark mode leaks white component chrome (e.g. the old Fleet table). For
+    `system` we resolve `data-bs-theme` from `prefers-color-scheme` since
+    Bootstrap doesn't auto-follow the OS. (Needs Bootstrap ≥ 5.3; harmless no-op
+    below that, where the `fd-theme` tokens still cover custom surfaces.)
   - Mobile: `.fd-dark` / `.fd-light` class on `<html>` (Appearance picker in
     Profile; persisted as `fd.theme`).
 

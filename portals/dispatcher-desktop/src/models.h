@@ -16,6 +16,7 @@ struct AppUser {
     std::string timezone;
     int app_role_id = 0;            // 1 dispatcher · 2 driver · 3 updater
     std::string avatar_document_id;
+    int avatar_color_id = 0;        // → avatar_color (self-picked person colour)
 };
 
 struct Driver {
@@ -23,6 +24,8 @@ struct Driver {
     std::string name;
     int driver_type_id = 0;
     bool active = true;
+    std::string home_base;
+    int avatar_color_id = 0;        // → avatar_color (0 = derive from name)
 };
 
 // Messaging (right-panel communications).

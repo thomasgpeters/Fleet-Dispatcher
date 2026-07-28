@@ -2,6 +2,8 @@
 
 #include <Wt/WString.h>
 
+#include "icons.h"
+
 namespace fd {
 
 namespace {
@@ -22,12 +24,14 @@ ProfileView::ProfileView(ApiClient* api, AppUser user,
     auto* body = addNew<Wt::WContainerWidget>();
     body->addStyleClass("card-body");
 
-    // Header: name, @username · role.
+    // Header: colour avatar + name, @username · role.
+    selectedColorId_ = user_.avatar_color_id;
     body->addNew<Wt::WText>(Wt::WString::fromUTF8(
-        "<h2 class=\"h5 mb-0\">" + user_.full_name + "</h2>"));
-    body->addNew<Wt::WText>(Wt::WString::fromUTF8(
-        "<p class=\"text-muted\">@" + user_.username + " · " +
-        roleLabel(user_.app_role_id) + "</p>"));
+        "<div class=\"fd-profile-head\">" +
+        personAvatar(user_.full_name, user_.avatar_color_id, user_.app_role_id) +
+        "<div><h2 class=\"h5 mb-0\">" + user_.full_name + "</h2>"
+        "<p class=\"text-muted mb-0\">@" + user_.username + " · " +
+        roleLabel(user_.app_role_id) + "</p></div></div>"));
 
     auto* form = body->addNew<Wt::WContainerWidget>();
     fullName_ = addField(form, "Full name", user_.full_name);
@@ -35,6 +39,7 @@ ProfileView::ProfileView(ApiClient* api, AppUser user,
     phone_ = addField(form, "Phone", user_.phone);
     title_ = addField(form, "Title", user_.title);
     timezone_ = addField(form, "Time zone", user_.timezone);
+    buildColorPicker(form);
 
     status_ = body->addNew<Wt::WText>();
     status_->addStyleClass("d-block text-muted my-2");
@@ -60,6 +65,30 @@ Wt::WLineEdit* ProfileView::addField(Wt::WContainerWidget* parent,
     return edit;
 }
 
+void ProfileView::buildColorPicker(Wt::WContainerWidget* parent) {
+    auto* group = parent->addNew<Wt::WContainerWidget>();
+    group->addStyleClass("mb-3");
+    group->addNew<Wt::WText>(
+        "<label class=\"form-label\">Icon colour</label>");
+    swatches_ = group->addNew<Wt::WContainerWidget>();
+    swatches_->addStyleClass("fd-swatches");
+    renderSwatches();
+}
+
+void ProfileView::renderSwatches() {
+    swatches_->clear();
+    for (int id = 1; id <= 10; ++id) {
+        const bool sel = (id == selectedColorId_);
+        auto* sw = swatches_->addNew<Wt::WText>(Wt::WString::fromUTF8(
+            std::string("<span class=\"fd-swatch") + (sel ? " is-selected" : "") +
+            "\" style=\"background:" + avatarHex(id) + "\"></span>"));
+        sw->clicked().connect([this, id]() {
+            selectedColorId_ = id;
+            renderSwatches();
+        });
+    }
+}
+
 void ProfileView::save() {
     ProfileEdit edit;
     edit.full_name = fullName_->text().toUTF8();
@@ -67,6 +96,7 @@ void ProfileView::save() {
     edit.phone = phone_->text().toUTF8();
     edit.title = title_->text().toUTF8();
     edit.timezone = timezone_->text().toUTF8();
+    edit.avatar_color_id = selectedColorId_;   // 0 = leave unchanged
 
     save_->setEnabled(false);
     status_->setText("Saving…");

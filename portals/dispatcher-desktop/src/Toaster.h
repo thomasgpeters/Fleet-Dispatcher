@@ -17,8 +17,11 @@ namespace fd {
 class Toaster : public Wt::WContainerWidget {
 public:
     enum class Level { Info, Success, Warning, Danger };
+    // Where the stack is pinned. TopRight = message notifications (default);
+    // BottomRight = the board's load-selection stack.
+    enum class Position { TopRight, BottomRight };
 
-    Toaster();
+    explicit Toaster(Position position = Position::TopRight);
 
     // Show a toast; it fades out after timeoutMs (0 = sticky until closed).
     void notify(const std::string& title, const std::string& message,

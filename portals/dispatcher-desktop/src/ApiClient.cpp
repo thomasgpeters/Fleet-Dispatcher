@@ -127,6 +127,8 @@ fd::Driver parseDriver(const Wt::Json::Object& res) {
     d.driver_type_id = jint(a, "driver_type_id");
     auto it = a.find("active");
     d.active = (it == a.end()) ? true : static_cast<bool>(it->second);
+    d.home_base = jstr(a, "home_base");
+    d.avatar_color_id = jint(a, "avatar_color_id");
     return d;
 }
 
@@ -346,6 +348,7 @@ fd::AppUser parseUser(const Wt::Json::Object& res) {
     u.timezone = jstr(a, "timezone");
     u.app_role_id = jint(a, "app_role_id");
     u.avatar_document_id = jstr(a, "avatar_document_id");
+    u.avatar_color_id = jint(a, "avatar_color_id");
     return u;
 }
 
@@ -456,6 +459,32 @@ void ApiClient::fetchDrivers(DriversCallback onOk, ErrorCallback onErr) {
         [onOk](const Wt::Json::Array& data) {
             std::vector<Driver> out;
             for (const Wt::Json::Value& v : data) out.push_back(parseDriver(v));
+            onOk(std::move(out));
+        },
+        std::move(onErr));
+}
+
+void ApiClient::fetchEquipment(EquipmentCallback onOk, ErrorCallback onErr) {
+    getCollection(
+        baseUrl_ + "/Equipment", authToken_,
+        [onOk](const Wt::Json::Array& data) {
+            std::vector<EquipmentInfo> out;
+            for (const Wt::Json::Value& v : data) {
+                const Wt::Json::Object& res = v;
+                const Wt::Json::Object& a = res.get("attributes");
+                EquipmentInfo e;
+                e.id = jstr(res, "id");
+                e.unit_number = jstr(a, "unit_number");
+                e.trailer_type_id = jint(a, "trailer_type_id");
+                e.power_unit_id = jint(a, "power_unit_id");
+                e.deck_length_ft = jint(a, "deck_length_ft");
+                e.weight_capacity_lbs = jint(a, "weight_capacity_lbs");
+                auto rampsIt = a.find("has_ramps");
+                e.has_ramps = (rampsIt != a.end()) && static_cast<bool>(rampsIt->second);
+                auto dualsIt = a.find("has_duals");
+                e.has_duals = (dualsIt != a.end()) && static_cast<bool>(dualsIt->second);
+                out.push_back(std::move(e));
+            }
             onOk(std::move(out));
         },
         std::move(onErr));
@@ -888,6 +917,9 @@ void ApiClient::updateUser(const std::string& id, const ProfileEdit& e,
     add("phone", e.phone);
     add("title", e.title);
     add("timezone", e.timezone);
+    // avatar_color_id is an integer FK: emit unquoted (0 = leave unchanged).
+    if (e.avatar_color_id > 0)
+        f.push_back("\"avatar_color_id\":" + std::to_string(e.avatar_color_id));
 
     std::ostringstream attrs;
     for (size_t i = 0; i < f.size(); ++i) {

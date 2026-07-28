@@ -21,9 +21,10 @@ const char* levelClass(Toaster::Level l) {
 }
 }  // namespace
 
-Toaster::Toaster() {
-    // Pinned top-right; the actual fixed positioning is in the CSS.
+Toaster::Toaster(Position position) {
+    // Pinned via CSS (fixed). Bottom-right variant stacks upward from the corner.
     addStyleClass("fd-toaster");
+    if (position == Position::BottomRight) addStyleClass("fd-toaster-bottom");
 
     // One sweeper for all toasts — removing a toast never deletes the timer that
     // is firing, so there's no use-after-free.
