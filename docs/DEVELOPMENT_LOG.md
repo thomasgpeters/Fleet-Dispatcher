@@ -5,6 +5,18 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-07-13
 
+### Smoke check + fleet-position seed (messaging + geolocation)
+- New **`scripts/smoke-check.sh`** — one-command runtime verification of the two
+  subsystems: **messaging** (login → list channels → list messages → optional
+  `--post` a test message and confirm the write) and **geolocation** (position_
+  report count via API + the geospatial endpoint `/health` and `/positions/latest`).
+  Read-only by default; jq-free; configurable via env / `.env`. Exit code = fail
+  count.
+- Seed: extended the `position_report` fixtures from 2 rigs to **all 9 assigned
+  rigs** (recent fixes spread across the current lanes) so the HUD map and
+  `/positions/latest` show the whole fleet — an empty map was likely why fleet
+  locations looked broken. Verified on PG16 (10 fixes, 9 rigs).
+
 ### Integration spec: Fleet ⇄ Smitty Services (vehicle sync)
 - New **`docs/INTEGRATION_SMITTY.md`** — a hand-off spec for syncing vehicle +
   service/repair data with Smitty Services. Canonical **VIN** key with per-app id

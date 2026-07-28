@@ -387,7 +387,16 @@ INSERT INTO position_report
   ('bbbbbbbb-0000-0000-0000-000000000002', 'aaaaaaaa-0000-0000-0000-000000000001', 3, 33.5779, -101.8552,   5.0, 62.0,  8.0, now() - interval '20 minutes'),
   ('bbbbbbbb-0000-0000-0000-000000000002', 'aaaaaaaa-0000-0000-0000-000000000001', 3, 34.1850, -101.7060,   8.0, 64.0,  6.0, now() - interval '5 minutes'),
   -- Sam's RAM car carrier (R-201), Denver area.
-  ('bbbbbbbb-0000-0000-0000-000000000004', 'aaaaaaaa-0000-0000-0000-000000000002', 1, 39.7392, -104.9903, 180.0,  0.0, 12.0, now() - interval '2 minutes');
+  ('bbbbbbbb-0000-0000-0000-000000000004', 'aaaaaaaa-0000-0000-0000-000000000002', 1, 39.7392, -104.9903, 180.0,  0.0, 12.0, now() - interval '2 minutes'),
+  -- The rest of the assigned fleet — one recent fix each, spread across the
+  -- current lanes so the HUD map + /positions/latest show the whole fleet.
+  ('bbbbbbbb-0000-0000-0000-000000000005', 'aaaaaaaa-0000-0000-0000-000000000003', 3, 35.4676,  -97.5164,  65.0, 58.0,  7.0, now() - interval '3 minutes'),  -- Marcus, Oklahoma City
+  ('bbbbbbbb-0000-0000-0000-000000000006', 'aaaaaaaa-0000-0000-0000-000000000004', 3, 30.8900, -102.8800,  95.0, 65.0,  9.0, now() - interval '4 minutes'),  -- Dwayne, W TX
+  ('bbbbbbbb-0000-0000-0000-000000000007', 'aaaaaaaa-0000-0000-0000-000000000005', 1, 39.0639, -108.5506, 300.0, 60.0,  8.0, now() - interval '6 minutes'),  -- Tanya, near Grand Junction
+  ('bbbbbbbb-0000-0000-0000-00000000000a', 'aaaaaaaa-0000-0000-0000-000000000006', 3, 31.7619, -106.4850, 270.0, 55.0, 10.0, now() - interval '7 minutes'),  -- Hector, El Paso
+  ('bbbbbbbb-0000-0000-0000-000000000008', 'aaaaaaaa-0000-0000-0000-000000000007', 3, 35.4000,  -97.6000,   0.0,  0.0, 12.0, now() - interval '9 minutes'),  -- Jill, parked near OKC
+  ('bbbbbbbb-0000-0000-0000-000000000009', 'aaaaaaaa-0000-0000-0000-000000000008', 3, 35.2000, -101.8300, 150.0, 63.0,  6.0, now() - interval '2 minutes'),  -- Ravi, Amarillo
+  ('bbbbbbbb-0000-0000-0000-000000000003', 'aaaaaaaa-0000-0000-0000-000000000009', 3, 32.3199, -106.7637, 280.0, 64.0,  8.0, now() - interval '5 minutes');  -- Bill, near Las Cruces
 
 -- ===========================================================================
 -- Navigation (trip for Pat's load, waypoints, a truck-stop POI, a route)
