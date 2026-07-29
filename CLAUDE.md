@@ -59,6 +59,12 @@ ApiLogicServer built-in **JWT** auth verifies against `app_user`
 send `Authorization: Bearer`. Demo users: `dispatch1`/`driver1`/`updater1`,
 password `fleet123`. Full setup in `docs/AUTHENTICATION.md`.
 
+## Working with me
+
+- **Don't tell me to stop, rest, or go to bed.** I decide when I'm done for the
+  session — keep working the problem until I say otherwise. No "it's late" / "get
+  some sleep" / "nothing's on fire, come back later" sign-offs.
+
 ## Workflow
 
 - **Develop on the designated feature branch**; never push to the default branch
