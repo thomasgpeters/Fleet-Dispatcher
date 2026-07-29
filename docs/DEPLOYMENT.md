@@ -341,9 +341,11 @@ database and re-install the extensions:
 psql "$DATABASE_URL" -f database/schema.sql
 psql "$DATABASE_URL" -f database/seed_data.sql
 
-# (b) regenerate ALS from the updated DB (database-first)
+# (b) regenerate ALS from the updated DB (database-first).
+#     The `als`/`ApiLogicServer` CLI lives in the API's Python venv — activate it
+#     first: `source /home/thomas/fleet-dispatcher-api/venv/bin/activate`.
 cd /home/thomas/fleet-dispatcher-api
-als rebuild-from-database --db_url="$DATABASE_URL"   # or: ApiLogicServer rebuild-from-database
+als rebuild-from-database --db_url="postgresql://fleet:fleet@localhost:5432/fleet_dispatcher"
 
 # (c) re-install our customizations — a fresh generate wipes logic/ + security/.
 #     Use the ABSOLUTE project path; make als-extensions copies the Kafka
@@ -353,6 +355,24 @@ cd ~/Fleet-Dispatcher
 make als-extensions ALS_PROJECT=/home/thomas/fleet-dispatcher-api
 ```
 
+> **⚠ Two rebuild traps that produce an empty `models.py` (boot fails with
+> `module 'database.models' has no attribute 'Message'`, crash-looping):**
+>
+> 1. **Always pass `--db_url` explicitly.** A bare `als rebuild-from-database`
+>    goes **interactive** and defaults to the `nw.sqlite` sample DB — reflecting
+>    Northwind, not Fleet. Non-interactive `--db_url=…` avoids it.
+> 2. **The `fleet` role must have `fleet` on its `search_path`,** or ALS reflects
+>    the empty `public` schema (the app tables live in `fleet`). A `--reset`
+>    with `--no-create` skips role setup, so re-assert it before regenerating:
+>    ```bash
+>    sudo -u postgres psql -d fleet_dispatcher -c \
+>      "ALTER ROLE fleet SET search_path = fleet, public;"
+>    ```
+>    Sanity gate after the rebuild — **do not restart until this passes:**
+>    ```bash
+>    grep -q "class Message" database/models.py && echo OK || echo "EMPTY — fix search_path/db_url"
+>    ```
+>
 > **Auth regenerate gotchas** (full detail in
 > [`AUTHENTICATION.md`](AUTHENTICATION.md#regenerate)): `add-auth` must target the
 > **absolute** project path; `Rule` imports from `logic_bank.logic_bank`;
@@ -439,6 +459,10 @@ sudo systemctl restart fleet-dispatcher-api
 | Symptom                                                    | Cause / fix                                                                 |
 | ---------------------------------------------------------- | --------------------------------------------------------------------------- |
 | Desktop build: `conversion from 'Wt::WString' to … std::string` | A Wt accessor returns `WString`; append `.toUTF8()` (see step 3).          |
+| Boot crash-loop: `module 'database.models' has no attribute 'Message'` | Rebuild reflected the wrong/empty schema → `models.py` has no app tables. Assert `search_path` (`ALTER ROLE fleet SET search_path = fleet, public;`) **and** rebuild with an explicit `--db_url` (bare = `nw.sqlite` sample). Gate on `grep -q "class Message" database/models.py` before restarting. |
+| `als rebuild-from-database` prompts `SQLAlchemy Database URI [default = nw.sqlite]` | You ran it with no `--db_url` — it went interactive and would reflect Northwind. Ctrl-C and re-run with `--db_url="postgresql://fleet:fleet@localhost:5432/fleet_dispatcher"`. |
+| `command 'als' not found` | The ALS CLI is in the API's venv — `source /home/thomas/fleet-dispatcher-api/venv/bin/activate` first. |
+| `make als-extensions` → `No rule to make target` | Run it from `~/Fleet-Dispatcher` (the repo), not the ALS project dir. |
 | New table/column absent from the API (404 on the resource)| ALS wasn't regenerated after the schema change — run step 2.                |
 | `comms_governance.py` not in `discovered logic`           | `als-extensions` not re-installed after regen — step 2(c) + restart.        |
 | `ImportError: cannot import name 'Rule'`                  | Import from `logic_bank.logic_bank`, not `…rule_bank.rule_bank`.             |
