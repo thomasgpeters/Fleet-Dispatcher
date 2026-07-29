@@ -1,28 +1,30 @@
 """Fleet Dispatcher — coerce empty-string foreign keys to NULL (auto-discovered).
 
-**Why this exists.** A JSON:API client that omits (or even sends `null` for) a
-nullable foreign key can reach the ORM as an empty string `''` rather than `None`
-(safrs deserialization). LogicBank then tries to load that parent with
-`SELECT … WHERE id = ''`, Postgres rejects `''::uuid`
-(`invalid input syntax for type uuid: ""`), the **transaction aborts**, and the
-write fails with a 500 — every later statement just echoes
+**Why this exists.** A JSON:API client that omits (or sends `null` for) a nullable
+foreign key can reach the ORM as an empty string `''` rather than `None` (safrs
+deserialization). LogicBank then loads that parent with `SELECT … WHERE id = ''`,
+Postgres rejects `''::uuid` (`invalid input syntax for type uuid: ""`), the
+**transaction aborts**, and the write 500s — every later statement just echoes
 `InFailedSqlTransaction`.
 
 The first place it bites is posting a normal (non-reply) **Message**:
 `message.reply_to_id` is a *self-referential* FK, so LogicBank loads a `message`
-parent with an empty key before the row is even inserted.
+parent with an empty key before the row is inserted.
 
-**The fix.** Register a SQLAlchemy attribute `set` listener on every **nullable
-FK column** across the model that rewrites `''` → `None` at assignment time —
-well before flush / parent-load — so the value is a proper SQL NULL. Real FK
-values (UUID strings) pass through untouched.
+**The fix.** A SQLAlchemy `before_flush` listener scrubs `''` → `None` on every
+nullable FK column of the pending (new/dirty) rows. Registered with `insert=True`
+so it runs **ahead of** LogicBank's own `before_flush` (which does the
+parent-load), and it reads the row's actual state at flush time — so it works no
+matter how safrs set the value (an attribute-`set` hook did NOT catch it, which
+is why this uses before_flush instead).
 
-Auto-discovered by ApiLogicServer (module under `logic/logic_discovery/`); the
-listeners are registered at import. Reinstalled after a regen via
-`make als-extensions`. See docs/DEPLOYMENT.md (redeploy troubleshooting).
+Auto-discovered by ApiLogicServer (module under `logic/logic_discovery/`);
+listeners register at import. Reinstalled after a regen via `make als-extensions`.
+See docs/DEPLOYMENT.md (redeploy troubleshooting).
 
 NOTE (ALS/SQLAlchemy version-sensitive): uses `sqlalchemy.inspect(cls)` +
-`mapper.column_attrs`; if your generated models differ, adjust the sweep.
+`mapper.column_attrs` and a class-level `Session` before_flush with `insert=True`;
+if your generated models/session differ, adjust.
 """
 
 from __future__ import annotations
@@ -32,20 +34,18 @@ import logging
 
 from sqlalchemy import event
 from sqlalchemy import inspect as _sa_inspect
+from sqlalchemy.orm import Session
 
 from database import models
 
 log = logging.getLogger(__name__)
 
-
-def _empty_to_none(target, value, oldvalue, initiator):  # SQLAlchemy 'set' hook
-    """Return None for an empty string; pass every other value through."""
-    return None if value == "" else value
+# class -> [nullable FK column attribute keys], computed once at import.
+_FK_KEYS: dict[type, list[str]] = {}
 
 
-def _register_empty_fk_coercion() -> int:
-    """Attach the coercion to every nullable FK column; return the count."""
-    registered = 0
+def _build_fk_map() -> int:
+    total = 0
     for _name, cls in _pyinspect.getmembers(models, _pyinspect.isclass):
         try:
             mapper = _sa_inspect(cls)
@@ -53,25 +53,41 @@ def _register_empty_fk_coercion() -> int:
             continue  # not a mapped class
         if not hasattr(mapper, "column_attrs"):
             continue
+        keys: list[str] = []
         for col_attr in mapper.column_attrs:
             col = col_attr.columns[0]
             if col.foreign_keys and col.nullable:
-                event.listen(
-                    getattr(cls, col_attr.key), "set", _empty_to_none, retval=True
-                )
-                registered += 1
-    return registered
+                keys.append(col_attr.key)
+        if keys:
+            _FK_KEYS[cls] = keys
+            total += len(keys)
+    return total
 
 
-# Register once, at discovery/import time (before any request flush).
-_count = _register_empty_fk_coercion()
+def _scrub_empty_fks(session, flush_context, instances):
+    """Turn '' into None on nullable FK columns of pending rows, before the
+    parent-load. Runs for inserts and updates."""
+    for obj in list(session.new) + list(session.dirty):
+        keys = _FK_KEYS.get(type(obj))
+        if not keys:
+            continue
+        for key in keys:
+            if getattr(obj, key, None) == "":
+                setattr(obj, key, None)
+
+
+_count = _build_fk_map()
+# insert=True → prepend, so we run BEFORE LogicBank's before_flush parent-load.
+event.listen(Session, "before_flush", _scrub_empty_fks, insert=True)
 log.info(
-    "Fleet Dispatcher: empty-FK->NULL coercion registered on %d nullable FK column(s)",
+    "Fleet Dispatcher: empty-FK->NULL before_flush scrub active on %d nullable FK "
+    "column(s) across %d model(s)",
     _count,
+    len(_FK_KEYS),
 )
 
 
 def declare_logic() -> None:
-    """ALS calls this on startup. The SQLAlchemy listeners above do the work, so
-    there is nothing to register with LogicBank here."""
+    """ALS calls this on startup. The SQLAlchemy before_flush listener above does
+    the work, so there is nothing to register with LogicBank here."""
     return None
