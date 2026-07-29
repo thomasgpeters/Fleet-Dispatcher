@@ -64,17 +64,22 @@ NMSG=$(printf '%s' "$MSG" | jcount)
 [ "${NMSG:-0}" -gt 0 ] && ok "messages reachable ($NMSG)" || note "no messages yet (not necessarily broken)"
 
 if [ "$DO_POST" = 1 ] && [ -n "$CHID" ]; then
-  UID=$(curl -sS -m 10 "${AUTH[@]}" "$API_BASE/AppUser?filter%5Busername%5D=$SMOKE_USER" 2>/dev/null \
+  # NB: use a custom name — UID is a read-only bash builtin (the numeric user id).
+  AUTHOR_ID=$(curl -sS -m 10 "${AUTH[@]}" "$API_BASE/AppUser?filter%5Busername%5D=$SMOKE_USER" 2>/dev/null \
         | sed -n 's/.*"id":"\([0-9a-f-]\{36\}\)".*/\1/p' | head -1)
-  BODY="smoke-check $(cat /proc/sys/kernel/random/uuid 2>/dev/null || echo test)"
-  POST=$(curl -sS -m 10 -o /dev/null -w '%{http_code}' "${AUTH[@]}" -X POST "$API_BASE/Message" \
-    -H 'Content-Type: application/vnd.api+json' \
-    -d "{\"data\":{\"type\":\"Message\",\"attributes\":{\"channel_id\":\"$CHID\",\"author_id\":\"$UID\",\"body\":\"$BODY\"}}}" 2>/dev/null)
-  case "$POST" in
-    20*) ok "posted a test message (HTTP $POST) to channel $CHID"
-         note "(a 'smoke-check …' message now exists in that channel)";;
-    *)   bad "message POST returned HTTP $POST";;
-  esac
+  if [ -z "$AUTHOR_ID" ]; then
+    bad "could not resolve author id for $SMOKE_USER (write test skipped)"
+  else
+    BODY="smoke-check $(cat /proc/sys/kernel/random/uuid 2>/dev/null || echo test)"
+    POST=$(curl -sS -m 10 -o /dev/null -w '%{http_code}' "${AUTH[@]}" -X POST "$API_BASE/Message" \
+      -H 'Content-Type: application/vnd.api+json' \
+      -d "{\"data\":{\"type\":\"Message\",\"attributes\":{\"channel_id\":\"$CHID\",\"author_id\":\"$AUTHOR_ID\",\"body\":\"$BODY\"}}}" 2>/dev/null)
+    case "$POST" in
+      20*) ok "posted a test message (HTTP $POST) to channel $CHID"
+           note "(a 'smoke-check …' message now exists in that channel)";;
+      *)   bad "message POST returned HTTP $POST";;
+    esac
+  fi
 else
   note "write test skipped (run with --post to send a test message)"
 fi
