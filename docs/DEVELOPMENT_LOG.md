@@ -5,6 +5,19 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-07-13
 
+### Fix: message POST 500 — empty-string FK → NULL coercion
+- Posting a normal (non-reply) message 500'd: the unset self-referential
+  `message.reply_to_id` reached the ORM as `''` (safrs), and LogicBank's
+  parent-load ran `WHERE message.id = ''::uuid` → `invalid input syntax for type
+  uuid` → aborted transaction → every later statement echoed
+  `InFailedSqlTransaction`. The mobile/desktop clients omit the field, so this hit
+  the app too — surfaced once the write path was exercised end-to-end.
+- Fix (server-side, all clients): new `als-extensions/logic_discovery/
+  empty_fk_coercion.py` registers a SQLAlchemy `set` listener on **every nullable
+  FK column** that rewrites `''`→`None` at assignment, before flush/parent-load.
+  Auto-discovered; reinstalled by `make als-extensions`. Documented in
+  DEPLOYMENT redeploy troubleshooting.
+
 ### Smoke check + fleet-position seed (messaging + geolocation)
 - New **`scripts/smoke-check.sh`** — one-command runtime verification of the two
   subsystems: **messaging** (login → list channels → list messages → optional
