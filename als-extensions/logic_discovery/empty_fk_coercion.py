@@ -105,6 +105,8 @@ try:
     _orig_query_get = Query.get
 
     def _query_get_safe(self, ident, *args, **kwargs):
+        log.warning("FKGET ident=%r type=%s empty=%s",  # TEMP diagnostic
+                    ident, type(ident).__name__, _ident_has_empty(ident))
         if _ident_has_empty(ident):
             return None
         return _orig_query_get(self, ident, *args, **kwargs)
