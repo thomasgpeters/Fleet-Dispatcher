@@ -64,24 +64,36 @@ def _build_fk_map() -> int:
     return total
 
 
-def _scrub_empty_fks(session, flush_context, instances):
-    """Turn '' into None on nullable FK columns of pending rows, before the
-    parent-load. Runs for inserts and updates."""
+def _scrub_obj(obj) -> None:
+    keys = _FK_KEYS.get(type(obj))
+    if not keys:
+        return
+    for key in keys:
+        if getattr(obj, key, None) == "":
+            setattr(obj, key, None)
+
+
+def _on_transient_to_pending(session, instance):
+    """Fires the moment an object is added to the session — before ANY flush, so
+    it beats LogicBank's before_flush parent-load regardless of listener order.
+    This is the one that actually catches safrs's '' before it can be queried."""
+    _scrub_obj(instance)
+
+
+def _scrub_before_flush(session, flush_context, instances):
+    """Backup: scrub pending rows at flush time too (covers values set after add)."""
     for obj in list(session.new) + list(session.dirty):
-        keys = _FK_KEYS.get(type(obj))
-        if not keys:
-            continue
-        for key in keys:
-            if getattr(obj, key, None) == "":
-                setattr(obj, key, None)
+        _scrub_obj(obj)
 
 
 _count = _build_fk_map()
-# insert=True → prepend, so we run BEFORE LogicBank's before_flush parent-load.
-event.listen(Session, "before_flush", _scrub_empty_fks, insert=True)
+# Primary hook: at add()-time (before any flush) — no ordering race with LogicBank.
+event.listen(Session, "transient_to_pending", _on_transient_to_pending)
+# Backup hook: at flush, prepended ahead of other before_flush listeners.
+event.listen(Session, "before_flush", _scrub_before_flush, insert=True)
 log.info(
-    "Fleet Dispatcher: empty-FK->NULL before_flush scrub active on %d nullable FK "
-    "column(s) across %d model(s)",
+    "Fleet Dispatcher: empty-FK->NULL coercion active (transient_to_pending + "
+    "before_flush) on %d nullable FK column(s) across %d model(s)",
     _count,
     len(_FK_KEYS),
 )
