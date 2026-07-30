@@ -70,10 +70,13 @@ if [ "$DO_POST" = 1 ] && [ -n "$CHID" ]; then
   if [ -z "$AUTHOR_ID" ]; then
     bad "could not resolve author id for $SMOKE_USER (write test skipped)"
   else
-    BODY="smoke-check $(cat /proc/sys/kernel/random/uuid 2>/dev/null || echo test)"
+    MSGID=$(cat /proc/sys/kernel/random/uuid 2>/dev/null)
+    BODY="smoke-check ${MSGID:-test}"
+    # Send a client-generated id: safrs 500s a UUID-PK create with no id (existence
+    # check on ''::uuid). Mirrors the mobile/desktop clients.
     POST=$(curl -sS -m 10 -o /dev/null -w '%{http_code}' "${AUTH[@]}" -X POST "$API_BASE/Message" \
       -H 'Content-Type: application/vnd.api+json' \
-      -d "{\"data\":{\"type\":\"Message\",\"attributes\":{\"channel_id\":\"$CHID\",\"author_id\":\"$AUTHOR_ID\",\"body\":\"$BODY\"}}}" 2>/dev/null)
+      -d "{\"data\":{\"type\":\"Message\",\"id\":\"$MSGID\",\"attributes\":{\"channel_id\":\"$CHID\",\"author_id\":\"$AUTHOR_ID\",\"body\":\"$BODY\"}}}" 2>/dev/null)
     case "$POST" in
       20*) ok "posted a test message (HTTP $POST) to channel $CHID"
            note "(a 'smoke-check …' message now exists in that channel)";;

@@ -135,14 +135,28 @@ async function getCollection<T>(
  * keys as attributes, so we pass `*_id` columns directly in `attributes`. If the
  * API is configured to require JSON:API `relationships`, switch to that form.
  */
+/** A client-generated UUID (v4). Falls back to Math.random on non-secure/older
+ *  webviews where crypto.randomUUID is unavailable. */
+function newUuid(): string {
+  const c = globalThis.crypto as Crypto | undefined;
+  if (c?.randomUUID) return c.randomUUID();
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (ch) => {
+    const r = (Math.random() * 16) | 0;
+    return (ch === "x" ? r : (r & 0x3) | 0x8).toString(16);
+  });
+}
+
 async function createResource<T>(
   resource: string,
   attributes: Record<string, unknown>,
 ): Promise<T> {
+  // Send a client-generated id: with a UUID primary key and NO id, safrs runs an
+  // existence check `get('')` -> `''::uuid` -> aborts the transaction -> 500 on
+  // every create. A supplied id is valid JSON:API and also idempotency-friendly.
   const res = await fetch(`${API_BASE_URL}/${resource}`, {
     method: "POST",
     headers: authHeaders({ "Content-Type": "application/vnd.api+json" }),
-    body: JSON.stringify({ data: { type: resource, attributes } }),
+    body: JSON.stringify({ data: { type: resource, id: newUuid(), attributes } }),
   });
   if (!res.ok) {
     guard(res);
