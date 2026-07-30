@@ -3,6 +3,32 @@
 Newest first. One entry per meaningful change set; pair with the checklist in
 [`TODO.md`](TODO.md).
 
+## 2026-07-30
+
+### Fix: message POST 500 — drop the self-referential reply_to FK
+- Posting a new (non-reply) message 500'd. Root cause: `message.reply_to_id` was a
+  **self-referential FK** (`REFERENCES message(id)`), so ALS generated a `reply_to_`
+  self-relationship; on insert, safrs left the unset FK as `''` and a lazy
+  relationship load ran `SELECT … WHERE message.id = ''::uuid` →
+  `InvalidTextRepresentation` → aborted transaction → 500 (everything after echoed
+  `InFailedSqlTransaction`).
+- Chased it through every ORM hook (attribute `set`, `transient_to_pending`,
+  `before_flush`, wrapping LogicBank's `_load_parents_on_insert`/
+  `_get_parent_logic_row`, patching `Query.get`/`Session.get`/
+  `load_on_pk_identity`). The lazy loader holds a *local* reference to the loader,
+  so module-level patches couldn't reach it — whack-a-mole against SQLAlchemy
+  internals.
+- **Structural fix**: dropped the FK constraint on `reply_to_id` (kept it as a
+  plain nullable UUID column). No self-FK → ALS generates no self-relationship →
+  no empty-key lazy/parent load. Replies still work (clients resolve the quoted
+  message by id via the API). Verified on PG16 (43 tables; `reply_to_id` present,
+  0 FK constraints). `als-extensions/logic_discovery/empty_fk_coercion.py` trimmed
+  to a safe session-level `''`→`NULL` scrub for other nullable FKs (removed the
+  SQLAlchemy-internal monkeypatches).
+- **Live apply** (no reseed needed): `ALTER TABLE fleet.message DROP CONSTRAINT
+  IF EXISTS message_reply_to_id_fkey;` then regenerate ALS + `make als-extensions`
+  + restart.
+
 ## 2026-07-13
 
 ### Fix: message POST 500 — empty-string FK → NULL coercion

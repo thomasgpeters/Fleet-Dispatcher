@@ -1,34 +1,24 @@
-"""Fleet Dispatcher — neutralize empty-string primary-key lookups (auto-discovered).
+"""Fleet Dispatcher — coerce empty-string foreign keys to NULL (auto-discovered).
 
-**The bug.** Posting a normal (non-reply) Message 500'd. LogicBank, loading the
-new row's parents, ends up running `session.query(Message).get('')` for the
-self-referential `reply_to` relationship (it derives an empty `''` key even though
-`message.reply_to_id` is `None`). Postgres rejects `''::uuid`
-(`invalid input syntax for type uuid: ""`), the **transaction aborts**, and the
-write fails with a 500 — every later statement just echoes `InFailedSqlTransaction`.
+A JSON:API client that omits (or sends null for) a nullable foreign key can reach
+the ORM as an empty string `''` rather than `None` (safrs deserialization). For a
+plain FK that's harmless-ish, but for anything that then gets looked up by that
+key it becomes `... WHERE id = ''::uuid` → `invalid input syntax for type uuid` →
+the transaction aborts and the write 500s.
 
-We tried nulling the FK at every pre-flush stage (attribute `set`,
-`transient_to_pending`, `before_flush`, and wrapping LogicBank's parent-load).
-None worked: at parent-load time the FK is already `None`, and LogicBank derives
-the `''` key from its *own* role metadata, under a role name that isn't a
-SQLAlchemy relationship key — so a name-based guard can't catch it.
-
-**The fix.** Attack the actual failing call. An **empty-string identity can never
-match a UUID (or integer) primary key**, so `session.query(X).get('')` /
-`session.get(X, '')` should simply return "not found" (`None`) instead of issuing
-a doomed `''::uuid` query. We patch `Query.get` and `Session.get` to short-circuit
-empty-string identities. This is safe (no table here uses `''` as a valid PK),
-universal, and independent of how the empty key was derived.
-
-We also keep light `''`→`None` FK scrubs on the session as defense-in-depth.
+The worst offender — the self-referential `message.reply_to_id` — has been fixed
+structurally by **dropping that FK constraint** (see database/schema.sql), which
+stops ALS generating the self-relationship that triggered a lazy empty-key load.
+This module is the lightweight, defense-in-depth complement: it normalizes `''` →
+`None` on **nullable FK columns** of pending rows via ordinary SQLAlchemy session
+events (no patching of SQLAlchemy internals), so a stray empty FK from any client
+is stored as a proper NULL.
 
 Auto-discovered by ApiLogicServer (module under `logic/logic_discovery/`);
-patches apply at import. Reinstalled after a regen via `make als-extensions`.
-See docs/DEPLOYMENT.md (redeploy troubleshooting).
+listeners register at import. Reinstalled after a regen via `make als-extensions`.
 
-NOTE (SQLAlchemy version-sensitive): patches `sqlalchemy.orm.Query.get` and
-`sqlalchemy.orm.Session.get`; guarded with try/except so a signature change
-no-ops with a warning rather than breaking startup.
+NOTE (SQLAlchemy version-sensitive): uses `sqlalchemy.inspect(cls)` +
+`mapper.column_attrs`; adjust if your generated models differ.
 """
 
 from __future__ import annotations
@@ -38,13 +28,13 @@ import logging
 
 from sqlalchemy import event
 from sqlalchemy import inspect as _sa_inspect
-from sqlalchemy.orm import Query, Session
+from sqlalchemy.orm import Session
 
 from database import models
 
 log = logging.getLogger(__name__)
 
-# class -> [nullable FK column keys], for the defense-in-depth scrubs.
+# class -> [nullable FK column attribute keys], computed once at import.
 _FK_KEYS: dict[type, list[str]] = {}
 
 
@@ -80,86 +70,17 @@ def _scrub_before_flush(session, flush_context, instances):
         _scrub_obj(obj)
 
 
-def _ident_has_empty(ident) -> bool:
-    """True if a primary-key identity is (or contains) an empty string."""
-    if ident == "":
-        return True
-    if isinstance(ident, (tuple, list)):
-        return any(x == "" for x in ident)
-    if isinstance(ident, dict):
-        return any(v == "" for v in ident.values())
-    return False
-
-
 _count = _build_fk_map()
-
-# Defense-in-depth: scrub '' -> None on nullable FK columns of pending rows.
 event.listen(Session, "transient_to_pending", _on_transient_to_pending)
 event.listen(Session, "before_flush", _scrub_before_flush, insert=True)
-
-# THE fix: an empty-string primary key can't match a UUID/int PK — return None
-# ("not found") instead of issuing `... WHERE id = ''::uuid`, which errors and
-# aborts the transaction. Every lookup path — Query.get, Session.get, AND lazy
-# relationship loads (e.g. touching message.reply_to_ when reply_to_id is empty)
-# — funnels through loading.load_on_pk_identity, so patching THAT catches them
-# all. (Query.get/Session.get alone missed the lazy-load path.)
-_patched = []
-try:
-    from sqlalchemy.orm import loading as _loading
-
-    _orig_load_on_pk = _loading.load_on_pk_identity
-
-    def _load_on_pk_safe(session, statement, primary_key_identity, *args, **kwargs):
-        try:
-            if primary_key_identity is not None and any(
-                v == "" for v in primary_key_identity
-            ):
-                return None  # empty PK -> no such row (skip the ''::uuid query)
-        except TypeError:
-            pass  # non-iterable identity; fall through
-        return _orig_load_on_pk(session, statement, primary_key_identity,
-                                *args, **kwargs)
-
-    _loading.load_on_pk_identity = _load_on_pk_safe
-    _patched.append("load_on_pk_identity")
-except Exception as exc:  # pragma: no cover - defensive
-    log.warning("empty-FK: could not patch loading.load_on_pk_identity: %s", exc)
-
-# Belt-and-suspenders: also short-circuit the public .get() entry points.
-try:
-    _orig_query_get = Query.get
-
-    def _query_get_safe(self, ident, *args, **kwargs):
-        if _ident_has_empty(ident):
-            return None
-        return _orig_query_get(self, ident, *args, **kwargs)
-
-    Query.get = _query_get_safe
-    _patched.append("Query.get")
-except Exception as exc:  # pragma: no cover - defensive
-    log.warning("empty-FK: could not patch Query.get: %s", exc)
-
-try:
-    _orig_session_get = Session.get
-
-    def _session_get_safe(self, entity, ident, *args, **kwargs):
-        if _ident_has_empty(ident):
-            return None
-        return _orig_session_get(self, entity, ident, *args, **kwargs)
-
-    Session.get = _session_get_safe
-    _patched.append("Session.get")
-except Exception as exc:  # pragma: no cover - defensive
-    log.warning("empty-FK: could not patch Session.get: %s", exc)
-
 log.info(
-    "Fleet Dispatcher: empty-PK lookups neutralized (%s); FK scrubs on %d column(s)",
-    ", ".join(_patched) or "none",
+    "Fleet Dispatcher: nullable-FK ''->NULL scrub active on %d column(s) across "
+    "%d model(s)",
     _count,
+    len(_FK_KEYS),
 )
 
 
 def declare_logic() -> None:
-    """ALS calls this on startup. The patches above do the work; nothing to
-    register with LogicBank here."""
+    """ALS calls this on startup; the session listeners above do the work."""
     return None
