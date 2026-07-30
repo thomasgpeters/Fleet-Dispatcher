@@ -87,15 +87,43 @@ def _scrub_before_flush(session, flush_context, instances):
 
 
 _count = _build_fk_map()
-# Primary hook: at add()-time (before any flush) — no ordering race with LogicBank.
+# Session-level hooks (belt-and-suspenders; lost the ordering race on their own).
 event.listen(Session, "transient_to_pending", _on_transient_to_pending)
-# Backup hook: at flush, prepended ahead of other before_flush listeners.
 event.listen(Session, "before_flush", _scrub_before_flush, insert=True)
+
+# THE fix: wrap LogicBank's own parent-loader so empty-string FKs on the row are
+# nulled *immediately before* it loads parents — guaranteed timing, inside
+# LogicBank, so it can't lose a listener-order race. safrs materializes the '' at
+# flush time (after every pre-flush hook), so this is the only point that reliably
+# sees it before `session.query(Parent).get('')` runs and blows up the transaction.
+# NOTE (LogicBank version-sensitive): patches
+# logic_bank.exec_row_logic.logic_row.LogicRow._load_parents_on_insert — if that
+# private name changes, this no-ops with a warning (guarded) and the write still
+# fails; revisit against the new LogicBank.
+_patched = False
+try:
+    from logic_bank.exec_row_logic.logic_row import LogicRow
+
+    _orig_load_parents = LogicRow._load_parents_on_insert
+
+    def _load_parents_scrubbed(self, *args, **kwargs):
+        row = self.row
+        for key in _FK_KEYS.get(type(row), ()):
+            if getattr(row, key, None) == "":
+                setattr(row, key, None)
+        return _orig_load_parents(self, *args, **kwargs)
+
+    LogicRow._load_parents_on_insert = _load_parents_scrubbed
+    _patched = True
+except Exception as exc:  # pragma: no cover - defensive
+    log.warning("empty-FK: could not wrap LogicRow._load_parents_on_insert: %s", exc)
+
 log.info(
-    "Fleet Dispatcher: empty-FK->NULL coercion active (transient_to_pending + "
-    "before_flush) on %d nullable FK column(s) across %d model(s)",
+    "Fleet Dispatcher: empty-FK->NULL coercion active on %d nullable FK column(s) "
+    "across %d model(s) (LogicBank parent-load wrapped=%s)",
     _count,
     len(_FK_KEYS),
+    _patched,
 )
 
 
