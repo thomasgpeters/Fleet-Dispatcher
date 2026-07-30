@@ -1,30 +1,34 @@
-"""Fleet Dispatcher — coerce empty-string foreign keys to NULL (auto-discovered).
+"""Fleet Dispatcher — neutralize empty-string primary-key lookups (auto-discovered).
 
-**Why this exists.** A JSON:API client that omits (or sends `null` for) a nullable
-foreign key can reach the ORM as an empty string `''` rather than `None` (safrs
-deserialization). LogicBank then loads that parent with `SELECT … WHERE id = ''`,
-Postgres rejects `''::uuid` (`invalid input syntax for type uuid: ""`), the
-**transaction aborts**, and the write 500s — every later statement just echoes
-`InFailedSqlTransaction`.
+**The bug.** Posting a normal (non-reply) Message 500'd. LogicBank, loading the
+new row's parents, ends up running `session.query(Message).get('')` for the
+self-referential `reply_to` relationship (it derives an empty `''` key even though
+`message.reply_to_id` is `None`). Postgres rejects `''::uuid`
+(`invalid input syntax for type uuid: ""`), the **transaction aborts**, and the
+write fails with a 500 — every later statement just echoes `InFailedSqlTransaction`.
 
-The first place it bites is posting a normal (non-reply) **Message**:
-`message.reply_to_id` is a *self-referential* FK, so LogicBank loads a `message`
-parent with an empty key before the row is inserted.
+We tried nulling the FK at every pre-flush stage (attribute `set`,
+`transient_to_pending`, `before_flush`, and wrapping LogicBank's parent-load).
+None worked: at parent-load time the FK is already `None`, and LogicBank derives
+the `''` key from its *own* role metadata, under a role name that isn't a
+SQLAlchemy relationship key — so a name-based guard can't catch it.
 
-**The fix.** A SQLAlchemy `before_flush` listener scrubs `''` → `None` on every
-nullable FK column of the pending (new/dirty) rows. Registered with `insert=True`
-so it runs **ahead of** LogicBank's own `before_flush` (which does the
-parent-load), and it reads the row's actual state at flush time — so it works no
-matter how safrs set the value (an attribute-`set` hook did NOT catch it, which
-is why this uses before_flush instead).
+**The fix.** Attack the actual failing call. An **empty-string identity can never
+match a UUID (or integer) primary key**, so `session.query(X).get('')` /
+`session.get(X, '')` should simply return "not found" (`None`) instead of issuing
+a doomed `''::uuid` query. We patch `Query.get` and `Session.get` to short-circuit
+empty-string identities. This is safe (no table here uses `''` as a valid PK),
+universal, and independent of how the empty key was derived.
+
+We also keep light `''`→`None` FK scrubs on the session as defense-in-depth.
 
 Auto-discovered by ApiLogicServer (module under `logic/logic_discovery/`);
-listeners register at import. Reinstalled after a regen via `make als-extensions`.
+patches apply at import. Reinstalled after a regen via `make als-extensions`.
 See docs/DEPLOYMENT.md (redeploy troubleshooting).
 
-NOTE (ALS/SQLAlchemy version-sensitive): uses `sqlalchemy.inspect(cls)` +
-`mapper.column_attrs` and a class-level `Session` before_flush with `insert=True`;
-if your generated models/session differ, adjust.
+NOTE (SQLAlchemy version-sensitive): patches `sqlalchemy.orm.Query.get` and
+`sqlalchemy.orm.Session.get`; guarded with try/except so a signature change
+no-ops with a warning rather than breaking startup.
 """
 
 from __future__ import annotations
@@ -34,13 +38,13 @@ import logging
 
 from sqlalchemy import event
 from sqlalchemy import inspect as _sa_inspect
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Query, Session
 
 from database import models
 
 log = logging.getLogger(__name__)
 
-# class -> [nullable FK column attribute keys], computed once at import.
+# class -> [nullable FK column keys], for the defense-in-depth scrubs.
 _FK_KEYS: dict[type, list[str]] = {}
 
 
@@ -50,14 +54,11 @@ def _build_fk_map() -> int:
         try:
             mapper = _sa_inspect(cls)
         except Exception:
-            continue  # not a mapped class
+            continue
         if not hasattr(mapper, "column_attrs"):
             continue
-        keys: list[str] = []
-        for col_attr in mapper.column_attrs:
-            col = col_attr.columns[0]
-            if col.foreign_keys and col.nullable:
-                keys.append(col_attr.key)
+        keys = [ca.key for ca in mapper.column_attrs
+                if ca.columns[0].foreign_keys and ca.columns[0].nullable]
         if keys:
             _FK_KEYS[cls] = keys
             total += len(keys)
@@ -65,103 +66,75 @@ def _build_fk_map() -> int:
 
 
 def _scrub_obj(obj) -> None:
-    keys = _FK_KEYS.get(type(obj))
-    if not keys:
-        return
-    for key in keys:
+    for key in _FK_KEYS.get(type(obj), ()):
         if getattr(obj, key, None) == "":
             setattr(obj, key, None)
 
 
 def _on_transient_to_pending(session, instance):
-    """Fires the moment an object is added to the session — before ANY flush, so
-    it beats LogicBank's before_flush parent-load regardless of listener order.
-    This is the one that actually catches safrs's '' before it can be queried."""
     _scrub_obj(instance)
 
 
 def _scrub_before_flush(session, flush_context, instances):
-    """Backup: scrub pending rows at flush time too (covers values set after add)."""
     for obj in list(session.new) + list(session.dirty):
         _scrub_obj(obj)
 
 
+def _ident_has_empty(ident) -> bool:
+    """True if a primary-key identity is (or contains) an empty string."""
+    if ident == "":
+        return True
+    if isinstance(ident, (tuple, list)):
+        return any(x == "" for x in ident)
+    if isinstance(ident, dict):
+        return any(v == "" for v in ident.values())
+    return False
+
+
 _count = _build_fk_map()
-# Session-level hooks (belt-and-suspenders; lost the ordering race on their own).
+
+# Defense-in-depth: scrub '' -> None on nullable FK columns of pending rows.
 event.listen(Session, "transient_to_pending", _on_transient_to_pending)
 event.listen(Session, "before_flush", _scrub_before_flush, insert=True)
 
-# THE fix: wrap LogicBank's own parent-loader so empty-string FKs on the row are
-# nulled *immediately before* it loads parents — guaranteed timing, inside
-# LogicBank, so it can't lose a listener-order race. safrs materializes the '' at
-# flush time (after every pre-flush hook), so this is the only point that reliably
-# sees it before `session.query(Parent).get('')` runs and blows up the transaction.
-# NOTE (LogicBank version-sensitive): patches
-# logic_bank.exec_row_logic.logic_row.LogicRow._load_parents_on_insert — if that
-# private name changes, this no-ops with a warning (guarded) and the write still
-# fails; revisit against the new LogicBank.
-_patched_load = False
-_patched_getparent = False
+# THE fix: an empty-string identity can't match a UUID/int PK — return None
+# ("not found") instead of issuing `... WHERE id = ''::uuid`, which errors and
+# aborts the transaction.
+_patched = []
 try:
-    from logic_bank.exec_row_logic.logic_row import LogicRow
+    _orig_query_get = Query.get
 
-    # (1) Scrub any literal '' FK on the row right before the parent-load.
-    _orig_load_parents = LogicRow._load_parents_on_insert
+    def _query_get_safe(self, ident, *args, **kwargs):
+        if _ident_has_empty(ident):
+            return None
+        return _orig_query_get(self, ident, *args, **kwargs)
 
-    def _load_parents_scrubbed(self, *args, **kwargs):
-        row = self.row
-        if type(row).__name__ == "Message":  # TEMP diagnostic
-            log.warning("FKDIAG load_parents Message reply_to_id=%r topic_id=%r",
-                        getattr(row, "reply_to_id", "?"), getattr(row, "topic_id", "?"))
-        for key in _FK_KEYS.get(type(row), ()):
-            if getattr(row, key, None) == "":
-                setattr(row, key, None)
-        return _orig_load_parents(self, *args, **kwargs)
-
-    LogicRow._load_parents_on_insert = _load_parents_scrubbed
-    _patched_load = True
-
-    # (2) The real fix: skip loading a parent whose FK is null/empty. A null FK
-    #     has no parent, so there is nothing to load — this prevents LogicBank
-    #     from running `session.query(Parent).get('')` (which errors on ''::uuid
-    #     and aborts the txn) for a self-referential relationship like
-    #     message.reply_to (derived as '' even when reply_to_id is None).
-    _orig_get_parent = LogicRow._get_parent_logic_row
-
-    def _get_parent_guarded(self, parent_role_name, *args, **kwargs):
-        try:
-            # NB: mapper.relationships is an ImmutableProperties — it has no
-            # .get(); use `in` / [] (that mistake made the guard a silent no-op).
-            rels = _sa_inspect(type(self.row)).relationships
-            if parent_role_name in rels:
-                rel = rels[parent_role_name]
-                vals = [getattr(self.row, c.key, None) for c in rel.local_columns]
-                if type(self.row).__name__ == "Message":  # TEMP diagnostic
-                    log.warning("FKDIAG get_parent role=%r vals=%r", parent_role_name, vals)
-                # A null/empty local FK means there is no parent to load, so skip
-                # the query entirely (prevents session.query(P).get('')).
-                if all(v in (None, "") for v in vals):
-                    return None
-        except Exception:
-            pass  # fall through to original on any introspection hiccup
-        return _orig_get_parent(self, parent_role_name, *args, **kwargs)
-
-    LogicRow._get_parent_logic_row = _get_parent_guarded
-    _patched_getparent = True
+    Query.get = _query_get_safe
+    _patched.append("Query.get")
 except Exception as exc:  # pragma: no cover - defensive
-    log.warning("empty-FK: could not wrap LogicRow parent-load methods: %s", exc)
+    log.warning("empty-FK: could not patch Query.get: %s", exc)
+
+try:
+    _orig_session_get = Session.get
+
+    def _session_get_safe(self, entity, ident, *args, **kwargs):
+        if _ident_has_empty(ident):
+            return None
+        return _orig_session_get(self, entity, ident, *args, **kwargs)
+
+    Session.get = _session_get_safe
+    _patched.append("Session.get")
+except Exception as exc:  # pragma: no cover - defensive
+    log.warning("empty-FK: could not patch Session.get: %s", exc)
 
 log.info(
-    "Fleet Dispatcher: empty-FK->NULL coercion active on %d nullable FK column(s) "
-    "across %d model(s) (load_parents_wrapped=%s, get_parent_guarded=%s)",
+    "Fleet Dispatcher: empty-PK lookups neutralized (%s); FK scrubs on %d column(s)",
+    ", ".join(_patched) or "none",
     _count,
-    len(_FK_KEYS),
-    _patched_load,
-    _patched_getparent,
 )
 
 
 def declare_logic() -> None:
-    """ALS calls this on startup. The SQLAlchemy before_flush listener above does
-    the work, so there is nothing to register with LogicBank here."""
+    """ALS calls this on startup. The patches above do the work; nothing to
+    register with LogicBank here."""
     return None
