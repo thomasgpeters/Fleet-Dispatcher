@@ -97,16 +97,39 @@ _count = _build_fk_map()
 event.listen(Session, "transient_to_pending", _on_transient_to_pending)
 event.listen(Session, "before_flush", _scrub_before_flush, insert=True)
 
-# THE fix: an empty-string identity can't match a UUID/int PK — return None
+# THE fix: an empty-string primary key can't match a UUID/int PK — return None
 # ("not found") instead of issuing `... WHERE id = ''::uuid`, which errors and
-# aborts the transaction.
+# aborts the transaction. Every lookup path — Query.get, Session.get, AND lazy
+# relationship loads (e.g. touching message.reply_to_ when reply_to_id is empty)
+# — funnels through loading.load_on_pk_identity, so patching THAT catches them
+# all. (Query.get/Session.get alone missed the lazy-load path.)
 _patched = []
+try:
+    from sqlalchemy.orm import loading as _loading
+
+    _orig_load_on_pk = _loading.load_on_pk_identity
+
+    def _load_on_pk_safe(session, statement, primary_key_identity, *args, **kwargs):
+        try:
+            if primary_key_identity is not None and any(
+                v == "" for v in primary_key_identity
+            ):
+                return None  # empty PK -> no such row (skip the ''::uuid query)
+        except TypeError:
+            pass  # non-iterable identity; fall through
+        return _orig_load_on_pk(session, statement, primary_key_identity,
+                                *args, **kwargs)
+
+    _loading.load_on_pk_identity = _load_on_pk_safe
+    _patched.append("load_on_pk_identity")
+except Exception as exc:  # pragma: no cover - defensive
+    log.warning("empty-FK: could not patch loading.load_on_pk_identity: %s", exc)
+
+# Belt-and-suspenders: also short-circuit the public .get() entry points.
 try:
     _orig_query_get = Query.get
 
     def _query_get_safe(self, ident, *args, **kwargs):
-        log.warning("FKGET ident=%r type=%s empty=%s",  # TEMP diagnostic
-                    ident, type(ident).__name__, _ident_has_empty(ident))
         if _ident_has_empty(ident):
             return None
         return _orig_query_get(self, ident, *args, **kwargs)
