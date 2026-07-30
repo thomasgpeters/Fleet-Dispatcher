@@ -336,12 +336,12 @@ CREATE TABLE message (
     topic_id    UUID REFERENCES channel_topic(id) ON DELETE SET NULL,
     author_id   UUID NOT NULL REFERENCES app_user(id),
     -- Threaded replies: the id of the message being replied to (NULL = top-level).
-    -- Deliberately NOT a FK to message(id): a self-referential FK makes ALS
-    -- generate a `reply_to_` self-relationship, and on insert LogicBank/SQLAlchemy
-    -- lazy-load a parent with an empty key ('' -> ''::uuid) which aborts the
-    -- transaction and 500s every new-message POST. Clients resolve the quoted
-    -- message by id via the API, so the FK constraint isn't needed. See
-    -- docs/DEPLOYMENT.md (redeploy troubleshooting) + DEVELOPMENT_LOG 2026-07-30.
+    -- Kept as a plain UUID (no self-FK to message(id)): clients resolve the quoted
+    -- message by id via the API, and dropping the self-relationship keeps ALS's
+    -- generated model simpler. (This was NOT the cause of the historic new-message
+    -- 500 — that was safrs doing an existence check on an empty UUID id when a
+    -- client omitted `data.id`; fixed by clients sending a generated id. See
+    -- DEVELOPMENT_LOG 2026-07-30.)
     reply_to_id UUID,
     body        TEXT NOT NULL DEFAULT '',  -- may be empty when attachment-only
     posted_at   TIMESTAMPTZ NOT NULL DEFAULT now(),

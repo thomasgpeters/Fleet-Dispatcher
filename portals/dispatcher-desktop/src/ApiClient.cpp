@@ -2,10 +2,12 @@
 
 #include <cctype>
 #include <chrono>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <ctime>
 #include <memory>
+#include <random>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -180,10 +182,40 @@ std::string jsonEscape(const std::string& s) {
 }
 
 // POST a JSON:API body and deliver the parsed "data" object to `onObj`.
+// A client-generated v4 UUID. safrs POST needs a client-supplied id: a UUID
+// primary key with no id triggers an existence check on '' (''::uuid) that
+// aborts the transaction and 500s every create. See docs/DEVELOPMENT_LOG.
+std::string newUuid() {
+    static thread_local std::mt19937_64 rng(std::random_device{}());
+    std::uniform_int_distribution<std::uint64_t> dist;
+    std::uint64_t a = dist(rng), b = dist(rng);
+    a = (a & 0xffffffffffff0fffULL) | 0x0000000000004000ULL;  // version 4
+    b = (b & 0x3fffffffffffffffULL) | 0x8000000000000000ULL;  // variant 1
+    char buf[37];
+    std::snprintf(buf, sizeof(buf), "%08x-%04x-%04x-%04x-%012llx",
+                  static_cast<unsigned>(a >> 32),
+                  static_cast<unsigned>((a >> 16) & 0xffff),
+                  static_cast<unsigned>(a & 0xffff),
+                  static_cast<unsigned>(b >> 48),
+                  static_cast<unsigned long long>(b & 0xffffffffffffULL));
+    return buf;
+}
+
 void postJson(const std::string& url, const std::string& body,
               const std::string& bearer,
               std::function<void(const Wt::Json::Object&)> onObj,
               ApiClient::ErrorCallback onErr) {
+    // Inject a client-generated id into JSON:API create bodies that don't carry
+    // one (safrs needs it for UUID PKs — see newUuid()). Bodies that already set
+    // an "id" (e.g. repin) are left untouched.
+    std::string finalBody = body;
+    if (body.find("\"id\":") == std::string::npos) {
+        const auto pos = body.find("\"attributes\"");
+        if (pos != std::string::npos) {
+            finalBody = body.substr(0, pos) + "\"id\":\"" + newUuid() + "\"," +
+                        body.substr(pos);
+        }
+    }
     auto client = std::make_shared<Wt::Http::Client>();
     client->setTimeout(std::chrono::seconds(15));
     client->done().connect(
@@ -211,7 +243,7 @@ void postJson(const std::string& url, const std::string& body,
     msg.addHeader("Content-Type", "application/vnd.api+json");
     msg.addHeader("Accept", "application/vnd.api+json");
     if (!bearer.empty()) msg.addHeader("Authorization", "Bearer " + bearer);
-    msg.addBodyText(body);
+    msg.addBodyText(finalBody);
     if (!client->post(url, msg)) onErr("could not start POST to " + url);
 }
 
