@@ -100,10 +100,12 @@ event.listen(Session, "before_flush", _scrub_before_flush, insert=True)
 # logic_bank.exec_row_logic.logic_row.LogicRow._load_parents_on_insert — if that
 # private name changes, this no-ops with a warning (guarded) and the write still
 # fails; revisit against the new LogicBank.
-_patched = False
+_patched_load = False
+_patched_getparent = False
 try:
     from logic_bank.exec_row_logic.logic_row import LogicRow
 
+    # (1) Scrub any literal '' FK on the row right before the parent-load.
     _orig_load_parents = LogicRow._load_parents_on_insert
 
     def _load_parents_scrubbed(self, *args, **kwargs):
@@ -114,16 +116,38 @@ try:
         return _orig_load_parents(self, *args, **kwargs)
 
     LogicRow._load_parents_on_insert = _load_parents_scrubbed
-    _patched = True
+    _patched_load = True
+
+    # (2) The real fix: skip loading a parent whose FK is null/empty. A null FK
+    #     has no parent, so there is nothing to load — this prevents LogicBank
+    #     from running `session.query(Parent).get('')` (which errors on ''::uuid
+    #     and aborts the txn) for a self-referential relationship like
+    #     message.reply_to (derived as '' even when reply_to_id is None).
+    _orig_get_parent = LogicRow._get_parent_logic_row
+
+    def _get_parent_guarded(self, parent_role_name, *args, **kwargs):
+        try:
+            rel = _sa_inspect(type(self.row)).relationships.get(parent_role_name)
+            if rel is not None:
+                for col in rel.local_columns:
+                    if getattr(self.row, col.key, None) in (None, ""):
+                        return None  # null/empty FK -> no parent to load
+        except Exception:
+            pass  # fall through to original on any introspection hiccup
+        return _orig_get_parent(self, parent_role_name, *args, **kwargs)
+
+    LogicRow._get_parent_logic_row = _get_parent_guarded
+    _patched_getparent = True
 except Exception as exc:  # pragma: no cover - defensive
-    log.warning("empty-FK: could not wrap LogicRow._load_parents_on_insert: %s", exc)
+    log.warning("empty-FK: could not wrap LogicRow parent-load methods: %s", exc)
 
 log.info(
     "Fleet Dispatcher: empty-FK->NULL coercion active on %d nullable FK column(s) "
-    "across %d model(s) (LogicBank parent-load wrapped=%s)",
+    "across %d model(s) (load_parents_wrapped=%s, get_parent_guarded=%s)",
     _count,
     len(_FK_KEYS),
-    _patched,
+    _patched_load,
+    _patched_getparent,
 )
 
 
