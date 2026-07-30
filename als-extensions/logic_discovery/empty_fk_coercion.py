@@ -110,6 +110,9 @@ try:
 
     def _load_parents_scrubbed(self, *args, **kwargs):
         row = self.row
+        if type(row).__name__ == "Message":  # TEMP diagnostic
+            log.warning("FKDIAG load_parents Message reply_to_id=%r topic_id=%r",
+                        getattr(row, "reply_to_id", "?"), getattr(row, "topic_id", "?"))
         for key in _FK_KEYS.get(type(row), ()):
             if getattr(row, key, None) == "":
                 setattr(row, key, None)
@@ -132,10 +135,12 @@ try:
             rels = _sa_inspect(type(self.row)).relationships
             if parent_role_name in rels:
                 rel = rels[parent_role_name]
+                vals = [getattr(self.row, c.key, None) for c in rel.local_columns]
+                if type(self.row).__name__ == "Message":  # TEMP diagnostic
+                    log.warning("FKDIAG get_parent role=%r vals=%r", parent_role_name, vals)
                 # A null/empty local FK means there is no parent to load, so skip
                 # the query entirely (prevents session.query(P).get('')).
-                if all(getattr(self.row, c.key, None) in (None, "")
-                       for c in rel.local_columns):
+                if all(v in (None, "") for v in vals):
                     return None
         except Exception:
             pass  # fall through to original on any introspection hiccup
