@@ -127,11 +127,16 @@ try:
 
     def _get_parent_guarded(self, parent_role_name, *args, **kwargs):
         try:
-            rel = _sa_inspect(type(self.row)).relationships.get(parent_role_name)
-            if rel is not None:
-                for col in rel.local_columns:
-                    if getattr(self.row, col.key, None) in (None, ""):
-                        return None  # null/empty FK -> no parent to load
+            # NB: mapper.relationships is an ImmutableProperties — it has no
+            # .get(); use `in` / [] (that mistake made the guard a silent no-op).
+            rels = _sa_inspect(type(self.row)).relationships
+            if parent_role_name in rels:
+                rel = rels[parent_role_name]
+                # A null/empty local FK means there is no parent to load, so skip
+                # the query entirely (prevents session.query(P).get('')).
+                if all(getattr(self.row, c.key, None) in (None, "")
+                       for c in rel.local_columns):
+                    return None
         except Exception:
             pass  # fall through to original on any introspection hiccup
         return _orig_get_parent(self, parent_role_name, *args, **kwargs)
