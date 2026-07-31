@@ -482,3 +482,110 @@ finish RMA Stages 2-3 first and start integration after. Explicit call
 from the Fleet + Smitty owners on which slot.
 
 ---
+
+# Fleet response v1
+
+**Date:** 2026-07-31 · **Owner:** Fleet Dispatcher team ·
+**Status:** proposal, answers Smitty response v1
+
+Smitty's v1 is accepted almost wholesale. The one place we diverge is C.2
+("byte-identical DDL"); the rest we adopt. Below are Fleet's positions and the
+one model change Fleet is making on its side to align with Smitty's per-asset
+vehicle model.
+
+## F.1 Granularity — Fleet moves to per-asset vehicles (agrees with Q1)
+
+Decision: **each physical asset — a power unit (tractor) OR a trailer — is its
+own Fleet entity with its own VIN.** This matches Smitty's one-VIN-per-vehicle
+model exactly, so the canonical `vehicle` is 1:1 across both systems by VIN.
+
+This replaces Fleet's current `equipment` row (which bundled a power unit +
+trailer as one unit). The rig-bundling idea is still valuable — Fleet keeps it,
+but as a **separate, time-effective association**, not the vehicle identity:
+
+- **`vehicle`** — the per-asset entity (tractor or trailer), VIN-keyed. This is
+  the canonical thing that syncs with Smitty.
+- **`rig_bundle`** — a **temporal combination**: which power unit + trailer +
+  **driver(s)** are working together, with `effective_from` / `effective_to`.
+  Supports **teams** (2+ drivers on one bundle). Full history: "who and what
+  was combined at any point in time" is a query against the effective window.
+
+Only `vehicle` crosses the integration boundary (VIN). `rig_bundle` is a
+**Fleet-internal dispatch concept** — Smitty services individual assets and
+doesn't need the bundle. This cleanly separates the shared canonical (vehicle)
+from Fleet's operational grouping (bundle).
+
+## F.2 Specs are typed per asset type (not one JSONB shape)
+
+Tractor specs and trailer specs are genuinely different domains (engine /
+horsepower / sleeper vs deck length / weight capacity / ramps / duals). Fleet
+keeps them as **typed, per-type value objects** — `tractor_spec` and
+`trailer_spec`, each 1:1 with `vehicle` by `asset_type`. This is a Fleet golden
+rule (typed columns + real FKs, not JSON blobs).
+
+For the Smitty sync, Fleet **serializes the relevant typed specs into the shared
+`specs` JSON on publish** — so Smitty still receives `specs` per C.2's column,
+but Fleet doesn't store a JSONB blob natively. Serialize on the wire, typed at
+rest.
+
+## F.3 On C.2 "byte-identical DDL" — counter-proposal
+
+We can't take C.2 literally: Fleet's conventions are **UUID primary keys + real
+FK relationships + typed spec columns**, while Smitty's shared tables use
+`SMALLINT` PKs, `specs JSONB`, and no FKs. A `SMALLINT vehicle_id` can't
+reference Fleet's `vehicle(id) UUID`, so identical DDL breaks Fleet's model.
+
+Proposed contract (already how VIN correlation is designed to work): **shared
+field set + semantics + VIN as the correlation key; each side keeps its native
+PK type and its own local FKs.** The sync **replicates by VIN**, not by identical
+row images. Concretely:
+- Fleet `vehicle`: `id UUID`, `smitty_vehicle_id SMALLINT` (correlation), `vin`.
+- Smitty `vehicles`: `vehicle_id SMALLINT`, `fleet_equipment_id`→(now
+  `fleet_vehicle_id`), `vin`.
+- The **columns and their meaning** are identical; the **PK type is native** to
+  each app.
+
+For the Smitty-owned tables Fleet consumes (`MaintenanceSchedule`,
+`VehicleOutOfService`, `Job`), Fleet reads them **via `/api/*` (pull)** and either
+mirrors into Fleet-native tables keyed by UUID+VIN, or just caches — no need for
+Fleet to hold `SMALLINT`-keyed mirror tables. Divergence is still a bug; we just
+correlate on VIN + field semantics instead of demanding identical PKs.
+
+## F.4 Accepted from Smitty v1 (no change needed)
+
+- **C.1 additive-only** migrations — yes.
+- **C.3 Fleet holds the toggle** — yes; Fleet owns the integration on/off and
+  Smitty degrades gracefully when Fleet is silent.
+- **Q2 both intervals, whichever first** — yes.
+- **Q3 JSON:API pull for Phase 1–3, Kafka at Phase 5** — yes. Fleet builds a
+  scheduled poller now; our existing Kafka producer slots in at Phase 5 (Fleet
+  can also emit `vehicle.v1` for Smitty's optional consumer then).
+- **Q4 Smitty publishes cost via `/api/Job`; Fleet computes valuation** — yes.
+- **Q5 correlation `vin → (customer_id, license_plate) → unit_number`; Fleet wins
+  VIN conflicts** — yes.
+- **Q6 resource-name mapping** — Fleet's consumer maps `WorkOrder → /api/Job`,
+  and calls `/api/Vehicle`, `/api/MaintenanceSchedule`, `/api/VehicleOutOfService`.
+  **Auth: shared `X-Service-Token`** (`SMITTY_SERVICE_TOKEN` env, LAN-only, kept
+  out of git, rotated). Fleet adds send + verify middleware on its ALS. JWT is a
+  Phase 5 conversation.
+
+## F.5 Fleet-side migration scope (heads-up, not blocking Smitty)
+
+Per-asset vehicles + temporal bundle is a **significant internal refactor** of
+Fleet's fleet aggregate — `equipment` (rig) → `vehicle` (asset) + `rig_bundle`
+(temporal combination). It touches `load`, `trip`, `position_report`,
+`driver_equipment`, the seed data, the desktop board/fleet views, and mobile.
+It does **not** block the integration contract above (the shared surface is
+`vehicle` by VIN + reading Smitty's `/api/Job` etc.), but it is the larger piece
+of Fleet-side work and will be phased (see Fleet `docs/TODO.md`).
+
+## F.6 Open item back to Smitty
+
+- Smitty's `vehicles.fleet_equipment_id` should become **`fleet_vehicle_id`**
+  (Fleet now keys the canonical asset as `vehicle`, not `equipment`). Same
+  correlation, renamed target. Additive per C.1.
+
+## Sequencing (R.6)
+
+**[Fleet owner to confirm]** — integration ahead of Smitty's RMA work, or after.
+Not yet decided.
