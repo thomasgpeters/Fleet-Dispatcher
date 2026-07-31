@@ -97,10 +97,27 @@ def _upsert(resource: str, correlation_attr: str, correlation_val: str,
 
 # --- sync passes ------------------------------------------------------------
 
+def _job_at_cost(job_id: str) -> float:
+    """At-cost total for a Smitty Job, summed from the LINE-level at-cost columns
+    Smitty exposes (job_parts.unit_cost x qty + job_labor_items.hourly_cost x
+    hours). Retail/markup (job_total, parts_total, labor_total) is NEVER read.
+    Quantities/hours are service facts and cross the boundary. TODO: confirm the
+    exact JobPart/JobLaborItem field + filter names against Smitty's v2 shapes."""
+    total = 0.0
+    for p in _smitty_get(f"JobPart?filter[job_id]={job_id}"):
+        a = p.get("attributes", {})
+        total += (a.get("unit_cost") or 0) * (a.get("quantity") or 0)
+    for l in _smitty_get(f"JobLaborItem?filter[job_id]={job_id}"):
+        a = l.get("attributes", {})
+        total += (a.get("hourly_cost") or 0) * (a.get("hours") or 0)
+    return round(total, 2)
+
+
 def sync_service_records() -> int:
-    """Smitty Job -> Fleet service_record. AT-COST ONLY: read the at-cost figure,
-    never the retail/markup fields. LogicBank Rule.copy snapshots the responsible
-    party from the vehicle on insert."""
+    """Smitty Job -> Fleet service_record. AT-COST ONLY: the at-cost figure is
+    summed from the line-level unit_cost/hourly_cost (Smitty response v2); the
+    retail/markup totals are never read. LogicBank Rule.copy snapshots the
+    responsible party from the vehicle on insert."""
     n = 0
     for job in _smitty_get("Job"):
         a = job.get("attributes", {})
@@ -117,8 +134,8 @@ def sync_service_records() -> int:
             "opened_at": a.get("opened_at"),
             "closed_at": a.get("closed_at"),
             "odometer_at_service": a.get("odometer_at_service"),
-            # AT-COST ONLY — do NOT map total_cost / job_total / any retail/markup.
-            "at_cost_amount": a.get("at_cost_total"),  # TODO: confirm at-cost field name
+            # AT-COST ONLY — summed from lines; do NOT read job_total/parts_total/etc.
+            "at_cost_amount": _job_at_cost(str(job["id"])),
             "vendor": "Smitty Services",
             "status": a.get("status"),
             # maint_responsibility_id is set by LogicBank (Rule.copy) — don't send.
