@@ -311,6 +311,9 @@ SELECT setval(pg_get_serial_sequence('bundle_driver_role', 'id'),   (SELECT max(
 SELECT setval(pg_get_serial_sequence('owner_type', 'id'),           (SELECT max(id) FROM owner_type));
 SELECT setval(pg_get_serial_sequence('maint_responsibility', 'id'), (SELECT max(id) FROM maint_responsibility));
 
+-- System clock singleton (the LogicBank "tick" driver's target).
+INSERT INTO sys_clock (id, today) VALUES (1, CURRENT_DATE);
+
 -- Tractors (asset_type 1) and trailers (asset_type 2), each VIN'd. Ownership +
 -- maintenance responsibility cover all four cases: fleet-owned, owner-operator
 -- owned, fleet-leased (Fleet maintains), and O/O-leased (O/O maintains).

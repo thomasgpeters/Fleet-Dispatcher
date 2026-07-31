@@ -5,6 +5,23 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-07-31
 
+### Doctrine: fleet business logic → LogicBank rules (+ tick pattern)
+- Established the forward-going rule: **business invariants belong in LogicBank**
+  (`als-extensions/logic_discovery/`), governed once at the ALS commit, not
+  duplicated in the C++/Python clients. Captured in `docs/LOGICBANK_RULES.md` +
+  CLAUDE.md golden rule 2.
+- **Temporal rules included**, via the tick pattern: new **`sys_clock`** singleton
+  (time as data); a thin agent advances `today` and LogicBank forward-chains the
+  time-based derivations. `vehicle_lease` gains `sys_clock_id` + a LogicBank-derived
+  `is_active`. Verified on PG16 (56 fleet tables; SQL preview of the formula).
+- New **`fleet_governance.py`** (sibling of comms_governance): dispatch-lock
+  (Load/Trip can't use an in-shop/out-of-service vehicle), bundle/spec/odometer
+  integrity constraints, and the tick-driven lease-activity formula; cost-
+  allocation / due-status / responsibility-resolution stubbed for Phase 3.
+  Auto-installs via the existing `als-extensions/install.sh` (copies
+  `logic_discovery/*.py`) — no new deploy step. Tick agent (cron/endpoint)
+  documented.
+
 ### Feature 7: vehicle ownership + maintenance responsibility + leases
 - Added ownership/responsibility to the `vehicle` model (drives who bears repair
   cost from Smitty service records): `owner_type` / `maint_responsibility` lookups

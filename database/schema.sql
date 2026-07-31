@@ -201,6 +201,17 @@ CREATE TABLE maint_responsibility (
     name  TEXT NOT NULL
 );
 
+-- System clock (singleton). Time is modeled as data so LogicBank rules can react
+-- to it: a thin "tick" agent advances `today` on a schedule, and that single row
+-- change forward-chains through every time-dependent LogicBank formula (lease
+-- expiry, maintenance overdue, responsibility reversion). The logic stays
+-- declarative in LogicBank; the agent is just a pulse. See docs/LOGICBANK_RULES.md.
+CREATE TABLE sys_clock (
+    id      INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),  -- exactly one row
+    today   DATE NOT NULL,
+    tick_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- A single physical asset: a power unit (tractor) OR a trailer. VIN-unique
 -- (nullable for legacy assets not yet VIN'd). This is the canonical vehicle
 -- shared with Smitty by VIN (`smitty_vehicle_id` is the reverse correlation).
@@ -297,6 +308,11 @@ CREATE TABLE vehicle_lease (
     maint_responsibility_id INTEGER NOT NULL REFERENCES maint_responsibility(id),  -- who maintains during the lease
     start_date              DATE,
     end_date                DATE,
+    -- Clock hook: FK to the singleton sys_clock so a tick (advancing today)
+    -- forward-chains into the is_active formula. is_active is LogicBank-derived
+    -- (start <= today <= end) — see als-extensions/logic_discovery/fleet_governance.py.
+    sys_clock_id            INTEGER NOT NULL REFERENCES sys_clock(id) DEFAULT 1,
+    is_active               BOOLEAN,                          -- LogicBank formula (tick-driven)
     created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
     CONSTRAINT vehicle_lease_period CHECK (end_date IS NULL OR start_date IS NULL OR end_date >= start_date)
 );
