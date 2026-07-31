@@ -337,6 +337,38 @@ INSERT INTO rig_bundle_driver (id, rig_bundle_id, driver_id, driver_role_id) VAL
   ('d3000000-0000-0000-0000-000000000004', 'd2000000-0000-0000-0000-000000000003', 'aaaaaaaa-0000-0000-0000-000000000005', 1),  -- Tanya, bobtail
   ('d3000000-0000-0000-0000-000000000005', 'd2000000-0000-0000-0000-000000000004', 'aaaaaaaa-0000-0000-0000-000000000001', 1);  -- Pat, historical step-deck rig
 
+-- Feature 7 Phase 2 — wire the vehicle model into associations, telemetry, and a
+-- couple of vehicle-based loads (additive; the equipment-based board loads above
+-- are untouched — those backfill onto vehicles in Phase 3).
+
+-- Drivers qualified on their tractors (per-asset analog of driver_equipment).
+INSERT INTO driver_vehicle (id, driver_id, vehicle_id) VALUES
+  ('d4000000-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-000000000001', 'd1000000-0000-0000-0000-000000000001'),  -- Pat -> TR-501
+  ('d4000000-0000-0000-0000-000000000002', 'aaaaaaaa-0000-0000-0000-000000000003', 'd1000000-0000-0000-0000-000000000002'),  -- Marcus -> TR-502
+  ('d4000000-0000-0000-0000-000000000003', 'aaaaaaaa-0000-0000-0000-000000000004', 'd1000000-0000-0000-0000-000000000002'),  -- Dwayne -> TR-502 (team)
+  ('d4000000-0000-0000-0000-000000000004', 'aaaaaaaa-0000-0000-0000-000000000005', 'd1000000-0000-0000-0000-000000000003');  -- Tanya -> TR-503
+
+-- (Vehicle-model position fixes are seeded in the Telemetry section below, after
+--  location_source exists.)
+
+-- Two current-week loads assigned via the VEHICLE model (power + trailer vehicle;
+-- equipment_id NULL). Placed in the current Sunday-first week so they render on
+-- the board for their drivers alongside the equipment-based loads.
+INSERT INTO load
+  (id, dispatch_week_id, driver_id, power_vehicle_id, trailer_vehicle_id, shipper_id, receiver_id,
+   commodity_id, pickup_id, dropoff_id, run_type_id, load_status_id,
+   deadhead_miles, loaded_miles, rate, deck_feet, weight_lbs, pickup_date, delivery_date) VALUES
+  ('88888888-0000-0000-0000-000000000201', '99999999-0000-0000-0000-000000000002',
+   'aaaaaaaa-0000-0000-0000-000000000001', 'd1000000-0000-0000-0000-000000000001', 'd1000000-0000-0000-0000-000000000012',
+   'dddddddd-0000-0000-0000-000000000001', 'eeeeeeee-0000-0000-0000-000000000001', 'ffffffff-0000-0000-0000-000000000001',
+   'cccccccc-0000-0000-0000-000000000003', 'cccccccc-0000-0000-0000-000000000002', 1, 2, 70.0, 760.0, 4300.00, 29.0, 42000,
+   (CURRENT_DATE - EXTRACT(DOW FROM CURRENT_DATE)::int + 2), (CURRENT_DATE - EXTRACT(DOW FROM CURRENT_DATE)::int + 4)),  -- Pat, TR-501 + RGN
+  ('88888888-0000-0000-0000-000000000202', '99999999-0000-0000-0000-000000000002',
+   'aaaaaaaa-0000-0000-0000-000000000003', 'd1000000-0000-0000-0000-000000000002', 'd1000000-0000-0000-0000-000000000011',
+   'dddddddd-0000-0000-0000-000000000003', 'eeeeeeee-0000-0000-0000-000000000003', 'ffffffff-0000-0000-0000-000000000004',
+   'cccccccc-0000-0000-0000-000000000004', 'cccccccc-0000-0000-0000-000000000006', 2, 2, 30.0, 340.0, 2200.00, 20.0, 9000,
+   (CURRENT_DATE - EXTRACT(DOW FROM CURRENT_DATE)::int + 3), (CURRENT_DATE - EXTRACT(DOW FROM CURRENT_DATE)::int + 4));  -- Marcus, TR-502 + step-deck
+
 -- ===========================================================================
 -- Messaging (lookups + a sample group channel with messages and an attachment)
 -- ===========================================================================
@@ -459,6 +491,13 @@ INSERT INTO position_report
   ('bbbbbbbb-0000-0000-0000-000000000008', 'aaaaaaaa-0000-0000-0000-000000000007', 3, 35.4000,  -97.6000,   0.0,  0.0, 12.0, now() - interval '9 minutes'),  -- Jill, parked near OKC
   ('bbbbbbbb-0000-0000-0000-000000000009', 'aaaaaaaa-0000-0000-0000-000000000008', 3, 35.2000, -101.8300, 150.0, 63.0,  6.0, now() - interval '2 minutes'),  -- Ravi, Amarillo
   ('bbbbbbbb-0000-0000-0000-000000000003', 'aaaaaaaa-0000-0000-0000-000000000009', 3, 32.3199, -106.7637, 280.0, 64.0,  8.0, now() - interval '5 minutes');  -- Bill, near Las Cruces
+
+-- Feature 7 Phase 2: latest fixes reported against the VEHICLE model (vehicle_id,
+-- not equipment_id) — the per-asset tractors from the new fleet.
+INSERT INTO position_report (vehicle_id, driver_id, location_source_id, lat, lng, heading_deg, speed_mph, recorded_at) VALUES
+  ('d1000000-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-000000000001', 3, 35.2220, -101.8313, 350.0, 60.0, now() - interval '3 minutes'),  -- TR-501 near Amarillo
+  ('d1000000-0000-0000-0000-000000000002', 'aaaaaaaa-0000-0000-0000-000000000003', 3, 35.4676,  -97.5164,  65.0, 58.0, now() - interval '4 minutes'),  -- TR-502 Oklahoma City
+  ('d1000000-0000-0000-0000-000000000003', 'aaaaaaaa-0000-0000-0000-000000000005', 3, 39.7392, -104.9903,   0.0,  0.0, now() - interval '6 minutes');  -- TR-503 Denver
 
 -- ===========================================================================
 -- Navigation (trip for Pat's load, waypoints, a truck-stop POI, a route)

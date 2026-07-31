@@ -254,6 +254,15 @@ CREATE TABLE rig_bundle_driver (
     UNIQUE (rig_bundle_id, driver_id)
 );
 
+-- Which vehicles a driver is qualified/assigned to operate (per-asset analog of
+-- driver_equipment; Feature 7 Phase 3 retires driver_equipment).
+CREATE TABLE driver_vehicle (
+    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    driver_id  UUID NOT NULL REFERENCES driver(id) ON DELETE CASCADE,
+    vehicle_id UUID NOT NULL REFERENCES vehicle(id) ON DELETE CASCADE,
+    UNIQUE (driver_id, vehicle_id)
+);
+
 -- ===========================================================================
 -- Dispatch context
 -- ===========================================================================
@@ -299,7 +308,11 @@ CREATE TABLE load (
     id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     dispatch_week_id UUID NOT NULL REFERENCES dispatch_week(id),
     driver_id        UUID REFERENCES driver(id),
-    equipment_id     UUID REFERENCES equipment(id),
+    equipment_id     UUID REFERENCES equipment(id),  -- legacy rig (Feature 7 Phase 3 retires this)
+    -- Feature 7: the load's assets as per-asset vehicles (added alongside
+    -- equipment_id; backfilled + made authoritative when equipment retires).
+    power_vehicle_id   UUID REFERENCES vehicle(id),  -- tractor
+    trailer_vehicle_id UUID REFERENCES vehicle(id),  -- trailer (NULL = bobtail)
     shipper_id       UUID NOT NULL REFERENCES shipper(id),
     receiver_id      UUID NOT NULL REFERENCES receiver(id),
     commodity_id     UUID NOT NULL REFERENCES commodity(id),
@@ -560,7 +573,8 @@ CREATE TABLE location_source (
 
 CREATE TABLE position_report (
     id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    equipment_id       UUID REFERENCES equipment(id),
+    equipment_id       UUID REFERENCES equipment(id),  -- legacy rig (Feature 7 Phase 3 retires this)
+    vehicle_id         UUID REFERENCES vehicle(id),    -- Feature 7: a fix comes from one asset (tractor/trailer tracker)
     driver_id          UUID REFERENCES driver(id),
     location_source_id INTEGER NOT NULL REFERENCES location_source(id),
     lat                DOUBLE PRECISION NOT NULL CHECK (lat BETWEEN -90 AND 90),
@@ -569,11 +583,12 @@ CREATE TABLE position_report (
     speed_mph          DOUBLE PRECISION CHECK (speed_mph IS NULL OR speed_mph >= 0),
     accuracy_m         DOUBLE PRECISION CHECK (accuracy_m IS NULL OR accuracy_m >= 0),
     recorded_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
-    -- A report identifies a rig and/or a driver.
-    CONSTRAINT position_has_subject CHECK (equipment_id IS NOT NULL OR driver_id IS NOT NULL)
+    -- A report identifies a rig/vehicle and/or a driver.
+    CONSTRAINT position_has_subject CHECK (equipment_id IS NOT NULL OR vehicle_id IS NOT NULL OR driver_id IS NOT NULL)
 );
 
 CREATE INDEX idx_position_report_equipment_time ON position_report (equipment_id, recorded_at DESC);
+CREATE INDEX idx_position_report_vehicle_time ON position_report (vehicle_id, recorded_at DESC);
 CREATE INDEX idx_position_report_recorded ON position_report (recorded_at);
 
 -- ===========================================================================
@@ -604,7 +619,10 @@ CREATE TABLE poi_category (
 CREATE TABLE trip (
     id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     driver_id      UUID REFERENCES driver(id),
-    equipment_id   UUID REFERENCES equipment(id),
+    equipment_id   UUID REFERENCES equipment(id),  -- legacy rig (Feature 7 Phase 3 retires this)
+    -- Feature 7: the trip's assets as per-asset vehicles (alongside equipment_id).
+    power_vehicle_id   UUID REFERENCES vehicle(id),
+    trailer_vehicle_id UUID REFERENCES vehicle(id),
     load_id        UUID REFERENCES load(id),
     trip_status_id INTEGER NOT NULL REFERENCES trip_status(id),
     name           TEXT,

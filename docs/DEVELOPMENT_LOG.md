@@ -5,6 +5,20 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-07-31
 
+### Feature 7 Phase 2: wire the vehicle model into load/trip/position (additive)
+- Added, **alongside** the `equipment_id` columns (non-destructive):
+  `load.power_vehicle_id` / `load.trailer_vehicle_id`, the same on `trip`,
+  `position_report.vehicle_id`, and a new `driver_vehicle` table (per-asset analog
+  of `driver_equipment`). `position_has_subject` now accepts a `vehicle_id`
+  subject.
+- Seed: `driver_vehicle` links (incl. Dwayne co-driving TR-502), 3 position fixes
+  via `vehicle_id`, and **2 fully vehicle-based loads** (`equipment_id` NULL,
+  power+trailer vehicles). The 13 legacy equipment-based loads stay intact —
+  coexistence verified on PG16 (52 fleet tables, public clean).
+- Phase 3 backfills all equipment→vehicle, cuts the clients (desktop board/fleet,
+  mobile) over to the vehicle model, and drops `equipment`/`driver_equipment` +
+  the `equipment_id` columns.
+
 ### Feature 7 Phase 1: per-asset vehicle model + rig bundles (schema + seed)
 - Fleet moves from `equipment` (bundled rig) to **per-asset vehicles**. Added
   **alongside** `equipment` (non-destructive Phase 1): `vehicle` (each tractor OR
