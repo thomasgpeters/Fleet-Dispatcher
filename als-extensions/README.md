@@ -15,6 +15,12 @@ monorepo, so they're versioned and re-installable after ALS is (re)generated.
   team-comms model (TODO Feature 4): broadcast channels are owner/admin-post-only,
   and muted/banned members can't post (with `restricted_until` expiry). Requires
   the P1–P3 schema, so regenerate ALS from the updated schema before installing.
+- `logic_discovery/fleet_governance.py` — **LogicBank rules for the fleet
+  aggregate** (Feature 7): dispatch-lock (no assigning an in-shop/out-of-service
+  vehicle), bundle/spec/odometer integrity, and **tick-driven** lease activity
+  (`sys_clock` + a thin tick agent forward-chains the temporal formulas). Business
+  invariants live here, not in the clients. Doctrine + tick agent:
+  [`../docs/LOGICBANK_RULES.md`](../docs/LOGICBANK_RULES.md).
 - `security/authentication_provider/sql/auth_provider.py` — ALS SQL auth provider
   that authenticates against our **`app_user`** table and verifies werkzeug
   password hashes (the default uses a separate sqlite auth DB + plaintext).

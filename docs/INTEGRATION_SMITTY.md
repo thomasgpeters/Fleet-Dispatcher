@@ -482,3 +482,204 @@ finish RMA Stages 2-3 first and start integration after. Explicit call
 from the Fleet + Smitty owners on which slot.
 
 ---
+
+# Fleet response v1
+
+**Date:** 2026-07-31 · **Owner:** Fleet Dispatcher team ·
+**Status:** proposal, answers Smitty response v1
+
+Smitty's v1 is accepted almost wholesale. The one place we diverge is C.2
+("byte-identical DDL"); the rest we adopt. Below are Fleet's positions and the
+one model change Fleet is making on its side to align with Smitty's per-asset
+vehicle model.
+
+## F.1 Granularity — Fleet moves to per-asset vehicles (agrees with Q1)
+
+Decision: **each physical asset — a power unit (tractor) OR a trailer — is its
+own Fleet entity with its own VIN.** This matches Smitty's one-VIN-per-vehicle
+model exactly, so the canonical `vehicle` is 1:1 across both systems by VIN.
+
+This replaces Fleet's current `equipment` row (which bundled a power unit +
+trailer as one unit). The rig-bundling idea is still valuable — Fleet keeps it,
+but as a **separate, time-effective association**, not the vehicle identity:
+
+- **`vehicle`** — the per-asset entity (tractor or trailer), VIN-keyed. This is
+  the canonical thing that syncs with Smitty.
+- **`rig_bundle`** — a **temporal combination**: which power unit + trailer +
+  **driver(s)** are working together, with `effective_from` / `effective_to`.
+  Supports **teams** (2+ drivers on one bundle). Full history: "who and what
+  was combined at any point in time" is a query against the effective window.
+
+Only `vehicle` crosses the integration boundary (VIN). `rig_bundle` is a
+**Fleet-internal dispatch concept** — Smitty services individual assets and
+doesn't need the bundle. This cleanly separates the shared canonical (vehicle)
+from Fleet's operational grouping (bundle).
+
+## F.2 Specs are typed per asset type (not one JSONB shape)
+
+Tractor specs and trailer specs are genuinely different domains (engine /
+horsepower / sleeper vs deck length / weight capacity / ramps / duals). Fleet
+keeps them as **typed, per-type value objects** — `tractor_spec` and
+`trailer_spec`, each 1:1 with `vehicle` by `asset_type`. This is a Fleet golden
+rule (typed columns + real FKs, not JSON blobs).
+
+For the Smitty sync, Fleet **serializes the relevant typed specs into the shared
+`specs` JSON on publish** — so Smitty still receives `specs` per C.2's column,
+but Fleet doesn't store a JSONB blob natively. Serialize on the wire, typed at
+rest.
+
+## F.3 On C.2 "byte-identical DDL" — counter-proposal
+
+We can't take C.2 literally: Fleet's conventions are **UUID primary keys + real
+FK relationships + typed spec columns**, while Smitty's shared tables use
+`SMALLINT` PKs, `specs JSONB`, and no FKs. A `SMALLINT vehicle_id` can't
+reference Fleet's `vehicle(id) UUID`, so identical DDL breaks Fleet's model.
+
+Proposed contract (already how VIN correlation is designed to work): **shared
+field set + semantics + VIN as the correlation key; each side keeps its native
+PK type and its own local FKs.** The sync **replicates by VIN**, not by identical
+row images. Concretely:
+- Fleet `vehicle`: `id UUID`, `smitty_vehicle_id SMALLINT` (correlation), `vin`.
+- Smitty `vehicles`: `vehicle_id SMALLINT`, `fleet_equipment_id`→(now
+  `fleet_vehicle_id`), `vin`.
+- The **columns and their meaning** are identical; the **PK type is native** to
+  each app.
+
+For the Smitty-owned tables Fleet consumes (`MaintenanceSchedule`,
+`VehicleOutOfService`, `Job`), Fleet reads them **via `/api/*` (pull)** and either
+mirrors into Fleet-native tables keyed by UUID+VIN, or just caches — no need for
+Fleet to hold `SMALLINT`-keyed mirror tables. Divergence is still a bug; we just
+correlate on VIN + field semantics instead of demanding identical PKs.
+
+## F.4 Accepted from Smitty v1 (no change needed)
+
+- **C.1 additive-only** migrations — yes.
+- **C.3 Fleet holds the toggle** — yes; Fleet owns the integration on/off and
+  Smitty degrades gracefully when Fleet is silent.
+- **Q2 both intervals, whichever first** — yes.
+- **Q3 JSON:API pull for Phase 1–3, Kafka at Phase 5** — yes. Fleet builds a
+  scheduled poller now; our existing Kafka producer slots in at Phase 5 (Fleet
+  can also emit `vehicle.v1` for Smitty's optional consumer then).
+- **Q4 Smitty publishes cost via `/api/Job`; Fleet computes valuation** — yes.
+- **Q5 correlation `vin → (customer_id, license_plate) → unit_number`; Fleet wins
+  VIN conflicts** — yes.
+- **Q6 resource-name mapping** — Fleet's consumer maps `WorkOrder → /api/Job`,
+  and calls `/api/Vehicle`, `/api/MaintenanceSchedule`, `/api/VehicleOutOfService`.
+  **Auth: shared `X-Service-Token`** (`SMITTY_SERVICE_TOKEN` env, LAN-only, kept
+  out of git, rotated). Fleet adds send + verify middleware on its ALS. JWT is a
+  Phase 5 conversation.
+
+## F.5 Fleet-side migration scope (heads-up, not blocking Smitty)
+
+Per-asset vehicles + temporal bundle is a **significant internal refactor** of
+Fleet's fleet aggregate — `equipment` (rig) → `vehicle` (asset) + `rig_bundle`
+(temporal combination). It touches `load`, `trip`, `position_report`,
+`driver_equipment`, the seed data, the desktop board/fleet views, and mobile.
+It does **not** block the integration contract above (the shared surface is
+`vehicle` by VIN + reading Smitty's `/api/Job` etc.), but it is the larger piece
+of Fleet-side work and will be phased (see Fleet `docs/TODO.md`).
+
+## F.6 Open item back to Smitty
+
+- Smitty's `vehicles.fleet_equipment_id` should become **`fleet_vehicle_id`**
+  (Fleet now keys the canonical asset as `vehicle`, not `equipment`). Same
+  correlation, renamed target. Additive per C.1.
+
+## Sequencing (R.6)
+
+**[Fleet owner to confirm]** — integration ahead of Smitty's RMA work, or after.
+Not yet decided.
+
+# Integration boundary — Smitty as a profit center (Fleet, 2026-07-31)
+
+New fact from the Fleet side that refines the whole contract: **Smitty's
+garage/staff is a separate profit center** that services **third-party rigs**,
+not only Fleet's fleet. This makes the two vehicle sets asymmetric and tightens
+a few rules — no schema change to Feature 7, but it changes how the sync scopes.
+
+## B.1 Fleet's vehicles are a *subset* of Smitty's
+
+```
+   Smitty `vehicles`  ⊇  { Fleet-owned rigs }  ∪  { third-party customer rigs }
+   Fleet  `vehicle`   =    Fleet-owned rigs only
+```
+
+- **Correlation is partial.** `fleet_vehicle_id` (and the matching VIN) is set
+  **only** on Smitty vehicles that belong to Fleet. Third-party vehicles have
+  `fleet_vehicle_id = NULL` and never appear on the Fleet side.
+- Fleet **ignores unknown VINs.** When Fleet reconciles/pulls from Smitty, any
+  `Vehicle` / `Job` / `MaintenanceSchedule` / `VehicleOutOfService` whose VIN
+  Fleet doesn't own is dropped — it's another customer's data.
+
+## B.2 Fleet is one *customer* of the garage
+
+Smitty already has `customer_id` on `vehicles` (per Smitty response R.1). Fleet
+is modeled as **the house / internal customer** — one `customer` row among the
+third parties. Practically:
+- **Scoping the sync:** the cleanest filter for Fleet↔Smitty calls is Smitty's
+  **Fleet customer_id** (all Fleet rigs share it), with VIN as the per-asset key.
+  A service-token request from Fleet should be scoped to that customer so Smitty
+  never exposes third-party vehicles/jobs across the boundary.
+- **Privacy:** third-party customer data (their VINs, jobs, costs) must **not**
+  cross to Fleet. The subset filter (B.1) + customer scoping (here) enforce that.
+
+## B.3 Cost passes to Fleet **at cost**; only the markup is confidential (corrects the earlier draft)
+
+Corrected model (supersedes the prior "no dollars cross" draft):
+
+- **The at-cost figure — parts + labor at cost — DOES cross to Fleet.** Mechanics
+  aren't free; Fleet has to cover the actual cost of servicing its rigs, so it
+  needs the number.
+- **The markup / margin on a Fleet job is negotiated per-job** between the shop
+  managers and the company (Fleet) — sometimes full retail, sometimes discounted,
+  sometimes waived ("eaten"); it is **not** a standing policy. That negotiated
+  markup and Smitty's retail pricing (what a third-party customer would pay) are
+  **Smitty-internal and don't cross** the boundary — they'd leak the per-job
+  negotiation and Smitty's third-party pricing. What Fleet is actually **billed**
+  for its own job (the agreed amount) is of course Fleet's own record.
+
+So the boundary carries **service facts + at-cost totals**, never retail/marked-up
+price:
+
+| Crosses to Fleet (Fleet-owned VINs) | Stays in Smitty's ledger (never crosses) |
+| --- | --- |
+| work performed, service type, dates, odometer-at-service | retail/invoiced price with **markup**; margin; third-party pricing |
+| **at-cost** parts + labor totals (what Fleet must cover) | Smitty's profit margin on the Fleet job |
+| `maintenance_schedule`, `out_of_service`, in-shop status | any pricing on **third-party** jobs (never crosses at all, B.1/B.2) |
+
+**Who bears the at-cost amount depends on the vehicle's ownership / lease** — Fleet
+receives the cost, then **allocates** it (see B.3a). Valuation/TCO (Feature 6) can
+use the real at-cost figures for Fleet-responsible vehicles.
+
+## B.3a Cost responsibility follows ownership + lease (Fleet-side model)
+
+The at-cost amount that crosses is **allocated by who is responsible for the
+vehicle**, which Fleet now models on the `vehicle` (Feature 7 — ownership +
+maintenance responsibility + `vehicle_lease`):
+
+| Vehicle situation | Who covers the repair cost |
+| --- | --- |
+| **Fleet-owned** | Fleet |
+| **Owner-operator's own vehicle** (tractor or trailer) | the owner-operator absorbs it |
+| **Fleet-leased** (e.g. a leased trailer Fleet doesn't own) | **Fleet**, for the life of the lease (maintenance responsibility ≠ ownership) |
+| **Owner-operator leases their own trailer** | per that lease — the O/O or the lessor; the `vehicle_lease` record names the responsible party |
+
+Key point: **maintenance responsibility can diverge from ownership** (leases), so
+Fleet stores it explicitly rather than deriving it from `owner_type` alone. When
+Smitty publishes a service record for a Fleet-serviced VIN, Fleet posts the
+at-cost amount against whichever party its `vehicle` says is responsible.
+
+## B.4 Asks back to Smitty
+
+1. Confirm **Fleet has a dedicated `customer_id`** (the house customer) so both
+   sides can scope Fleet↔Smitty traffic to it.
+2. The service-token endpoints Fleet calls (`/api/Job`, `/api/MaintenanceSchedule`,
+   `/api/VehicleOutOfService`, `/api/Vehicle`) should be **filterable by
+   customer_id and/or a set of VINs**, so Fleet only ever receives Fleet-owned
+   rows — never third-party data.
+3. `fleet_vehicle_id` stays **nullable** on `vehicles` (only Fleet rigs set it) —
+   already implied by additive C.1, restated here for the third-party case.
+4. The Fleet-facing `/api/Job` (+ JobPart/JobLaborItem) responses must **omit the
+   cost/money fields** for Fleet VINs (`total_cost`, `parts_total`, `labor_total`,
+   `estimated/actual_cost`, per-line pricing) — service facts only, no dollars
+   (see B.3). Easiest as a cost-stripped projection/view for the Fleet token.

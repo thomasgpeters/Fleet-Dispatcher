@@ -472,6 +472,42 @@ Open questions (blocking the schema build — answer any time):
 4. Any **specific data points** you want on the Overview tab beyond year/make/
    model/VIN/odometer/specs (e.g. plate, DOT #, insurance policy/expiry, fuel type)?
 
+## Feature 7 — Per-asset vehicle model + rig bundles (fleet aggregate refactor)
+
+Decided 2026-07-31 (drives the Smitty integration — see
+[`INTEGRATION_SMITTY.md`](INTEGRATION_SMITTY.md) "Fleet response v1"). Fleet moves
+from `equipment` (a bundled rig) to **per-asset vehicles** + a **temporal bundle**.
+
+Model:
+- [ ] **`vehicle`** — each physical asset (tractor OR trailer) is its own
+      UUID-keyed entity, VIN-unique. `asset_type_id` (tractor/trailer), unit #,
+      make/model/year, plate, dot_number, fuel_type, odometer + as_of,
+      operational_status, `smitty_vehicle_id` correlation. This is the canonical
+      thing that syncs with Smitty by VIN.
+- [ ] **Typed specs per type** — `tractor_spec` (power_unit, hp, axles, sleeper…)
+      and `trailer_spec` (trailer_type, deck_length_ft, weight_capacity_lbs,
+      has_ramps, has_duals, axles…), each 1:1 with `vehicle` by asset_type. (Not
+      a JSONB blob — serialize to JSON only on the Smitty publish.)
+- [ ] **`rig_bundle`** — temporal combination: power_vehicle + trailer_vehicle +
+      **driver(s)** with `effective_from`/`effective_to`. Supports **teams** (2+
+      drivers via `rig_bundle_driver`). Full history of who/what was combined when.
+- [ ] **Maintenance attaches to `vehicle`** (per-asset), matching Smitty.
+
+Migration (large — `equipment` is deeply embedded):
+- [ ] Repoint `load`, `trip`, `position_report`, `driver_equipment` off
+      `equipment` onto `vehicle`/`rig_bundle`; route optimizer reads capacity from
+      `trailer_spec`.
+- [ ] Rebuild seed data (vehicles + bundles); `/verify-db`; **regenerate ALS**.
+- [ ] Desktop **Fleet view** (vehicles grouped by type + current bundles) and
+      **Board** (bundle-aware); mobile driver "my vehicle/bundle".
+- [ ] Phase it: (1) add `vehicle`/specs alongside `equipment` + backfill; (2)
+      repoint references; (3) retire `equipment`. Keeps each step verifiable.
+
+> This is the larger Fleet-side piece behind the Smitty integration. The
+> integration *contract* (share `vehicle` by VIN; read Smitty `/api/Job` etc.)
+> doesn't block on the full refactor, but the per-asset `vehicle` table is the
+> shared surface, so it leads.
+
 ## Cross-cutting
 
 - [x] **DB schema separation (DECIDED + done):** shared instance with

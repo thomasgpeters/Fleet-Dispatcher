@@ -276,6 +276,129 @@ FROM wk, (VALUES
 ) AS v(id, driver_id, equipment_id, shipper_id, receiver_id, commodity_id, pickup_id, dropoff_id, run_type_id, load_status_id, deadhead_miles, loaded_miles, rate, deck_feet, weight_lbs, day_offset, transit);
 
 -- ===========================================================================
+-- Vehicles & rig bundles (Feature 7 — per-asset model). Seeded ALONGSIDE the
+-- equipment/loads above (Phase 1). Each tractor/trailer is its own VIN'd vehicle;
+-- bundles show current combinations + one historical combination (Pat moved from
+-- a step-deck to the RGN) + a driver team (Marcus + Dwayne).
+-- ===========================================================================
+INSERT INTO asset_type (id, code, name) VALUES
+  (1, 'tractor', 'Tractor'),
+  (2, 'trailer', 'Trailer');
+
+INSERT INTO vehicle_status (id, code, name) VALUES
+  (1, 'in_service',     'In service'),
+  (2, 'out_of_service', 'Out of service'),
+  (3, 'in_maintenance', 'In maintenance'),
+  (4, 'retired',        'Retired');
+
+INSERT INTO bundle_driver_role (id, code, name) VALUES
+  (1, 'primary',   'Primary'),
+  (2, 'co_driver', 'Co-driver');
+
+INSERT INTO owner_type (id, code, name) VALUES
+  (1, 'fleet',          'Fleet'),
+  (2, 'owner_operator', 'Owner-operator'),
+  (3, 'lessor',         'Lessor');
+
+INSERT INTO maint_responsibility (id, code, name) VALUES
+  (1, 'fleet',          'Fleet'),
+  (2, 'owner_operator', 'Owner-operator'),
+  (3, 'lessor',         'Lessor');
+
+SELECT setval(pg_get_serial_sequence('asset_type', 'id'),           (SELECT max(id) FROM asset_type));
+SELECT setval(pg_get_serial_sequence('vehicle_status', 'id'),       (SELECT max(id) FROM vehicle_status));
+SELECT setval(pg_get_serial_sequence('bundle_driver_role', 'id'),   (SELECT max(id) FROM bundle_driver_role));
+SELECT setval(pg_get_serial_sequence('owner_type', 'id'),           (SELECT max(id) FROM owner_type));
+SELECT setval(pg_get_serial_sequence('maint_responsibility', 'id'), (SELECT max(id) FROM maint_responsibility));
+
+-- System clock singleton (the LogicBank "tick" driver's target).
+INSERT INTO sys_clock (id, today) VALUES (1, CURRENT_DATE);
+
+-- Tractors (asset_type 1) and trailers (asset_type 2), each VIN'd. Ownership +
+-- maintenance responsibility cover all four cases: fleet-owned, owner-operator
+-- owned, fleet-leased (Fleet maintains), and O/O-leased (O/O maintains).
+INSERT INTO vehicle
+  (id, vin, unit_number, asset_type_id, make, model, model_year, plate, dot_number, fuel_type, odometer_miles, odometer_as_of, vehicle_status_id, owner_type_id, owner_driver_id, owner_name, maint_responsibility_id) VALUES
+  -- TR-501: owner-operator Pat owns his tractor -> Pat covers repairs.
+  ('d1000000-0000-0000-0000-000000000001', '1FUJGLDR9CLBP8834', 'TR-501', 1, 'Freightliner', 'Cascadia', 2021, 'TX-8841', 'DOT-1123456', 'diesel', 412000, now() - interval '2 days', 1, 2, 'aaaaaaaa-0000-0000-0000-000000000001', NULL, 2),
+  -- TR-502, TR-503: fleet-owned company tractors -> Fleet covers.
+  ('d1000000-0000-0000-0000-000000000002', '1XKYDP9X5MJ413552', 'TR-502', 1, 'Kenworth',     'T680',     2020, 'TX-5521', 'DOT-1123456', 'diesel', 388500, now() - interval '1 day',  1, 1, NULL, NULL, 1),
+  ('d1000000-0000-0000-0000-000000000003', '3AKJHHDR7LSLX1234', 'TR-503', 1, 'Peterbilt',    '579',      2019, 'TX-3391', 'DOT-1123456', 'diesel', 501200, now() - interval '5 hours',1, 1, NULL, NULL, 1),
+  -- TL-901: fleet-owned trailer -> Fleet covers.
+  ('d1000000-0000-0000-0000-000000000011', '1JJV532W1LL123456', 'TL-901', 2, 'Wabash',       'Step-deck',2020, 'TX-9014', NULL,          NULL,     NULL,   NULL,                       1, 1, NULL, NULL, 1),
+  -- TL-902: fleet-LEASED (lessor owns) but Fleet maintains for the lease term.
+  ('d1000000-0000-0000-0000-000000000012', '5JYFA1229MP654321', 'TL-902', 2, 'Fontaine',     'RGN Low-boy',2021,'TX-9025', NULL,          NULL,     NULL,   NULL,                       1, 3, NULL, 'XTRA Lease',    1),
+  -- TL-903: an owner-operator leases their own trailer -> O/O maintains (in shop now).
+  ('d1000000-0000-0000-0000-000000000013', '1UYVS2530MU987654', 'TL-903', 2, 'Great Dane',   'Flatbed',  2018, 'TX-9037', NULL,          NULL,     NULL,   NULL,                       3, 3, NULL, 'Star Leasing',  2);
+
+-- Lease detail for the two leased trailers (responsibility during the lease).
+INSERT INTO vehicle_lease (id, vehicle_id, lessor_name, lessee_type_id, lessee_driver_id, maint_responsibility_id, start_date, end_date) VALUES
+  -- Fleet leases TL-902 and is responsible for its maintenance.
+  ('d5000000-0000-0000-0000-000000000001', 'd1000000-0000-0000-0000-000000000012', 'XTRA Lease',   1, NULL,                                    1, DATE '2025-01-01', DATE '2027-12-31'),
+  -- Owner-operator Hector leases TL-903 on his own -> Hector is responsible.
+  ('d5000000-0000-0000-0000-000000000002', 'd1000000-0000-0000-0000-000000000013', 'Star Leasing', 2, 'aaaaaaaa-0000-0000-0000-000000000006', 2, DATE '2026-03-01', DATE '2028-02-29');
+
+INSERT INTO tractor_spec (vehicle_id, power_unit_id, horsepower, num_axles, has_sleeper) VALUES
+  ('d1000000-0000-0000-0000-000000000001', 1, 455, 3, TRUE),
+  ('d1000000-0000-0000-0000-000000000002', 1, 500, 3, TRUE),
+  ('d1000000-0000-0000-0000-000000000003', 1, 455, 3, FALSE);
+
+INSERT INTO trailer_spec (vehicle_id, trailer_type_id, deck_length_ft, weight_capacity_lbs, has_ramps, has_duals, num_axles) VALUES
+  ('d1000000-0000-0000-0000-000000000011', 1, 52, 48000, TRUE,  FALSE, 2),  -- step-deck
+  ('d1000000-0000-0000-0000-000000000012', 2, 29, 80000, FALSE, FALSE, 3),  -- RGN low-boy
+  ('d1000000-0000-0000-0000-000000000013', 3, 52, 48000, FALSE, FALSE, 2);  -- flatbed
+
+-- Rig bundles: three current combinations + one historical (Pat's earlier rig).
+INSERT INTO rig_bundle (id, power_vehicle_id, trailer_vehicle_id, effective_from, effective_to) VALUES
+  -- CURRENT: TR-501 + RGN, Pat solo
+  ('d2000000-0000-0000-0000-000000000001', 'd1000000-0000-0000-0000-000000000001', 'd1000000-0000-0000-0000-000000000012', now() - interval '30 days', NULL),
+  -- CURRENT: TR-502 + step-deck, Marcus + Dwayne team
+  ('d2000000-0000-0000-0000-000000000002', 'd1000000-0000-0000-0000-000000000002', 'd1000000-0000-0000-0000-000000000011', now() - interval '14 days', NULL),
+  -- CURRENT: TR-503 bobtail (no trailer), Tanya
+  ('d2000000-0000-0000-0000-000000000003', 'd1000000-0000-0000-0000-000000000003', NULL,                                    now() - interval '3 days',  NULL),
+  -- HISTORICAL: Pat was on TR-501 + step-deck before switching to the RGN
+  ('d2000000-0000-0000-0000-000000000004', 'd1000000-0000-0000-0000-000000000001', 'd1000000-0000-0000-0000-000000000011', now() - interval '90 days', now() - interval '30 days');
+
+INSERT INTO rig_bundle_driver (id, rig_bundle_id, driver_id, driver_role_id) VALUES
+  ('d3000000-0000-0000-0000-000000000001', 'd2000000-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-000000000001', 1),  -- Pat, current RGN rig
+  ('d3000000-0000-0000-0000-000000000002', 'd2000000-0000-0000-0000-000000000002', 'aaaaaaaa-0000-0000-0000-000000000003', 1),  -- Marcus primary
+  ('d3000000-0000-0000-0000-000000000003', 'd2000000-0000-0000-0000-000000000002', 'aaaaaaaa-0000-0000-0000-000000000004', 2),  -- Dwayne co-driver (team)
+  ('d3000000-0000-0000-0000-000000000004', 'd2000000-0000-0000-0000-000000000003', 'aaaaaaaa-0000-0000-0000-000000000005', 1),  -- Tanya, bobtail
+  ('d3000000-0000-0000-0000-000000000005', 'd2000000-0000-0000-0000-000000000004', 'aaaaaaaa-0000-0000-0000-000000000001', 1);  -- Pat, historical step-deck rig
+
+-- Feature 7 Phase 2 — wire the vehicle model into associations, telemetry, and a
+-- couple of vehicle-based loads (additive; the equipment-based board loads above
+-- are untouched — those backfill onto vehicles in Phase 3).
+
+-- Drivers qualified on their tractors (per-asset analog of driver_equipment).
+INSERT INTO driver_vehicle (id, driver_id, vehicle_id) VALUES
+  ('d4000000-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-000000000001', 'd1000000-0000-0000-0000-000000000001'),  -- Pat -> TR-501
+  ('d4000000-0000-0000-0000-000000000002', 'aaaaaaaa-0000-0000-0000-000000000003', 'd1000000-0000-0000-0000-000000000002'),  -- Marcus -> TR-502
+  ('d4000000-0000-0000-0000-000000000003', 'aaaaaaaa-0000-0000-0000-000000000004', 'd1000000-0000-0000-0000-000000000002'),  -- Dwayne -> TR-502 (team)
+  ('d4000000-0000-0000-0000-000000000004', 'aaaaaaaa-0000-0000-0000-000000000005', 'd1000000-0000-0000-0000-000000000003');  -- Tanya -> TR-503
+
+-- (Vehicle-model position fixes are seeded in the Telemetry section below, after
+--  location_source exists.)
+
+-- Two current-week loads assigned via the VEHICLE model (power + trailer vehicle;
+-- equipment_id NULL). Placed in the current Sunday-first week so they render on
+-- the board for their drivers alongside the equipment-based loads.
+INSERT INTO load
+  (id, dispatch_week_id, driver_id, power_vehicle_id, trailer_vehicle_id, shipper_id, receiver_id,
+   commodity_id, pickup_id, dropoff_id, run_type_id, load_status_id,
+   deadhead_miles, loaded_miles, rate, deck_feet, weight_lbs, pickup_date, delivery_date) VALUES
+  ('88888888-0000-0000-0000-000000000201', '99999999-0000-0000-0000-000000000002',
+   'aaaaaaaa-0000-0000-0000-000000000001', 'd1000000-0000-0000-0000-000000000001', 'd1000000-0000-0000-0000-000000000012',
+   'dddddddd-0000-0000-0000-000000000001', 'eeeeeeee-0000-0000-0000-000000000001', 'ffffffff-0000-0000-0000-000000000001',
+   'cccccccc-0000-0000-0000-000000000003', 'cccccccc-0000-0000-0000-000000000002', 1, 2, 70.0, 760.0, 4300.00, 29.0, 42000,
+   (CURRENT_DATE - EXTRACT(DOW FROM CURRENT_DATE)::int + 2), (CURRENT_DATE - EXTRACT(DOW FROM CURRENT_DATE)::int + 4)),  -- Pat, TR-501 + RGN
+  ('88888888-0000-0000-0000-000000000202', '99999999-0000-0000-0000-000000000002',
+   'aaaaaaaa-0000-0000-0000-000000000003', 'd1000000-0000-0000-0000-000000000002', 'd1000000-0000-0000-0000-000000000011',
+   'dddddddd-0000-0000-0000-000000000003', 'eeeeeeee-0000-0000-0000-000000000003', 'ffffffff-0000-0000-0000-000000000004',
+   'cccccccc-0000-0000-0000-000000000004', 'cccccccc-0000-0000-0000-000000000006', 2, 2, 30.0, 340.0, 2200.00, 20.0, 9000,
+   (CURRENT_DATE - EXTRACT(DOW FROM CURRENT_DATE)::int + 3), (CURRENT_DATE - EXTRACT(DOW FROM CURRENT_DATE)::int + 4));  -- Marcus, TR-502 + step-deck
+
+-- ===========================================================================
 -- Messaging (lookups + a sample group channel with messages and an attachment)
 -- ===========================================================================
 INSERT INTO channel_type (id, code, name) VALUES
@@ -397,6 +520,13 @@ INSERT INTO position_report
   ('bbbbbbbb-0000-0000-0000-000000000008', 'aaaaaaaa-0000-0000-0000-000000000007', 3, 35.4000,  -97.6000,   0.0,  0.0, 12.0, now() - interval '9 minutes'),  -- Jill, parked near OKC
   ('bbbbbbbb-0000-0000-0000-000000000009', 'aaaaaaaa-0000-0000-0000-000000000008', 3, 35.2000, -101.8300, 150.0, 63.0,  6.0, now() - interval '2 minutes'),  -- Ravi, Amarillo
   ('bbbbbbbb-0000-0000-0000-000000000003', 'aaaaaaaa-0000-0000-0000-000000000009', 3, 32.3199, -106.7637, 280.0, 64.0,  8.0, now() - interval '5 minutes');  -- Bill, near Las Cruces
+
+-- Feature 7 Phase 2: latest fixes reported against the VEHICLE model (vehicle_id,
+-- not equipment_id) — the per-asset tractors from the new fleet.
+INSERT INTO position_report (vehicle_id, driver_id, location_source_id, lat, lng, heading_deg, speed_mph, recorded_at) VALUES
+  ('d1000000-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-000000000001', 3, 35.2220, -101.8313, 350.0, 60.0, now() - interval '3 minutes'),  -- TR-501 near Amarillo
+  ('d1000000-0000-0000-0000-000000000002', 'aaaaaaaa-0000-0000-0000-000000000003', 3, 35.4676,  -97.5164,  65.0, 58.0, now() - interval '4 minutes'),  -- TR-502 Oklahoma City
+  ('d1000000-0000-0000-0000-000000000003', 'aaaaaaaa-0000-0000-0000-000000000005', 3, 39.7392, -104.9903,   0.0,  0.0, now() - interval '6 minutes');  -- TR-503 Denver
 
 -- ===========================================================================
 -- Navigation (trip for Pat's load, waypoints, a truck-stop POI, a route)

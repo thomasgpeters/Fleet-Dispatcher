@@ -3,6 +3,66 @@
 Newest first. One entry per meaningful change set; pair with the checklist in
 [`TODO.md`](TODO.md).
 
+## 2026-07-31
+
+### Doctrine: fleet business logic → LogicBank rules (+ tick pattern)
+- Established the forward-going rule: **business invariants belong in LogicBank**
+  (`als-extensions/logic_discovery/`), governed once at the ALS commit, not
+  duplicated in the C++/Python clients. Captured in `docs/LOGICBANK_RULES.md` +
+  CLAUDE.md golden rule 2.
+- **Temporal rules included**, via the tick pattern: new **`sys_clock`** singleton
+  (time as data); a thin agent advances `today` and LogicBank forward-chains the
+  time-based derivations. `vehicle_lease` gains `sys_clock_id` + a LogicBank-derived
+  `is_active`. Verified on PG16 (56 fleet tables; SQL preview of the formula).
+- New **`fleet_governance.py`** (sibling of comms_governance): dispatch-lock
+  (Load/Trip can't use an in-shop/out-of-service vehicle), bundle/spec/odometer
+  integrity constraints, and the tick-driven lease-activity formula; cost-
+  allocation / due-status / responsibility-resolution stubbed for Phase 3.
+  Auto-installs via the existing `als-extensions/install.sh` (copies
+  `logic_discovery/*.py`) — no new deploy step. Tick agent (cron/endpoint)
+  documented.
+
+### Feature 7: vehicle ownership + maintenance responsibility + leases
+- Added ownership/responsibility to the `vehicle` model (drives who bears repair
+  cost from Smitty service records): `owner_type` / `maint_responsibility` lookups
+  (`fleet`/`owner_operator`/`lessor`), `vehicle.owner_type_id` + `owner_driver_id`
+  (the O/O) + `owner_name` + `maint_responsibility_id`, and a `vehicle_lease` table.
+  Maintenance responsibility can **diverge** from ownership (leases).
+- Seed covers all four cases: O/O-owned tractor (Pat), fleet-owned, Fleet-leased
+  trailer (Fleet maintains, XTRA Lease), O/O-leased trailer (Hector maintains,
+  Star Leasing). Verified on PG16 (55 fleet tables). Boundary/cost model:
+  `INTEGRATION_SMITTY.md` B.3/B.3a.
+
+### Feature 7 Phase 2: wire the vehicle model into load/trip/position (additive)
+- Added, **alongside** the `equipment_id` columns (non-destructive):
+  `load.power_vehicle_id` / `load.trailer_vehicle_id`, the same on `trip`,
+  `position_report.vehicle_id`, and a new `driver_vehicle` table (per-asset analog
+  of `driver_equipment`). `position_has_subject` now accepts a `vehicle_id`
+  subject.
+- Seed: `driver_vehicle` links (incl. Dwayne co-driving TR-502), 3 position fixes
+  via `vehicle_id`, and **2 fully vehicle-based loads** (`equipment_id` NULL,
+  power+trailer vehicles). The 13 legacy equipment-based loads stay intact —
+  coexistence verified on PG16 (52 fleet tables, public clean).
+- Phase 3 backfills all equipment→vehicle, cuts the clients (desktop board/fleet,
+  mobile) over to the vehicle model, and drops `equipment`/`driver_equipment` +
+  the `equipment_id` columns.
+
+### Feature 7 Phase 1: per-asset vehicle model + rig bundles (schema + seed)
+- Fleet moves from `equipment` (bundled rig) to **per-asset vehicles**. Added
+  **alongside** `equipment` (non-destructive Phase 1): `vehicle` (each tractor OR
+  trailer, VIN-keyed, `smitty_vehicle_id` correlation), typed `tractor_spec` /
+  `trailer_spec` (1:1 by asset type), and a **temporal** `rig_bundle`
+  (power + optional trailer over `[effective_from, effective_to)`) with
+  `rig_bundle_driver` supporting **teams**. New lookups: `asset_type`,
+  `vehicle_status`, `bundle_driver_role`.
+- Seed: 3 tractors + 3 trailers (VINs + specs), 3 current bundles (incl. a
+  Marcus+Dwayne **team** and a Tanya **bobtail**) + 1 **historical** bundle
+  (Pat's earlier step-deck rig). Verified on PG16 (51 fleet tables).
+- This is the shared surface for the **Smitty integration** (`vehicle` by VIN).
+  Phase 2 repoints `load`/`trip`/`position_report`/`driver_equipment`; Phase 3
+  retires `equipment`. Design: `docs/INTEGRATION_SMITTY.md` "Fleet response v1",
+  plan: `docs/TODO.md` Feature 7.
+
 ## 2026-07-30
 
 ### Fix: message POST 500 — clients must send a UUID `data.id` (safrs empty-PK check)

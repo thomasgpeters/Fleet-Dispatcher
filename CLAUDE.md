@@ -36,6 +36,15 @@ never connect to Kafka brokers directly — only the bridge (URL + JWT).
    A schema change means **ALS must be regenerated** — say so. After a fresh ALS
    generate, re-install our customizations with `make als-extensions` (the Kafka
    event producers in `als-extensions/`; rebuilds preserve them).
+   **Business invariants → LogicBank rules, not client code.** If a rule must hold
+   no matter which client writes (dispatch locks, integrity, cost allocation,
+   ownership/lease responsibility), it belongs in `als-extensions/logic_discovery/`
+   (`fleet_governance.py` / `comms_governance.py`), governed once at the ALS
+   commit — never duplicated in the C++ desktop and the Python/mobile clients.
+   **Temporal rules count too:** model time as data (`sys_clock`) and let a thin
+   "tick" agent advance it so LogicBank forward-chains the time-based derivations
+   (leases, overdue, responsibility). Agents are pulses; logic is declarative;
+   clients stay presentation-only. Doctrine + install path: `docs/LOGICBANK_RULES.md`.
 3. **Verify DB changes on a throwaway Postgres before committing.** Apply
    `schema.sql` + `seed_data.sql` to a fresh PG16 cluster and check it's clean.
    Use the `/verify-db` command. Never test against a persistent database.
