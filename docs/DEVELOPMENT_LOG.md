@@ -5,6 +5,17 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-07-31
 
+### Feature 7: vehicle ownership + maintenance responsibility + leases
+- Added ownership/responsibility to the `vehicle` model (drives who bears repair
+  cost from Smitty service records): `owner_type` / `maint_responsibility` lookups
+  (`fleet`/`owner_operator`/`lessor`), `vehicle.owner_type_id` + `owner_driver_id`
+  (the O/O) + `owner_name` + `maint_responsibility_id`, and a `vehicle_lease` table.
+  Maintenance responsibility can **diverge** from ownership (leases).
+- Seed covers all four cases: O/O-owned tractor (Pat), fleet-owned, Fleet-leased
+  trailer (Fleet maintains, XTRA Lease), O/O-leased trailer (Hector maintains,
+  Star Leasing). Verified on PG16 (55 fleet tables). Boundary/cost model:
+  `INTEGRATION_SMITTY.md` B.3/B.3a.
+
 ### Feature 7 Phase 2: wire the vehicle model into load/trip/position (additive)
 - Added, **alongside** the `equipment_id` columns (non-destructive):
   `load.power_vehicle_id` / `load.trailer_vehicle_id`, the same on `trip`,

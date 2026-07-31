@@ -169,6 +169,8 @@ resources). Codes shown below match the `code` column in
 - `vehicle_status` (Feature 7): `in_service`, `out_of_service`, `in_maintenance`,
   `retired`.
 - `bundle_driver_role` (Feature 7): `primary`, `co_driver`.
+- `owner_type` / `maint_responsibility` (Feature 7): `fleet`, `owner_operator`,
+  `lessor` — who owns a vehicle and who covers its repair cost (can diverge).
 
 ### Vehicle & RigBundle *(Feature 7 — per-asset model, aligns with Smitty)*
 
@@ -187,6 +189,14 @@ Feature 7 + `INTEGRATION_SMITTY.md`):
   which assets ran together when.
 - **`rig_bundle_driver`** — driver(s) on a bundle, each with a `bundle_driver_role`
   — supports **teams** (2+ drivers).
+- **Ownership & responsibility** — `vehicle.owner_type_id` (`fleet` /
+  `owner_operator` → `owner_driver_id` / `lessor` → `owner_name`) plus a separate
+  `maint_responsibility_id` for **who covers repair cost**, which can **diverge**
+  from ownership. `vehicle_lease` captures the divergence: a lessor owns the asset,
+  a lessee (Fleet or an owner-operator) holds the lease, and the lease names the
+  maintenance-responsible party for its term (e.g. Fleet-leased trailer Fleet must
+  maintain; O/O who leases their own trailer). Drives cost allocation for Smitty
+  service records (see `INTEGRATION_SMITTY.md` B.3/B.3a).
 - `load_status`: `draft`, `dispatched`, `in_transit`, `delivered`, `settled`,
   `cancelled`.
 - `app_role`: `dispatcher`, `driver`, `updater`.

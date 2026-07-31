@@ -295,19 +295,45 @@ INSERT INTO bundle_driver_role (id, code, name) VALUES
   (1, 'primary',   'Primary'),
   (2, 'co_driver', 'Co-driver');
 
-SELECT setval(pg_get_serial_sequence('asset_type', 'id'),         (SELECT max(id) FROM asset_type));
-SELECT setval(pg_get_serial_sequence('vehicle_status', 'id'),     (SELECT max(id) FROM vehicle_status));
-SELECT setval(pg_get_serial_sequence('bundle_driver_role', 'id'), (SELECT max(id) FROM bundle_driver_role));
+INSERT INTO owner_type (id, code, name) VALUES
+  (1, 'fleet',          'Fleet'),
+  (2, 'owner_operator', 'Owner-operator'),
+  (3, 'lessor',         'Lessor');
 
--- Tractors (asset_type 1) and trailers (asset_type 2), each VIN'd.
+INSERT INTO maint_responsibility (id, code, name) VALUES
+  (1, 'fleet',          'Fleet'),
+  (2, 'owner_operator', 'Owner-operator'),
+  (3, 'lessor',         'Lessor');
+
+SELECT setval(pg_get_serial_sequence('asset_type', 'id'),           (SELECT max(id) FROM asset_type));
+SELECT setval(pg_get_serial_sequence('vehicle_status', 'id'),       (SELECT max(id) FROM vehicle_status));
+SELECT setval(pg_get_serial_sequence('bundle_driver_role', 'id'),   (SELECT max(id) FROM bundle_driver_role));
+SELECT setval(pg_get_serial_sequence('owner_type', 'id'),           (SELECT max(id) FROM owner_type));
+SELECT setval(pg_get_serial_sequence('maint_responsibility', 'id'), (SELECT max(id) FROM maint_responsibility));
+
+-- Tractors (asset_type 1) and trailers (asset_type 2), each VIN'd. Ownership +
+-- maintenance responsibility cover all four cases: fleet-owned, owner-operator
+-- owned, fleet-leased (Fleet maintains), and O/O-leased (O/O maintains).
 INSERT INTO vehicle
-  (id, vin, unit_number, asset_type_id, make, model, model_year, plate, dot_number, fuel_type, odometer_miles, odometer_as_of, vehicle_status_id) VALUES
-  ('d1000000-0000-0000-0000-000000000001', '1FUJGLDR9CLBP8834', 'TR-501', 1, 'Freightliner', 'Cascadia', 2021, 'TX-8841', 'DOT-1123456', 'diesel', 412000, now() - interval '2 days', 1),
-  ('d1000000-0000-0000-0000-000000000002', '1XKYDP9X5MJ413552', 'TR-502', 1, 'Kenworth',     'T680',     2020, 'TX-5521', 'DOT-1123456', 'diesel', 388500, now() - interval '1 day',  1),
-  ('d1000000-0000-0000-0000-000000000003', '3AKJHHDR7LSLX1234', 'TR-503', 1, 'Peterbilt',    '579',      2019, 'TX-3391', 'DOT-1123456', 'diesel', 501200, now() - interval '5 hours',1),
-  ('d1000000-0000-0000-0000-000000000011', '1JJV532W1LL123456', 'TL-901', 2, 'Wabash',       'Step-deck',2020, 'TX-9014', NULL,          NULL,     NULL,   NULL,                       1),
-  ('d1000000-0000-0000-0000-000000000012', '5JYFA1229MP654321', 'TL-902', 2, 'Fontaine',     'RGN Low-boy',2021,'TX-9025', NULL,          NULL,     NULL,   NULL,                       1),
-  ('d1000000-0000-0000-0000-000000000013', '1UYVS2530MU987654', 'TL-903', 2, 'Great Dane',   'Flatbed',  2018, 'TX-9037', NULL,          NULL,     NULL,   NULL,                       3);  -- in maintenance
+  (id, vin, unit_number, asset_type_id, make, model, model_year, plate, dot_number, fuel_type, odometer_miles, odometer_as_of, vehicle_status_id, owner_type_id, owner_driver_id, owner_name, maint_responsibility_id) VALUES
+  -- TR-501: owner-operator Pat owns his tractor -> Pat covers repairs.
+  ('d1000000-0000-0000-0000-000000000001', '1FUJGLDR9CLBP8834', 'TR-501', 1, 'Freightliner', 'Cascadia', 2021, 'TX-8841', 'DOT-1123456', 'diesel', 412000, now() - interval '2 days', 1, 2, 'aaaaaaaa-0000-0000-0000-000000000001', NULL, 2),
+  -- TR-502, TR-503: fleet-owned company tractors -> Fleet covers.
+  ('d1000000-0000-0000-0000-000000000002', '1XKYDP9X5MJ413552', 'TR-502', 1, 'Kenworth',     'T680',     2020, 'TX-5521', 'DOT-1123456', 'diesel', 388500, now() - interval '1 day',  1, 1, NULL, NULL, 1),
+  ('d1000000-0000-0000-0000-000000000003', '3AKJHHDR7LSLX1234', 'TR-503', 1, 'Peterbilt',    '579',      2019, 'TX-3391', 'DOT-1123456', 'diesel', 501200, now() - interval '5 hours',1, 1, NULL, NULL, 1),
+  -- TL-901: fleet-owned trailer -> Fleet covers.
+  ('d1000000-0000-0000-0000-000000000011', '1JJV532W1LL123456', 'TL-901', 2, 'Wabash',       'Step-deck',2020, 'TX-9014', NULL,          NULL,     NULL,   NULL,                       1, 1, NULL, NULL, 1),
+  -- TL-902: fleet-LEASED (lessor owns) but Fleet maintains for the lease term.
+  ('d1000000-0000-0000-0000-000000000012', '5JYFA1229MP654321', 'TL-902', 2, 'Fontaine',     'RGN Low-boy',2021,'TX-9025', NULL,          NULL,     NULL,   NULL,                       1, 3, NULL, 'XTRA Lease',    1),
+  -- TL-903: an owner-operator leases their own trailer -> O/O maintains (in shop now).
+  ('d1000000-0000-0000-0000-000000000013', '1UYVS2530MU987654', 'TL-903', 2, 'Great Dane',   'Flatbed',  2018, 'TX-9037', NULL,          NULL,     NULL,   NULL,                       3, 3, NULL, 'Star Leasing',  2);
+
+-- Lease detail for the two leased trailers (responsibility during the lease).
+INSERT INTO vehicle_lease (id, vehicle_id, lessor_name, lessee_type_id, lessee_driver_id, maint_responsibility_id, start_date, end_date) VALUES
+  -- Fleet leases TL-902 and is responsible for its maintenance.
+  ('d5000000-0000-0000-0000-000000000001', 'd1000000-0000-0000-0000-000000000012', 'XTRA Lease',   1, NULL,                                    1, DATE '2025-01-01', DATE '2027-12-31'),
+  -- Owner-operator Hector leases TL-903 on his own -> Hector is responsible.
+  ('d5000000-0000-0000-0000-000000000002', 'd1000000-0000-0000-0000-000000000013', 'Star Leasing', 2, 'aaaaaaaa-0000-0000-0000-000000000006', 2, DATE '2026-03-01', DATE '2028-02-29');
 
 INSERT INTO tractor_spec (vehicle_id, power_unit_id, horsepower, num_axles, has_sleeper) VALUES
   ('d1000000-0000-0000-0000-000000000001', 1, 455, 3, TRUE),
