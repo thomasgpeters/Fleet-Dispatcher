@@ -623,34 +623,51 @@ third parties. Practically:
 - **Privacy:** third-party customer data (their VINs, jobs, costs) must **not**
   cross to Fleet. The subset filter (B.1) + customer scoping (here) enforce that.
 
-## B.3 Cost is confidential — Fleet-job dollars do NOT cross the boundary (refines/overrides Q4)
+## B.3 Cost passes to Fleet **at cost**; only the markup is confidential (corrects the earlier draft)
 
-**Correction to Q4 / F.4.** Fleet-vehicle **job costs never cross the integration
-boundary** — not the invoiced amount, not the at-cost parts/labor. Servicing a
-Fleet rig at Smitty is an internal, inter-company transaction whose pricing is
-frequently **absorbed ("eaten") or heavily discounted**; exposing those dollars
-across the boundary would leak the internal pricing arrangement (and, given
-Smitty's public/third-party context, must be treated as non-shareable).
+Corrected model (supersedes the prior "no dollars cross" draft):
 
-So the boundary carries **service facts, not service money**:
+- **The at-cost figure — parts + labor at cost — DOES cross to Fleet.** Mechanics
+  aren't free; Fleet has to cover the actual cost of servicing its rigs, so it
+  needs the number.
+- **The markup / margin on a Fleet job is negotiated per-job** between the shop
+  managers and the company (Fleet) — sometimes full retail, sometimes discounted,
+  sometimes waived ("eaten"); it is **not** a standing policy. That negotiated
+  markup and Smitty's retail pricing (what a third-party customer would pay) are
+  **Smitty-internal and don't cross** the boundary — they'd leak the per-job
+  negotiation and Smitty's third-party pricing. What Fleet is actually **billed**
+  for its own job (the agreed amount) is of course Fleet's own record.
 
-| Crosses to Fleet (for Fleet-owned VINs) | Stays in Smitty's ledger (never crosses) |
+So the boundary carries **service facts + at-cost totals**, never retail/marked-up
+price:
+
+| Crosses to Fleet (Fleet-owned VINs) | Stays in Smitty's ledger (never crosses) |
 | --- | --- |
-| work performed, service type, dates, odometer-at-service, vendor | `total_cost`, `parts_total`, `labor_total`, `estimated/actual_cost` |
-| `maintenance_schedule` (due/overdue), `out_of_service`, in-shop status | any per-part / per-labor pricing on Fleet Jobs |
+| work performed, service type, dates, odometer-at-service | retail/invoiced price with **markup**; margin; third-party pricing |
+| **at-cost** parts + labor totals (what Fleet must cover) | Smitty's profit margin on the Fleet job |
+| `maintenance_schedule`, `out_of_service`, in-shop status | any pricing on **third-party** jobs (never crosses at all, B.1/B.2) |
 
-Implications:
-- The Fleet↔Smitty pull of `/api/Job` (and JobPart/JobLaborItem) for Fleet VINs
-  must be **cost-field-stripped** — Smitty returns the service record without the
-  money columns, or Fleet's consumer drops them on ingest. (Third-party Jobs
-  never cross at all, per B.1/B.2.)
-- **Valuation/TCO (Feature 6) is computed from Fleet's OWN cost basis**, not from
-  Smitty's discounted/eaten invoice. Fleet may still record its internal service
-  cost separately in its own ledger; that number is a Fleet-side figure, not
-  sourced across the boundary.
-- Net: the two directions of confidentiality are symmetric — third-party data
-  never reaches Fleet (B.1/B.2), and Fleet-job **pricing** never leaves Smitty.
-  Only the operational service history crosses.
+**Who bears the at-cost amount depends on the vehicle's ownership / lease** — Fleet
+receives the cost, then **allocates** it (see B.3a). Valuation/TCO (Feature 6) can
+use the real at-cost figures for Fleet-responsible vehicles.
+
+## B.3a Cost responsibility follows ownership + lease (Fleet-side model)
+
+The at-cost amount that crosses is **allocated by who is responsible for the
+vehicle**, which Fleet now models on the `vehicle` (Feature 7 — ownership +
+maintenance responsibility + `vehicle_lease`):
+
+| Vehicle situation | Who covers the repair cost |
+| --- | --- |
+| **Fleet-owned** | Fleet |
+| **Owner-operator's own vehicle** (tractor or trailer) | the owner-operator absorbs it |
+| **Fleet-leased** (e.g. a leased trailer Fleet doesn't own) | **Fleet**, for the life of the lease (maintenance responsibility ≠ ownership) |
+| **Owner-operator leases their own trailer** | per that lease — the O/O or the lessor; the `vehicle_lease` record names the responsible party |
+
+Key point: **maintenance responsibility can diverge from ownership** (leases), so
+Fleet stores it explicitly rather than deriving it from `owner_type` alone. When
+Smitty publishes a service record for a Fleet-serviced VIN, Fleet posts the
+at-cost amount against whichever party its `vehicle` says is responsible.
 
 ## B.4 Asks back to Smitty
 
