@@ -276,6 +276,68 @@ FROM wk, (VALUES
 ) AS v(id, driver_id, equipment_id, shipper_id, receiver_id, commodity_id, pickup_id, dropoff_id, run_type_id, load_status_id, deadhead_miles, loaded_miles, rate, deck_feet, weight_lbs, day_offset, transit);
 
 -- ===========================================================================
+-- Vehicles & rig bundles (Feature 7 — per-asset model). Seeded ALONGSIDE the
+-- equipment/loads above (Phase 1). Each tractor/trailer is its own VIN'd vehicle;
+-- bundles show current combinations + one historical combination (Pat moved from
+-- a step-deck to the RGN) + a driver team (Marcus + Dwayne).
+-- ===========================================================================
+INSERT INTO asset_type (id, code, name) VALUES
+  (1, 'tractor', 'Tractor'),
+  (2, 'trailer', 'Trailer');
+
+INSERT INTO vehicle_status (id, code, name) VALUES
+  (1, 'in_service',     'In service'),
+  (2, 'out_of_service', 'Out of service'),
+  (3, 'in_maintenance', 'In maintenance'),
+  (4, 'retired',        'Retired');
+
+INSERT INTO bundle_driver_role (id, code, name) VALUES
+  (1, 'primary',   'Primary'),
+  (2, 'co_driver', 'Co-driver');
+
+SELECT setval(pg_get_serial_sequence('asset_type', 'id'),         (SELECT max(id) FROM asset_type));
+SELECT setval(pg_get_serial_sequence('vehicle_status', 'id'),     (SELECT max(id) FROM vehicle_status));
+SELECT setval(pg_get_serial_sequence('bundle_driver_role', 'id'), (SELECT max(id) FROM bundle_driver_role));
+
+-- Tractors (asset_type 1) and trailers (asset_type 2), each VIN'd.
+INSERT INTO vehicle
+  (id, vin, unit_number, asset_type_id, make, model, model_year, plate, dot_number, fuel_type, odometer_miles, odometer_as_of, vehicle_status_id) VALUES
+  ('d1000000-0000-0000-0000-000000000001', '1FUJGLDR9CLBP8834', 'TR-501', 1, 'Freightliner', 'Cascadia', 2021, 'TX-8841', 'DOT-1123456', 'diesel', 412000, now() - interval '2 days', 1),
+  ('d1000000-0000-0000-0000-000000000002', '1XKYDP9X5MJ413552', 'TR-502', 1, 'Kenworth',     'T680',     2020, 'TX-5521', 'DOT-1123456', 'diesel', 388500, now() - interval '1 day',  1),
+  ('d1000000-0000-0000-0000-000000000003', '3AKJHHDR7LSLX1234', 'TR-503', 1, 'Peterbilt',    '579',      2019, 'TX-3391', 'DOT-1123456', 'diesel', 501200, now() - interval '5 hours',1),
+  ('d1000000-0000-0000-0000-000000000011', '1JJV532W1LL123456', 'TL-901', 2, 'Wabash',       'Step-deck',2020, 'TX-9014', NULL,          NULL,     NULL,   NULL,                       1),
+  ('d1000000-0000-0000-0000-000000000012', '5JYFA1229MP654321', 'TL-902', 2, 'Fontaine',     'RGN Low-boy',2021,'TX-9025', NULL,          NULL,     NULL,   NULL,                       1),
+  ('d1000000-0000-0000-0000-000000000013', '1UYVS2530MU987654', 'TL-903', 2, 'Great Dane',   'Flatbed',  2018, 'TX-9037', NULL,          NULL,     NULL,   NULL,                       3);  -- in maintenance
+
+INSERT INTO tractor_spec (vehicle_id, power_unit_id, horsepower, num_axles, has_sleeper) VALUES
+  ('d1000000-0000-0000-0000-000000000001', 1, 455, 3, TRUE),
+  ('d1000000-0000-0000-0000-000000000002', 1, 500, 3, TRUE),
+  ('d1000000-0000-0000-0000-000000000003', 1, 455, 3, FALSE);
+
+INSERT INTO trailer_spec (vehicle_id, trailer_type_id, deck_length_ft, weight_capacity_lbs, has_ramps, has_duals, num_axles) VALUES
+  ('d1000000-0000-0000-0000-000000000011', 1, 52, 48000, TRUE,  FALSE, 2),  -- step-deck
+  ('d1000000-0000-0000-0000-000000000012', 2, 29, 80000, FALSE, FALSE, 3),  -- RGN low-boy
+  ('d1000000-0000-0000-0000-000000000013', 3, 52, 48000, FALSE, FALSE, 2);  -- flatbed
+
+-- Rig bundles: three current combinations + one historical (Pat's earlier rig).
+INSERT INTO rig_bundle (id, power_vehicle_id, trailer_vehicle_id, effective_from, effective_to) VALUES
+  -- CURRENT: TR-501 + RGN, Pat solo
+  ('d2000000-0000-0000-0000-000000000001', 'd1000000-0000-0000-0000-000000000001', 'd1000000-0000-0000-0000-000000000012', now() - interval '30 days', NULL),
+  -- CURRENT: TR-502 + step-deck, Marcus + Dwayne team
+  ('d2000000-0000-0000-0000-000000000002', 'd1000000-0000-0000-0000-000000000002', 'd1000000-0000-0000-0000-000000000011', now() - interval '14 days', NULL),
+  -- CURRENT: TR-503 bobtail (no trailer), Tanya
+  ('d2000000-0000-0000-0000-000000000003', 'd1000000-0000-0000-0000-000000000003', NULL,                                    now() - interval '3 days',  NULL),
+  -- HISTORICAL: Pat was on TR-501 + step-deck before switching to the RGN
+  ('d2000000-0000-0000-0000-000000000004', 'd1000000-0000-0000-0000-000000000001', 'd1000000-0000-0000-0000-000000000011', now() - interval '90 days', now() - interval '30 days');
+
+INSERT INTO rig_bundle_driver (id, rig_bundle_id, driver_id, driver_role_id) VALUES
+  ('d3000000-0000-0000-0000-000000000001', 'd2000000-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-000000000001', 1),  -- Pat, current RGN rig
+  ('d3000000-0000-0000-0000-000000000002', 'd2000000-0000-0000-0000-000000000002', 'aaaaaaaa-0000-0000-0000-000000000003', 1),  -- Marcus primary
+  ('d3000000-0000-0000-0000-000000000003', 'd2000000-0000-0000-0000-000000000002', 'aaaaaaaa-0000-0000-0000-000000000004', 2),  -- Dwayne co-driver (team)
+  ('d3000000-0000-0000-0000-000000000004', 'd2000000-0000-0000-0000-000000000003', 'aaaaaaaa-0000-0000-0000-000000000005', 1),  -- Tanya, bobtail
+  ('d3000000-0000-0000-0000-000000000005', 'd2000000-0000-0000-0000-000000000004', 'aaaaaaaa-0000-0000-0000-000000000001', 1);  -- Pat, historical step-deck rig
+
+-- ===========================================================================
 -- Messaging (lookups + a sample group channel with messages and an attachment)
 -- ===========================================================================
 INSERT INTO channel_type (id, code, name) VALUES

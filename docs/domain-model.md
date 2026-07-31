@@ -165,6 +165,28 @@ resources). Codes shown below match the `code` column in
   `light`, `beige`, `tan`, `honey`, `bronze`, `brown`, `deep`, `espresso`) with a
   `hex`. Users self-pick (`app_user.avatar_color_id`); drivers can be assigned one
   (`driver.avatar_color_id`), falling back to a tone derived from the name.
+- `asset_type` (Feature 7): `tractor`, `trailer`.
+- `vehicle_status` (Feature 7): `in_service`, `out_of_service`, `in_maintenance`,
+  `retired`.
+- `bundle_driver_role` (Feature 7): `primary`, `co_driver`.
+
+### Vehicle & RigBundle *(Feature 7 — per-asset model, aligns with Smitty)*
+
+Fleet is moving from `equipment` (a bundled rig) to **per-asset vehicles** plus a
+**temporal bundle** (added alongside `equipment` in Phase 1; see `TODO.md`
+Feature 7 + `INTEGRATION_SMITTY.md`):
+
+- **`vehicle`** *(aggregate root)* — one physical asset, a **tractor OR trailer**,
+  VIN-keyed (VIN is the canonical key shared with Smitty; `smitty_vehicle_id`
+  correlates back). Carries identity, odometer, `vehicle_status`, dot/plate/fuel.
+- **`tractor_spec` / `trailer_spec`** — typed 1:1 specs per asset type (engine/hp/
+  sleeper vs deck/weight/ramps/duals), because tractor and trailer specs are
+  different domains.
+- **`rig_bundle`** — the **temporal combination** of a power unit + (optional)
+  trailer over `[effective_from, effective_to)` (NULL = current). Full history of
+  which assets ran together when.
+- **`rig_bundle_driver`** — driver(s) on a bundle, each with a `bundle_driver_role`
+  — supports **teams** (2+ drivers).
 - `load_status`: `draft`, `dispatched`, `in_transit`, `delivered`, `settled`,
   `cancelled`.
 - `app_role`: `dispatcher`, `driver`, `updater`.

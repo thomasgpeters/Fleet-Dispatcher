@@ -3,6 +3,24 @@
 Newest first. One entry per meaningful change set; pair with the checklist in
 [`TODO.md`](TODO.md).
 
+## 2026-07-31
+
+### Feature 7 Phase 1: per-asset vehicle model + rig bundles (schema + seed)
+- Fleet moves from `equipment` (bundled rig) to **per-asset vehicles**. Added
+  **alongside** `equipment` (non-destructive Phase 1): `vehicle` (each tractor OR
+  trailer, VIN-keyed, `smitty_vehicle_id` correlation), typed `tractor_spec` /
+  `trailer_spec` (1:1 by asset type), and a **temporal** `rig_bundle`
+  (power + optional trailer over `[effective_from, effective_to)`) with
+  `rig_bundle_driver` supporting **teams**. New lookups: `asset_type`,
+  `vehicle_status`, `bundle_driver_role`.
+- Seed: 3 tractors + 3 trailers (VINs + specs), 3 current bundles (incl. a
+  Marcus+Dwayne **team** and a Tanya **bobtail**) + 1 **historical** bundle
+  (Pat's earlier step-deck rig). Verified on PG16 (51 fleet tables).
+- This is the shared surface for the **Smitty integration** (`vehicle` by VIN).
+  Phase 2 repoints `load`/`trip`/`position_report`/`driver_equipment`; Phase 3
+  retires `equipment`. Design: `docs/INTEGRATION_SMITTY.md` "Fleet response v1",
+  plan: `docs/TODO.md` Feature 7.
+
 ## 2026-07-30
 
 ### Fix: message POST 500 — clients must send a UUID `data.id` (safrs empty-PK check)
