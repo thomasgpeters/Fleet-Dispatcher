@@ -275,3 +275,210 @@ out_of_service (
 Feature 6 (vehicle detail & lifecycle — the asset fields this depends on),
 `docs/REALTIME.md` (Kafka topic strategy this mirrors), `docs/DEPLOYMENT.md`
 (shared-instance schema separation).*
+
+---
+
+# Smitty response v1
+
+**Date:** 2026-07-13 · **Owner:** Smitty Services team ·
+**Status:** proposal, awaiting Fleet review
+
+Answers to §9's six open questions and the three cross-cutting constraints
+Smitty is holding to. Concrete Phase 1 work items are captured in
+`tasks/TODO.md §5 Fleet Dispatcher integration` — read that for the
+checklist; this section is the *position* the checklist is built against.
+
+## R.1 Smitty state today (facts, not aspirations)
+
+| Concept | Smitty today | Gap Fleet needs to know about |
+| --- | --- | --- |
+| Vehicle | `vehicles` table. `vehicle_id SMALLINT` PK, `vin VARCHAR(30) NOT NULL UNIQUE`, `year`, `make`, `model`, `license_plate`, `notes`, `customer_id` FK. ALS resource name: **`Vehicle`**. | No odometer, no operational_status, no dot/fuel/asset_type, no specs, no fleet_equipment_id correlation. Additive migration adds them. |
+| Work order | `jobs` table + `job_parts` / `job_labor_items` / `job_notes` / `job_purchases`. ALS resource: **`Job`** (not `WorkOrder`). Lifecycle: `New → In Progress → Complete → Invoiced`. | Fleet consumers should map `WorkOrder ↔ /api/Job`. Cost fields already present: `estimated_cost`, `actual_cost`, `parts_total`, `labor_total`, `job_total`. |
+| Maintenance schedule | *does not exist* | Phase 1 adds `maintenance_schedules` table + `/api/MaintenanceSchedule` resource. |
+| Out-of-service window | *does not exist* | Phase 1 adds `vehicle_out_of_service` table + `/api/VehicleOutOfService` resource. |
+| Auth | bcrypt + username/password + Wt session. **No JWT support.** ALS is currently open on the LAN. | Phase 1 adds shared-service-token check for cross-app calls. |
+| Kafka | *not in the stack* — Wt + ApiLogicServer + Postgres only. | Deferred to Phase 5. Phase 1-3 use JSON:API pull only. |
+
+## R.2 Cross-cutting constraints Smitty is holding to
+
+These bound every schema and code change in the integration:
+
+**C.1 — Schema changes are additive-only.** No `DROP COLUMN`, no renames,
+no type changes. Every migration is `ADD COLUMN IF NOT EXISTS` on existing
+tables and `CREATE TABLE IF NOT EXISTS` for new ones. Deprecated fields stay
+in place, become nullable, and just stop being written. This preserves the
+ability to roll back a Smitty deploy without losing correlation data Fleet
+has already published into the mirror.
+
+**C.2 — Byte-identical DDL on both sides for shared tables.** The extended
+`vehicles` shape, the new `maintenance_schedules` table, and
+`vehicle_out_of_service` are **the same DDL** on both Smitty and Fleet
+Dispatcher, each maintained in its own schema (`smitty.*` / `fleet.*`).
+Not "compatible" — literally the same column list, types, defaults. The
+sync layer replicates rows, not translates them. Divergence in these
+tables is a bug.
+
+**C.3 — Fleet Dispatcher holds the on/off switch.** Smitty does not have a
+matching toggle; it is a passive party. When Fleet's admin turns
+integration off, Smitty's mirror fields simply go stale (or NULL where
+they were never published). Smitty's UI must degrade gracefully — no
+dependency on the mirror being fresh, no error surface when Fleet is silent.
+
+## R.3 Answers to §9's open questions
+
+**Q1 — Canonical granularity: one VIN per canonical vehicle.**
+Every serviced asset — power unit *and* trailer — is its own Smitty
+`vehicles` row today, keyed by VIN. Fleet's `equipment` rig-bundling maps
+to *N* Smitty vehicles; a single Fleet equipment row can point at (say) a
+tractor + trailer as two separate Smitty vehicle rows via VIN, and the
+sync layer keeps both agreed. Rig-level canonical vehicle would collapse
+Smitty's per-asset service history and is a non-starter.
+
+**Q2 — Maintenance interval basis: both, whichever comes first.**
+`maintenance_schedules` carries `interval_miles NULL` and
+`interval_days NULL`. Either or both may be set on a row. `next_due` is
+the earlier of (mileage-based next-due, date-based next-due); the app
+computes both when the row is written, and re-computes on each odometer
+push from Fleet. Time-only items (annual DOT inspection) leave
+`interval_miles` NULL; mileage-only items (oil change) leave
+`interval_days` NULL; mixed items (brake fluid: 24 months **or** 25 000
+miles) set both.
+
+**Q3 — Sync mechanism: JSON:API pull for Phase 1-3, Kafka in Phase 5.**
+Smitty is a C++ Wt frontend against ApiLogicServer; a native Kafka
+producer/consumer in that stack is disproportionate for the initial
+integration. Both apps' ALS already speaks JSON:API. Phase 1-3 uses
+scheduled pull from either direction, coalescing at ALS. Phase 5 adds a
+Python-side event producer on ALS's row-change hooks — a small module,
+does not touch the Wt frontend. Fleet's existing Kafka plane sees a
+`vehicle-service.v1` topic emitted from Smitty's ALS.
+
+**Q4 — Valuation SoR: Smitty publishes cost history, Fleet computes value.**
+Job / JobPart / JobLaborItem already track repair costs at per-service
+granularity and are exposed as `/api/Job`. Fleet reads that, rolls up
+into asset valuation on its side. Rolling total-cost-of-ownership into
+Smitty's model would drag Smitty into asset-lifecycle territory it does
+not currently model — different consumers, different lifecycle.
+
+**Q5 — Identity fallback when VIN is missing/dirty.**
+Correlation order: `vin` → `(customer_id, license_plate)` → `unit_number`
+via the correlation-mapping table both sides maintain
+(`fleet_equipment_id` on Smitty's vehicles is the reverse pointer). On a
+VIN conflict between the two sides, **Fleet wins** — telematics + DOT
+compliance authoritative, Smitty applies the correction via the next
+scheduled pull. If integration is off (per C.3), Smitty stays on its
+last-known VIN until Fleet resumes publishing.
+
+**Q6 — Resource names + auth.**
+- **Smitty resource names Fleet should call:** `/api/Vehicle`,
+  `/api/Job` (work order), `/api/JobPart`, `/api/JobLaborItem`,
+  `/api/JobNote`, `/api/MaintenanceSchedule` (Phase 1 new),
+  `/api/VehicleOutOfService` (Phase 1 new). No `WorkOrder` or
+  `WorkOrderLine` — Fleet's docs should map to Smitty's names.
+- **Auth for Phase 1-3:** shared service token in `X-Service-Token`
+  header, checked by a small ALS middleware. Env-var `SMITTY_SERVICE_TOKEN`
+  on both sides. Combined with LAN-only exposure since we share a
+  Postgres instance. Not JWT — that's a Phase 5 discussion when Kafka
+  lands and cross-service auth gets a bigger conversation.
+
+## R.4 Shared schema (identical on both sides, additive to existing)
+
+Applies verbatim to Smitty's `smitty.*` schema and Fleet's `fleet.*`
+schema. Both sides commit the same DDL patch, adjusted only for the
+local `vehicles` / `equipment` table name — the *columns* being added
+are identical.
+
+```sql
+-- 1. ADDITIVE columns on the local vehicle table (both sides).
+--    Fleet applies these to fleet.equipment (or fleet.vehicles if that
+--    is the renamed target); Smitty applies to smitty.vehicles.
+--    Column list is byte-identical.
+ALTER TABLE vehicles
+    ADD COLUMN IF NOT EXISTS fleet_equipment_id  VARCHAR(60),
+    ADD COLUMN IF NOT EXISTS odometer_miles      INTEGER,
+    ADD COLUMN IF NOT EXISTS odometer_as_of      TIMESTAMP,
+    ADD COLUMN IF NOT EXISTS operational_status  VARCHAR(20),   -- in_service | out_of_service
+    ADD COLUMN IF NOT EXISTS asset_type          VARCHAR(20),   -- tractor | truck | trailer
+    ADD COLUMN IF NOT EXISTS dot_number          VARCHAR(20),
+    ADD COLUMN IF NOT EXISTS fuel_type           VARCHAR(20),
+    ADD COLUMN IF NOT EXISTS specs               JSONB;
+
+-- 2. maintenance_schedules — new table, identical both sides.
+--    vehicle_id FK targets the LOCAL vehicles table. vin is the
+--    denormalized correlation key that survives cross-app matching.
+CREATE TABLE IF NOT EXISTS maintenance_schedules (
+    schedule_id       SMALLINT     PRIMARY KEY GENERATED BY DEFAULT AS IDENTITY,
+    vehicle_id        SMALLINT     NOT NULL,
+    vin               VARCHAR(30),
+    service_type      VARCHAR(60)  NOT NULL,
+    interval_miles    INTEGER,
+    interval_days     INTEGER,
+    next_due_on       DATE,
+    next_due_odometer INTEGER,
+    status            VARCHAR(20)  NOT NULL DEFAULT 'upcoming',
+    created_at        TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at        TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by        VARCHAR(60)
+);
+
+CREATE INDEX IF NOT EXISTS idx_maintenance_schedules_vin
+    ON maintenance_schedules (vin);
+CREATE INDEX IF NOT EXISTS idx_maintenance_schedules_vehicle
+    ON maintenance_schedules (vehicle_id, status);
+
+-- 3. vehicle_out_of_service — new table, identical both sides.
+CREATE TABLE IF NOT EXISTS vehicle_out_of_service (
+    oos_id      SMALLINT     PRIMARY KEY GENERATED BY DEFAULT AS IDENTITY,
+    vehicle_id  SMALLINT     NOT NULL,
+    vin         VARCHAR(30),
+    from_ts     TIMESTAMP    NOT NULL,
+    to_ts       TIMESTAMP,
+    reason      TEXT,
+    created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by  VARCHAR(60)
+);
+
+CREATE INDEX IF NOT EXISTS idx_vehicle_oos_vin
+    ON vehicle_out_of_service (vin);
+CREATE INDEX IF NOT EXISTS idx_vehicle_oos_active
+    ON vehicle_out_of_service (vehicle_id, to_ts);
+```
+
+Note the deliberate omission of cross-app FKs. `vehicle_id` inside these
+new tables points at the LOCAL vehicle table. `vin` is the cross-app
+correlation carried as a denormalized column so an unmatched-VIN row on
+one side still round-trips cleanly. This is what makes C.3 (Fleet holds
+the toggle) safe — Smitty can operate on the tables with Fleet silent
+and no dangling FKs.
+
+## R.5 Phased plan (Smitty side)
+
+Detailed checklist lives in `tasks/TODO.md §5`. Summary:
+
+- **Phase 1 — Schema + token.** Additive DDL patch (rma-parallel style),
+  service-token middleware on ALS, one-shot reconcile script. No UI
+  changes. Fleet applies identical DDL its side.
+- **Phase 2 — Fleet → Smitty pull.** Scheduled reconcile from Fleet's
+  `/api/Equipment` into Smitty's `vehicles`. Log-only failure surface.
+- **Phase 3 — Smitty → Fleet publish (readable).** Fleet pulls Smitty's
+  `/api/Job`, `/api/MaintenanceSchedule`, `/api/VehicleOutOfService`
+  through the same shared-token endpoint. No Smitty code change beyond
+  Phase 1's middleware.
+- **Phase 4 — Maintenance UI on Smitty.** VehicleDetail Maintenance tab
+  showing upcoming/due/overdue + current OOS windows; Schedule Service
+  and Start/End OOS actions. This is the first user-visible slice.
+- **Phase 5 — Optional Kafka bridge.** Python-side producer on ALS
+  row-change hooks emits `vehicle-service.v1`. Consumer for
+  `vehicle.v1` (odometer / status) replaces or augments the Phase 2
+  pull. C++ frontend never touches Kafka.
+
+## R.6 Sequencing versus in-flight Smitty work
+
+Landing Phase 1 pushes **§4b RMA Phase 1 Stage 2** (Inventory plumbing +
+UI wiring) further out — RMA schema is on main but the C++ wiring
+hasn't started. If Fleet's timeline is urgent, the integration outranks
+RMA and RMA UI slides. If Fleet is comfortable waiting a cycle, we
+finish RMA Stages 2-3 first and start integration after. Explicit call
+from the Fleet + Smitty owners on which slot.
+
+---
