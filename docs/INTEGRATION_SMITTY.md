@@ -585,10 +585,27 @@ of Fleet-side work and will be phased (see Fleet `docs/TODO.md`).
   (Fleet now keys the canonical asset as `vehicle`, not `equipment`). Same
   correlation, renamed target. Additive per C.1.
 
-## Sequencing (R.6)
+## Sequencing (R.6) — decided: **Smitty finishes RMA first, integration after**
 
-**[Fleet owner to confirm]** — integration ahead of Smitty's RMA work, or after.
-Not yet decided.
+**Fleet's call (2026-07-31): finish Smitty's in-flight RMA (Stages 2–3) first;
+Fleet + Smitty start the integration build after.**
+
+Rationale — the contract is locked, so there's no urgency to have Smitty drop
+RMA now:
+- The integration's *full* value (dispatch respects in-shop status, maintenance
+  on real vehicles, cost allocation) is gated by **Fleet's own Phase 3**
+  (equipment → vehicle cutover), which is a substantial lift not yet done. So
+  Smitty's endpoints would sit waiting even if built today.
+- The shared surface already exists on the Fleet side (`vehicle` by VIN,
+  ownership/lease responsibility, LogicBank dispatch-lock), and the contract is
+  agreed — so integration can be picked up cleanly whenever RMA lands, with no
+  context-switch penalty mid-RMA.
+- Meanwhile Fleet proceeds in parallel on Phase 3 + the **Fleet-side consumer
+  scaffolding** (mirror tables, poller, cost-allocation rule) — none of which
+  needs Smitty's endpoints live yet.
+
+*(Fleet owner can flip this in one word if RMA slips or the in-shop dispatch-lock
+becomes urgent sooner.)*
 
 # Integration boundary — Smitty as a profit center (Fleet, 2026-07-31)
 
@@ -683,3 +700,25 @@ at-cost amount against whichever party its `vehicle` says is responsible.
    cost/money fields** for Fleet VINs (`total_cost`, `parts_total`, `labor_total`,
    `estimated/actual_cost`, per-line pricing) — service facts only, no dollars
    (see B.3). Easiest as a cost-stripped projection/view for the Fleet token.
+
+# Fleet-side consumer — built (Fleet, 2026-07-31)
+
+Fleet's half of the sync is scaffolded and verified, ready to ingest the moment
+Smitty ships its Phase-1 endpoints:
+
+- **Mirror tables** (Fleet-native UUID keys, VIN-correlated, FK to `vehicle`;
+  at-cost only): `service_record`, `maintenance_schedule`,
+  `vehicle_out_of_service`. Verified on PG16 (59 fleet tables).
+- **LogicBank** (`als-extensions/logic_discovery/fleet_governance.py`) does the
+  ingest logic declaratively: `Rule.copy` snapshots the responsible party onto a
+  service record at service time (cost allocation); a `Rule.formula` derives
+  maintenance `status` (upcoming/due/overdue) from `sys_clock.today` + the vehicle
+  odometer; and the **dispatch-lock** constraint reads open `vehicle_out_of_service`
+  windows, so an in-shop rig can't be dispatched from any client.
+- **Poller** (`integration/smitty_poller.py`) — the thin fetch driver. It pulls
+  Smitty's data (scoped to Fleet's `customer_id`, at-cost only, unresolved VINs
+  dropped) and **writes through Fleet's ALS API** so the LogicBank rules fire on
+  ingest. No business logic in the agent.
+
+Waiting on Smitty (per B.4): the Fleet `customer_id`, customer/VIN-filterable
+endpoints, and the **at-cost figure on `Job`** distinct from retail/`job_total`.

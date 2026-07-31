@@ -338,6 +338,29 @@ INSERT INTO vehicle_lease (id, vehicle_id, lessor_name, lessee_type_id, lessee_d
   -- Owner-operator Hector leases TL-903 on his own -> Hector is responsible.
   ('d5000000-0000-0000-0000-000000000002', 'd1000000-0000-0000-0000-000000000013', 'Star Leasing', 2, 'aaaaaaaa-0000-0000-0000-000000000006', 2, DATE '2026-03-01', DATE '2028-02-29');
 
+-- Smitty service mirror (demo of what the poller ingests; at-cost only). The
+-- maint_responsibility snapshot mirrors what LogicBank's Rule.copy would set from
+-- the vehicle at ingest time.
+INSERT INTO service_record
+  (id, smitty_job_id, vin, vehicle_id, service_type, complaint, opened_at, closed_at, odometer_at_service, at_cost_amount, vendor, status, maint_responsibility_id) VALUES
+  -- TL-903 in the shop now (O/O Hector's leased trailer -> he's responsible).
+  ('d6000000-0000-0000-0000-000000000001', 'JOB-10241', '1UYVS2530MU987654', 'd1000000-0000-0000-0000-000000000013', 'Brake service', 'Air leak, right rear', now() - interval '1 day', NULL, NULL, 640.00, 'Smitty Services', 'in_progress', 2),
+  -- TR-501 completed PM (owner-operator Pat's tractor -> Pat responsible).
+  ('d6000000-0000-0000-0000-000000000002', 'JOB-10188', '1FUJGLDR9CLBP8834', 'd1000000-0000-0000-0000-000000000001', 'PM service', 'Scheduled 25k service', now() - interval '9 days', now() - interval '9 days', 410000, 385.50, 'Smitty Services', 'invoiced', 2),
+  -- TR-502 completed (fleet-owned -> Fleet responsible).
+  ('d6000000-0000-0000-0000-000000000003', 'JOB-10205', '1XKYDP9X5MJ413552', 'd1000000-0000-0000-0000-000000000002', 'Tire replacement', 'Steer tires', now() - interval '4 days', now() - interval '4 days', 387000, 1120.00, 'Smitty Services', 'complete', 1);
+
+-- Upcoming maintenance (Fleet warns dispatchers; status derived by LogicBank).
+INSERT INTO maintenance_schedule
+  (id, smitty_schedule_id, vin, vehicle_id, service_type, interval_miles, interval_days, next_due_on, next_due_odometer, status) VALUES
+  ('d7000000-0000-0000-0000-000000000001', 'SCH-501-oil', '1FUJGLDR9CLBP8834', 'd1000000-0000-0000-0000-000000000001', 'Oil change',     25000, NULL, NULL,             435000, 'upcoming'),
+  ('d7000000-0000-0000-0000-000000000002', 'SCH-502-dot', '1XKYDP9X5MJ413552', 'd1000000-0000-0000-0000-000000000002', 'DOT inspection', NULL,  365,  CURRENT_DATE + 20, NULL,   'upcoming'),
+  ('d7000000-0000-0000-0000-000000000003', 'SCH-903-brk', '1UYVS2530MU987654', 'd1000000-0000-0000-0000-000000000013', 'Brake inspection',NULL,  180,  CURRENT_DATE - 5,  NULL,   'overdue');
+
+-- Active out-of-service window (TL-903 is in the shop -> not dispatchable).
+INSERT INTO vehicle_out_of_service (id, smitty_oos_id, vin, vehicle_id, from_ts, to_ts, reason) VALUES
+  ('d8000000-0000-0000-0000-000000000001', 'OOS-903', '1UYVS2530MU987654', 'd1000000-0000-0000-0000-000000000013', now() - interval '1 day', NULL, 'In shop — brake service');
+
 INSERT INTO tractor_spec (vehicle_id, power_unit_id, horsepower, num_axles, has_sleeper) VALUES
   ('d1000000-0000-0000-0000-000000000001', 1, 455, 3, TRUE),
   ('d1000000-0000-0000-0000-000000000002', 1, 500, 3, TRUE),

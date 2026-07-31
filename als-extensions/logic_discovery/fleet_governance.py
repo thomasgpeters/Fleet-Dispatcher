@@ -39,6 +39,8 @@ log = logging.getLogger(__name__)
 VEHICLE_STATUS_IN_SERVICE = 1        # 2 out_of_service · 3 in_maintenance · 4 retired
 ASSET_TYPE_TRACTOR = 1
 ASSET_TYPE_TRAILER = 2
+DUE_SOON_DAYS = 7                    # maintenance "due" window (date side)
+DUE_SOON_MILES = 1000                # maintenance "due" window (mileage side)
 
 
 # --- helpers ----------------------------------------------------------------
@@ -50,27 +52,39 @@ def _vehicle(session, vehicle_id):
             .filter_by(id=vehicle_id).one_or_none())
 
 
-def _dispatchable(vehicle) -> bool:
-    """A vehicle can be dispatched only when it's in service (not in the shop,
-    out of service, or retired)."""
-    return vehicle is None or vehicle.vehicle_status_id == VEHICLE_STATUS_IN_SERVICE
+def _active_oos(session, vehicle_id) -> bool:
+    """True if the vehicle has an open out-of-service window (to_ts NULL) — the
+    Smitty in-shop signal, mirrored Fleet-side."""
+    if not vehicle_id:
+        return False
+    return (session.query(models.VehicleOutOfService)
+            .filter_by(vehicle_id=vehicle_id, to_ts=None).first() is not None)
+
+
+def _dispatchable(session, vehicle) -> bool:
+    """A vehicle can be dispatched only when it's in service AND not in an open
+    out-of-service window (e.g. sitting in Smitty's shop)."""
+    if vehicle is None:
+        return True
+    return (vehicle.vehicle_status_id == VEHICLE_STATUS_IN_SERVICE
+            and not _active_oos(session, vehicle.id))
 
 
 # --- constraints (reject invalid writes) ------------------------------------
 
 def _load_rig_available(row, old_row, logic_row: LogicRow) -> bool:
     """Don't assign a load to a vehicle that's in the shop / out of service.
-    The closed-loop payoff of the Smitty integration: Smitty flips a rig to
-    in_maintenance, and dispatch is blocked here for every client at once."""
+    The closed-loop payoff of the Smitty integration: Smitty opens an OOS window
+    (or flips status), and dispatch is blocked here for every client at once."""
     session = logic_row.session
-    return (_dispatchable(_vehicle(session, row.power_vehicle_id))
-            and _dispatchable(_vehicle(session, row.trailer_vehicle_id)))
+    return (_dispatchable(session, _vehicle(session, row.power_vehicle_id))
+            and _dispatchable(session, _vehicle(session, row.trailer_vehicle_id)))
 
 
 def _trip_rig_available(row, old_row, logic_row: LogicRow) -> bool:
     session = logic_row.session
-    return (_dispatchable(_vehicle(session, row.power_vehicle_id))
-            and _dispatchable(_vehicle(session, row.trailer_vehicle_id)))
+    return (_dispatchable(session, _vehicle(session, row.power_vehicle_id))
+            and _dispatchable(session, _vehicle(session, row.trailer_vehicle_id)))
 
 
 def _bundle_roles_valid(row, old_row, logic_row: LogicRow) -> bool:
@@ -123,6 +137,31 @@ def _lease_is_active(row, old_row, logic_row: LogicRow):
     return True
 
 
+def _schedule_status(row, old_row, logic_row: LogicRow):
+    """Maintenance status: upcoming | due | overdue, from sys_clock.today (date)
+    and the vehicle odometer (mileage), whichever is closer. Tick-driven on the
+    date side; recomputed on odometer pushes on the mileage side."""
+    session = logic_row.session
+    clock = (session.query(models.SysClock)
+             .filter_by(id=row.sys_clock_id or 1).one_or_none())
+    today = clock.today if clock else None
+    veh = _vehicle(session, row.vehicle_id)
+    odo = veh.odometer_miles if veh else None
+
+    overdue = due = False
+    if row.next_due_on and today:
+        if today > row.next_due_on:
+            overdue = True
+        elif (row.next_due_on - today).days <= DUE_SOON_DAYS:
+            due = True
+    if row.next_due_odometer and odo is not None:
+        if odo >= row.next_due_odometer:
+            overdue = True
+        elif row.next_due_odometer - odo <= DUE_SOON_MILES:
+            due = True
+    return "overdue" if overdue else ("due" if due else "upcoming")
+
+
 # --- registration -----------------------------------------------------------
 
 def declare_logic() -> None:
@@ -143,16 +182,21 @@ def declare_logic() -> None:
     # Temporal: tick-driven lease activity (sys_clock -> lease cascade).
     Rule.formula(derive=models.VehicleLease.is_active, calling=_lease_is_active)
 
-    log.info("Fleet Dispatcher fleet governance registered "
-             "(dispatch-lock + bundle/spec/odometer integrity + tick-driven lease activity)")
+    # Smitty service mirror (Fleet-side consumer):
+    # Cost allocation — snapshot who was responsible AT SERVICE TIME onto the
+    # ingested service record (Rule.copy from the vehicle parent), so the at-cost
+    # amount is allocated correctly even if responsibility later changes.
+    Rule.copy(derive=models.ServiceRecord.maint_responsibility_id,
+              from_parent=models.Vehicle.maint_responsibility_id)
+    # Maintenance status — upcoming/due/overdue from the clock (date) + odometer.
+    Rule.formula(derive=models.MaintenanceSchedule.status, calling=_schedule_status)
 
-    # ---- PLANNED (need Phase-3 Smitty-mirror tables) -------------------------
-    # Rule.copy(...)  maint_responsibility snapshot onto an ingested service
-    #                 record (allocate at-cost to the party responsible at
-    #                 service time).
-    # Rule.formula(models.MaintenanceSchedule.status, ...)  upcoming/due/overdue
-    #                 from sys_clock.today (date) + vehicle.odometer (mileage).
+    log.info("Fleet Dispatcher fleet governance registered "
+             "(dispatch-lock incl. OOS + bundle/spec/odometer integrity + "
+             "tick-driven lease activity + service-mirror cost-allocation/maint-status)")
+
+    # ---- PLANNED -------------------------------------------------------------
     # Rule.formula(models.Vehicle.maint_responsibility_id, ...)  re-derive from
-    #                 ownership + the active lease (lease wins), tick-driven.
-    # Rule.row_event(models.Vehicle, ...)  set vehicle_status from a Smitty
-    #                 in-shop / out-of-service ingest.
+    #                 ownership + the active lease (lease wins), tick-driven —
+    #                 currently stored authoritatively; make it a formula once the
+    #                 owner/lease chain is finalized.

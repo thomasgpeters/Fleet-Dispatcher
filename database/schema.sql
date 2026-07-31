@@ -319,6 +319,66 @@ CREATE TABLE vehicle_lease (
 
 CREATE INDEX idx_vehicle_lease_vehicle ON vehicle_lease (vehicle_id, end_date);
 
+-- ---------------------------------------------------------------------------
+-- Smitty service mirror (Fleet-side consumer). Smitty Services is the system of
+-- record; these are Fleet's READ-ONLY projections, kept fresh by the poller
+-- (a thin fetch agent — see integration/smitty_poller.py). Correlated by VIN,
+-- Fleet-native UUID keys + FK to `vehicle`. Only Fleet-owned VINs are ingested
+-- (third-party rows are dropped); costs are **at-cost only** — no retail/markup
+-- crosses the boundary (see docs/INTEGRATION_SMITTY.md B.1–B.3).
+-- ---------------------------------------------------------------------------
+CREATE TABLE service_record (
+    id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    smitty_job_id           TEXT,                              -- Smitty Job id (correlation)
+    vin                     TEXT,                              -- correlation key
+    vehicle_id              UUID REFERENCES vehicle(id),       -- resolved from VIN (NULL until matched)
+    service_type            TEXT,
+    complaint               TEXT,
+    opened_at               TIMESTAMPTZ,
+    closed_at               TIMESTAMPTZ,
+    odometer_at_service     INTEGER CHECK (odometer_at_service IS NULL OR odometer_at_service >= 0),
+    at_cost_amount          NUMERIC(12,2) CHECK (at_cost_amount IS NULL OR at_cost_amount >= 0),  -- at-cost only (NO markup/retail)
+    vendor                  TEXT,
+    status                  TEXT,                              -- new | in_progress | complete | invoiced
+    -- LogicBank snapshots who was responsible AT SERVICE TIME (Rule.copy from
+    -- the vehicle), so allocation is correct even if responsibility later changes.
+    maint_responsibility_id INTEGER REFERENCES maint_responsibility(id),
+    created_at              TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_service_record_vin ON service_record (vin);
+CREATE INDEX idx_service_record_vehicle ON service_record (vehicle_id, opened_at DESC);
+
+CREATE TABLE maintenance_schedule (
+    id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    smitty_schedule_id TEXT,                                   -- Smitty schedule id (correlation)
+    vin               TEXT,
+    vehicle_id        UUID REFERENCES vehicle(id),
+    service_type      TEXT,
+    interval_miles    INTEGER,
+    interval_days     INTEGER,
+    next_due_on       DATE,
+    next_due_odometer INTEGER,
+    -- LogicBank formula: upcoming | due | overdue, from sys_clock.today (date)
+    -- and the vehicle odometer (mileage). Tick + odometer-push driven.
+    status            TEXT,
+    sys_clock_id      INTEGER NOT NULL REFERENCES sys_clock(id) DEFAULT 1,  -- clock hook
+    created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_maintenance_schedule_vehicle ON maintenance_schedule (vehicle_id, status);
+
+CREATE TABLE vehicle_out_of_service (
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    smitty_oos_id TEXT,                                        -- Smitty OOS id (correlation)
+    vin           TEXT,
+    vehicle_id    UUID REFERENCES vehicle(id),
+    from_ts       TIMESTAMPTZ,
+    to_ts         TIMESTAMPTZ,                                 -- NULL = still out of service
+    reason        TEXT,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT vehicle_oos_period CHECK (to_ts IS NULL OR from_ts IS NULL OR to_ts >= from_ts)
+);
+CREATE INDEX idx_vehicle_oos_vehicle ON vehicle_out_of_service (vehicle_id, to_ts);
+
 -- ===========================================================================
 -- Dispatch context
 -- ===========================================================================

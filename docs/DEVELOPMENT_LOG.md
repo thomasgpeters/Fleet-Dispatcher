@@ -5,6 +5,23 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-07-31
 
+### Smitty integration: sequencing decided + Fleet-side consumer built
+- **Sequencing (R.6):** decided **RMA first, integration after** — the shared
+  surface + contract already exist Fleet-side, and full value is gated by Fleet
+  Phase 3, so no reason for Smitty to drop RMA now. Recorded in
+  `INTEGRATION_SMITTY.md` (flippable).
+- **Fleet-side consumer built (verified on PG16, 59 fleet tables):** mirror tables
+  `service_record` / `maintenance_schedule` / `vehicle_out_of_service` (Fleet-
+  native UUID keys, VIN-correlated, **at-cost only**). LogicBank
+  (`fleet_governance.py`): `Rule.copy` snapshots the responsible party onto a
+  service record (cost allocation at service time), a `Rule.formula` derives
+  maintenance status (upcoming/due/overdue) from `sys_clock` + odometer, and the
+  dispatch-lock now also reads open OOS windows (in-shop rig can't be dispatched).
+- **Poller** `integration/smitty_poller.py` — the thin fetch driver (scaffold): pulls
+  Smitty scoped to Fleet's customer_id (at-cost only, unresolved VINs dropped) and
+  **writes through Fleet's ALS API** so LogicBank fires on ingest. Runs once Smitty
+  ships Phase-1 endpoints.
+
 ### Doctrine: fleet business logic → LogicBank rules (+ tick pattern)
 - Established the forward-going rule: **business invariants belong in LogicBank**
   (`als-extensions/logic_discovery/`), governed once at the ALS commit, not
