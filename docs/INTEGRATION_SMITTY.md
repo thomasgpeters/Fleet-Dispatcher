@@ -623,13 +623,34 @@ third parties. Practically:
 - **Privacy:** third-party customer data (their VINs, jobs, costs) must **not**
   cross to Fleet. The subset filter (B.1) + customer scoping (here) enforce that.
 
-## B.3 Cost & valuation (refines Q4)
+## B.3 Cost is confidential — Fleet-job dollars do NOT cross the boundary (refines/overrides Q4)
 
-Fleet computes asset valuation/TCO from Smitty's `Job` costs **for its own
-rigs**. Servicing a Fleet rig at Smitty is an **inter-company / internal**
-transaction (garage P&L vs fleet P&L); third-party revenue is entirely Smitty's
-and out of scope for Fleet. Fleet reads cost per VIN it owns; how Smitty books
-internal vs external revenue is Smitty's ledger, not part of this contract.
+**Correction to Q4 / F.4.** Fleet-vehicle **job costs never cross the integration
+boundary** — not the invoiced amount, not the at-cost parts/labor. Servicing a
+Fleet rig at Smitty is an internal, inter-company transaction whose pricing is
+frequently **absorbed ("eaten") or heavily discounted**; exposing those dollars
+across the boundary would leak the internal pricing arrangement (and, given
+Smitty's public/third-party context, must be treated as non-shareable).
+
+So the boundary carries **service facts, not service money**:
+
+| Crosses to Fleet (for Fleet-owned VINs) | Stays in Smitty's ledger (never crosses) |
+| --- | --- |
+| work performed, service type, dates, odometer-at-service, vendor | `total_cost`, `parts_total`, `labor_total`, `estimated/actual_cost` |
+| `maintenance_schedule` (due/overdue), `out_of_service`, in-shop status | any per-part / per-labor pricing on Fleet Jobs |
+
+Implications:
+- The Fleet↔Smitty pull of `/api/Job` (and JobPart/JobLaborItem) for Fleet VINs
+  must be **cost-field-stripped** — Smitty returns the service record without the
+  money columns, or Fleet's consumer drops them on ingest. (Third-party Jobs
+  never cross at all, per B.1/B.2.)
+- **Valuation/TCO (Feature 6) is computed from Fleet's OWN cost basis**, not from
+  Smitty's discounted/eaten invoice. Fleet may still record its internal service
+  cost separately in its own ledger; that number is a Fleet-side figure, not
+  sourced across the boundary.
+- Net: the two directions of confidentiality are symmetric — third-party data
+  never reaches Fleet (B.1/B.2), and Fleet-job **pricing** never leaves Smitty.
+  Only the operational service history crosses.
 
 ## B.4 Asks back to Smitty
 
@@ -641,3 +662,7 @@ internal vs external revenue is Smitty's ledger, not part of this contract.
    rows — never third-party data.
 3. `fleet_vehicle_id` stays **nullable** on `vehicles` (only Fleet rigs set it) —
    already implied by additive C.1, restated here for the third-party case.
+4. The Fleet-facing `/api/Job` (+ JobPart/JobLaborItem) responses must **omit the
+   cost/money fields** for Fleet VINs (`total_cost`, `parts_total`, `labor_total`,
+   `estimated/actual_cost`, per-line pricing) — service facts only, no dollars
+   (see B.3). Easiest as a cost-stripped projection/view for the Fleet token.
