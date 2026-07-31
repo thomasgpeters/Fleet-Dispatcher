@@ -589,3 +589,55 @@ of Fleet-side work and will be phased (see Fleet `docs/TODO.md`).
 
 **[Fleet owner to confirm]** — integration ahead of Smitty's RMA work, or after.
 Not yet decided.
+
+# Integration boundary — Smitty as a profit center (Fleet, 2026-07-31)
+
+New fact from the Fleet side that refines the whole contract: **Smitty's
+garage/staff is a separate profit center** that services **third-party rigs**,
+not only Fleet's fleet. This makes the two vehicle sets asymmetric and tightens
+a few rules — no schema change to Feature 7, but it changes how the sync scopes.
+
+## B.1 Fleet's vehicles are a *subset* of Smitty's
+
+```
+   Smitty `vehicles`  ⊇  { Fleet-owned rigs }  ∪  { third-party customer rigs }
+   Fleet  `vehicle`   =    Fleet-owned rigs only
+```
+
+- **Correlation is partial.** `fleet_vehicle_id` (and the matching VIN) is set
+  **only** on Smitty vehicles that belong to Fleet. Third-party vehicles have
+  `fleet_vehicle_id = NULL` and never appear on the Fleet side.
+- Fleet **ignores unknown VINs.** When Fleet reconciles/pulls from Smitty, any
+  `Vehicle` / `Job` / `MaintenanceSchedule` / `VehicleOutOfService` whose VIN
+  Fleet doesn't own is dropped — it's another customer's data.
+
+## B.2 Fleet is one *customer* of the garage
+
+Smitty already has `customer_id` on `vehicles` (per Smitty response R.1). Fleet
+is modeled as **the house / internal customer** — one `customer` row among the
+third parties. Practically:
+- **Scoping the sync:** the cleanest filter for Fleet↔Smitty calls is Smitty's
+  **Fleet customer_id** (all Fleet rigs share it), with VIN as the per-asset key.
+  A service-token request from Fleet should be scoped to that customer so Smitty
+  never exposes third-party vehicles/jobs across the boundary.
+- **Privacy:** third-party customer data (their VINs, jobs, costs) must **not**
+  cross to Fleet. The subset filter (B.1) + customer scoping (here) enforce that.
+
+## B.3 Cost & valuation (refines Q4)
+
+Fleet computes asset valuation/TCO from Smitty's `Job` costs **for its own
+rigs**. Servicing a Fleet rig at Smitty is an **inter-company / internal**
+transaction (garage P&L vs fleet P&L); third-party revenue is entirely Smitty's
+and out of scope for Fleet. Fleet reads cost per VIN it owns; how Smitty books
+internal vs external revenue is Smitty's ledger, not part of this contract.
+
+## B.4 Asks back to Smitty
+
+1. Confirm **Fleet has a dedicated `customer_id`** (the house customer) so both
+   sides can scope Fleet↔Smitty traffic to it.
+2. The service-token endpoints Fleet calls (`/api/Job`, `/api/MaintenanceSchedule`,
+   `/api/VehicleOutOfService`, `/api/Vehicle`) should be **filterable by
+   customer_id and/or a set of VINs**, so Fleet only ever receives Fleet-owned
+   rows — never third-party data.
+3. `fleet_vehicle_id` stays **nullable** on `vehicles` (only Fleet rigs set it) —
+   already implied by additive C.1, restated here for the third-party case.
