@@ -42,9 +42,26 @@ echo "Publishing '$PREFIX' -> remote '$REMOTE_NAME' ($REMOTE_URL), branch '$BRAN
 echo
 
 # Standard subtree push. Recomputes the prefix history and pushes it.
-# If the target has diverged and a fast-forward is impossible, fall back to a
-# split + force push (see scripts/README or the monorepo README).
-git subtree push --prefix="$PREFIX" "$REMOTE_NAME" "$BRANCH"
+if git subtree push --prefix="$PREFIX" "$REMOTE_NAME" "$BRANCH"; then
+  echo
+  echo "Done. Fleet-Dispatcher-Mobile @ $BRANCH now mirrors $PREFIX."
+  exit 0
+fi
+
+# Fast-forward push was rejected — the mobile repo diverged from the monorepo's
+# recomputed subtree (a stale/auto commit on that repo, or a prior push with
+# different hashes). The monorepo is the source of truth and the mobile repo is a
+# publish MIRROR (no direct development there), so recompute the subtree and
+# force-push it, overwriting the remote branch. If instead the push failed for a
+# non-diverge reason (auth), this force-push surfaces the same error.
+echo
+echo ">> Fast-forward rejected; falling back to split + force-push"
+echo "   (monorepo is source of truth; mobile repo is a publish mirror)."
+TMP_BRANCH="mobile-publish-tmp-$$"
+git branch -D "$TMP_BRANCH" 2>/dev/null || true
+git subtree split --prefix="$PREFIX" -b "$TMP_BRANCH"
+git push "$REMOTE_NAME" "$TMP_BRANCH:$BRANCH" --force
+git branch -D "$TMP_BRANCH"
 
 echo
-echo "Done. Fleet-Dispatcher-Mobile @ $BRANCH now mirrors $PREFIX."
+echo "Done (force). Fleet-Dispatcher-Mobile @ $BRANCH now mirrors $PREFIX."
