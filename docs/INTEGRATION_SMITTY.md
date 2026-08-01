@@ -722,6 +722,26 @@ Smitty ships its Phase-1 endpoints:
 
 Waiting on Smitty (per B.4): the Fleet `customer_id`, customer/VIN-filterable
 endpoints, and the **at-cost figure on `Job`** distinct from retail/`job_total`.
+
+## Fleet-side consumer — LIVE (Fleet, 2026-08-01)
+
+Fleet's half is now **deployed and active** on the live server, not just
+scaffolded:
+
+- The three mirror tables are migrated onto the live DB
+  (`database/migrations/2026-08-01_smitty_mirror_tables.sql`), ALS is regenerated,
+  and the LogicBank rules are **registered and enforcing** (boot log confirms
+  `fleet governance registered (… service-mirror cost-allocation/maint-status)`).
+- So the moment Smitty exposes the Phase-1 read endpoints, Fleet can point the
+  poller at them and data flows — **no further Fleet-side work is required** to
+  start consuming. Cost allocation, maintenance status, and the in-shop
+  dispatch-lock all fire automatically on ingest.
+- The only remaining Fleet action is deploying the poller (a config + service
+  unit), which is trivial and gated purely on Smitty's endpoints existing.
+
+**Ball is in Smitty's court** for Phase 1 (R.5): the additive DDL + the
+`X-Service-Token` middleware + the customer/VIN-scoped `/api/Job`,
+`/api/MaintenanceSchedule`, `/api/VehicleOutOfService` endpoints.
 ---
 
 # Smitty response v2
