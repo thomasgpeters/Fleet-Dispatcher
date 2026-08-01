@@ -443,6 +443,9 @@ CREATE TABLE load (
     -- deck feet + weight. Checked against equipment capacity by the optimizer.
     deck_feet        NUMERIC(5,1) CHECK (deck_feet IS NULL OR deck_feet >= 0),
     weight_lbs       INTEGER CHECK (weight_lbs IS NULL OR weight_lbs >= 0),
+    -- Currency default is owned HERE (the middleware), not the clients: they omit
+    -- currency on create and read back this value. Don't re-add a 'USD' default in
+    -- client code.
     currency         TEXT NOT NULL DEFAULT 'USD',
     -- Scheduling within the dispatch week: drives the desktop board's
     -- Today (pickup_date = today) vs Week (placed by pickup_date) views.

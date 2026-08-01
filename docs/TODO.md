@@ -540,11 +540,17 @@ Sequenced smallest-blast-radius first:
         `unread_count` and drop the client-side computation. Keep the Kafka bump
         as an **optimistic** UI update; treat the ALS value as reconciling truth
         (don't rip the realtime path out).
-- [ ] **2 — `currency` default `"USD"` → schema/rule**. Hard-coded in two
-      clients (desktop `models.h`, rendered defensively in `BoardView.cpp`; mobile
-      load form mirror). A duplicated default literal — move to a column default
-      or a small `Rule.formula` so the value is stamped at the ALS commit and the
-      clients stop carrying the fallback.
+- [x] **2 — `currency` default `"USD"` → schema (already the source of truth)**.
+      Audit outcome: the default was *already* server-side — `load.currency` /
+      `settlement.currency` are `NOT NULL DEFAULT 'USD'` and the desktop
+      `createLoad` omits currency, so the middleware already stamps it (a column
+      default is the right KISS mechanism; a LogicBank rule would be the redundant
+      -rule anti-pattern). Mobile already read `load.currency` directly. Fixed the
+      one real duplication — the **desktop's carried default literals**: dropped
+      the `models.h` struct initializer (`currency = "USD"`) and the
+      `.empty() ? "USD"` fallbacks in `BoardView.cpp`'s `money()`/`dollars()`,
+      keeping only the USD→`$` symbol mapping (presentation). Schema comment marks
+      the column default as the single source of truth.
 - [ ] **3 — Waypoint next-sequence + reorder → invariant rule**. Mobile
       `TripWaypointsPage.tsx` computes the next `seq` as `max+1` (or inserts
       before the destination and bumps everything after, back-to-front, against

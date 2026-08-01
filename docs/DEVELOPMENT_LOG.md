@@ -5,6 +5,17 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-08-01
 
+### Client-calculated values → LogicBank (item 2: currency default)
+- Outcome: the `'USD'` default was **already** middleware-owned — `load.currency`
+  and `settlement.currency` are `NOT NULL DEFAULT 'USD'` and the desktop
+  `createLoad` omits currency, so ALS already stamps it (a column default is the
+  right mechanism; a LogicBank rule would be redundant per golden rule 2). Mobile
+  already read `load.currency` directly. Removed the one real duplication — the
+  **desktop's carried default literals**: `models.h` struct initializer
+  (`currency = "USD"`) and the `.empty() ? "USD"` fallbacks in `BoardView.cpp`
+  (`money()`/`dollars()`), keeping only the USD→`$` symbol mapping (presentation).
+  Added a schema comment marking the column default as the single source of truth.
+
 ### Client-calculated values → LogicBank (audit, item 1: unread counts)
 - Audited both clients for calculated values kept in procedural code (sums,
   counts, aggregates, defaults) that belong in the middleware. Findings +

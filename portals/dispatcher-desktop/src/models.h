@@ -111,7 +111,8 @@ struct Load {
     std::string dispatch_week_id;
     std::string pickup_date;      // "YYYY-MM-DD" (may be empty)
     std::string delivery_date;    // "YYYY-MM-DD" (may be empty)
-    std::string currency = "USD";
+    std::string currency;         // from the API; default lives in the schema
+                                  // (load.currency DEFAULT 'USD'), not here
     int run_type_id = 0;
     int load_status_id = 0;
     double rate = 0.0;
