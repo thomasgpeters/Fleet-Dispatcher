@@ -5,6 +5,20 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-08-01
 
+### Smitty integration — turned on (Fleet-side mirror tables migrated)
+- Added `database/migrations/2026-08-01_smitty_mirror_tables.sql`: an incremental,
+  idempotent migration that creates the three Smitty service-mirror tables
+  (`service_record`, `maintenance_schedule`, `vehicle_out_of_service`) on a live
+  DB that predates them — the tables the crash-loop incident found missing. DDL is
+  verbatim from `schema.sql` (source of truth) with `IF NOT EXISTS`. Verified on
+  throwaway PG16: applies (56→59), idempotent on re-run, FK→`vehicle` resolves,
+  and `schema-drift-check.sh` clears to zero missing.
+- Applying it on the box + regen + `make als-extensions` + restart activates the
+  previously-dormant (hasattr-guarded) LogicBank rules in `fleet_governance.py`
+  (service-record cost allocation, maintenance status, OOS-based dispatch lock).
+  The poller (`integration/smitty_poller.py`) runs once Smitty ships its Phase-1
+  endpoints. See docs/INTEGRATION_SMITTY.md.
+
 ### Client-calculated values → LogicBank (item 3: waypoint ordering)
 - Design note: `docs/WAYPOINT_ORDERING.md`. The mobile `TripWaypointsPage`'s
   `seq` arithmetic — the audit's ugliest client-side calculated value — moved to
