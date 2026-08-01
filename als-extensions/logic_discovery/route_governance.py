@@ -123,9 +123,30 @@ def declare_logic() -> None:
     All three mutate sibling rows in the same commit; the deferrable unique
     constraint makes that safe.
     """
-    Rule.early_row_event(on_class=models.Waypoint, calling=_waypoint_place)
-    Rule.row_event(on_class=models.Waypoint, calling=_waypoint_reorder)
-    Rule.after_flush_row_event(models.Waypoint, calling=_waypoint_densify)
+    # Defensive registration: if a given event API isn't present in this
+    # LogicBank version, skip that one rule with a warning rather than raising
+    # (an AttributeError here would abort LogicBank activation for EVERY module
+    # and crash-loop the API). Positional on_class matches the working
+    # after_flush_row_event call in comms_governance.py.
+    def _register(event_name, calling, *, fallback=None):
+        hook = getattr(Rule, event_name, None)
+        if hook is None and fallback:
+            hook = getattr(Rule, fallback, None)
+            if hook is not None:
+                log.warning("route governance: Rule.%s unavailable — using "
+                            "Rule.%s for %s", event_name, fallback, calling.__name__)
+        if hook is None:
+            log.warning("route governance: no event hook for %s (tried %s%s) — "
+                        "waypoint rule skipped", calling.__name__, event_name,
+                        f"/{fallback}" if fallback else "")
+            return
+        hook(models.Waypoint, calling=calling)
+
+    # place-on-insert needs to set the row's own seq before flush (early); fall
+    # back to a plain row event if early isn't available in this version.
+    _register("early_row_event", _waypoint_place, fallback="row_event")
+    _register("row_event", _waypoint_reorder)          # shift-on-move (needs old_row)
+    _register("after_flush_row_event", _waypoint_densify)  # densify-on-delete
 
     log.info("Fleet Dispatcher route governance registered "
              "(waypoint seq: place-on-insert + shift-on-move + densify-on-delete)")

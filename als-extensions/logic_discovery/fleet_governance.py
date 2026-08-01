@@ -54,8 +54,10 @@ def _vehicle(session, vehicle_id):
 
 def _active_oos(session, vehicle_id) -> bool:
     """True if the vehicle has an open out-of-service window (to_ts NULL) — the
-    Smitty in-shop signal, mirrored Fleet-side."""
-    if not vehicle_id:
+    Smitty in-shop signal, mirrored Fleet-side. Guarded on the generated model:
+    if the mirror table hasn't been migrated onto this DB yet, there's no OOS
+    signal to read, so treat it as 'not out of service' rather than crashing."""
+    if not vehicle_id or not hasattr(models, "VehicleOutOfService"):
         return False
     return (session.query(models.VehicleOutOfService)
             .filter_by(vehicle_id=vehicle_id, to_ts=None).first() is not None)
@@ -182,14 +184,25 @@ def declare_logic() -> None:
     # Temporal: tick-driven lease activity (sys_clock -> lease cascade).
     Rule.formula(derive=models.VehicleLease.is_active, calling=_lease_is_active)
 
-    # Smitty service mirror (Fleet-side consumer):
-    # Cost allocation — snapshot who was responsible AT SERVICE TIME onto the
-    # ingested service record (Rule.copy from the vehicle parent), so the at-cost
-    # amount is allocated correctly even if responsibility later changes.
-    Rule.copy(derive=models.ServiceRecord.maint_responsibility_id,
-              from_parent=models.Vehicle.maint_responsibility_id)
-    # Maintenance status — upcoming/due/overdue from the clock (date) + odometer.
-    Rule.formula(derive=models.MaintenanceSchedule.status, calling=_schedule_status)
+    # Smitty service mirror (Fleet-side consumer) — the Phase-3 Smitty consumer
+    # surface. GUARDED on the generated model: a live DB that hasn't been migrated
+    # to include these tables yet must NOT abort LogicBank activation (that would
+    # crash-loop the whole API and take dispatch-lock / comms / routing down with
+    # it). They register automatically once the tables exist and ALS is
+    # regenerated. Create them with the DDL in docs/INTEGRATION_SMITTY.md.
+    if hasattr(models, "ServiceRecord"):
+        # Cost allocation — snapshot who was responsible AT SERVICE TIME onto the
+        # ingested service record (Rule.copy from the vehicle parent), so the
+        # at-cost amount is allocated correctly even if responsibility later changes.
+        Rule.copy(derive=models.ServiceRecord.maint_responsibility_id,
+                  from_parent=models.Vehicle.maint_responsibility_id)
+    if hasattr(models, "MaintenanceSchedule"):
+        # Maintenance status — upcoming/due/overdue from the clock (date) + odometer.
+        Rule.formula(derive=models.MaintenanceSchedule.status, calling=_schedule_status)
+    if not (hasattr(models, "ServiceRecord") and hasattr(models, "MaintenanceSchedule")):
+        log.warning("Fleet governance: Smitty-mirror tables not in the generated "
+                    "model — service-record / maintenance-schedule rules skipped "
+                    "(they activate once the tables exist + ALS is regenerated).")
 
     log.info("Fleet Dispatcher fleet governance registered "
              "(dispatch-lock incl. OOS + bundle/spec/odometer integrity + "
