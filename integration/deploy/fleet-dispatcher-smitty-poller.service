@@ -1,0 +1,61 @@
+# Fleet Dispatcher — Smitty poller (one-shot sync) systemd unit.
+#
+# Pulls Smitty's service data (jobs / maintenance schedules / OOS windows) scoped
+# to Fleet's customer_id, at-cost only, and writes it through Fleet's ALS JSON:API
+# so LogicBank fires on ingest (cost allocation, maintenance status, dispatch
+# lock). It's a THIN fetch agent — no business logic (see integration/README.md
+# and docs/LOGICBANK_RULES.md "agents are pulses").
+#
+# This is a ONE-SHOT batch: it runs the sync once and exits. Cadence is driven by
+# the companion timer (fleet-dispatcher-smitty-poller.timer), the same way the
+# LogicBank tick agent is scheduled.
+#
+# Gated on Smitty Phase 1: it only does useful work once Smitty ships its
+# customer/VIN-scoped /api/Job, /api/MaintenanceSchedule, /api/VehicleOutOfService
+# endpoints + the X-Service-Token middleware (docs/INTEGRATION_SMITTY.md R.5).
+#
+# Install (repo-convention paths; ADAPT to this host — on the current server
+# services run as `thomas` from /home/thomas, not `fleet` from /opt, so set User=
+# and the paths to match, or reuse the ALS venv which already has `requests`):
+#   sudo useradd --system --no-create-home --shell /usr/sbin/nologin fleet  # once (shared)
+#   sudo mkdir -p /opt/fleet-dispatcher/integration
+#   sudo cp integration/smitty_poller.py integration/requirements.txt \
+#           /opt/fleet-dispatcher/integration/
+#   sudo python3 -m venv /opt/fleet-dispatcher/integration/venv
+#   sudo /opt/fleet-dispatcher/integration/venv/bin/pip install -r \
+#        /opt/fleet-dispatcher/integration/requirements.txt
+#   sudo mkdir -p /etc/fleet-dispatcher
+#   sudo cp integration/deploy/smitty-poller.env.example /etc/fleet-dispatcher/smitty-poller.env
+#   sudo chmod 600 /etc/fleet-dispatcher/smitty-poller.env   # holds the tokens
+#   sudo $EDITOR /etc/fleet-dispatcher/smitty-poller.env     # set FLEET_TOKEN + SMITTY_*
+#   sudo cp integration/deploy/fleet-dispatcher-smitty-poller.service /etc/systemd/system/
+#   sudo cp integration/deploy/fleet-dispatcher-smitty-poller.timer   /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now fleet-dispatcher-smitty-poller.timer   # the TIMER, not the service
+#
+# Run once by hand (test):  sudo systemctl start fleet-dispatcher-smitty-poller.service
+# Logs:                     journalctl -u fleet-dispatcher-smitty-poller -f
+
+[Unit]
+Description=Fleet Dispatcher — Smitty service poller (one-shot sync)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=fleet
+Group=fleet
+
+WorkingDirectory=/opt/fleet-dispatcher/integration
+# smitty-poller.env supplies FLEET_API_BASE, FLEET_TOKEN, SMITTY_API_BASE,
+# SMITTY_SERVICE_TOKEN, SMITTY_CUSTOMER_ID. Leading '-' = ok if the file is absent.
+EnvironmentFile=-/etc/fleet-dispatcher/smitty-poller.env
+ExecStart=/opt/fleet-dispatcher/integration/venv/bin/python smitty_poller.py
+
+# Hardening (optional; relax if it interferes with your setup).
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+# No [Install] — this service is started by the .timer, not enabled directly.
