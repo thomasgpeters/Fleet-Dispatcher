@@ -1,7 +1,7 @@
 """Fleet Dispatcher — comms governance (auto-discovered LogicBank logic).
 
 Server-side enforcement for the team-comms model (Telegram-style; see
-docs/TODO.md "Feature 4"). Two rules, both on Message insert:
+docs/TODO.md "Feature 4"). Message-posting constraints:
 
   P1  Broadcast posting lock — in a BROADCAST channel only the owner/admins may
       post; members are read-only.
@@ -9,9 +9,19 @@ docs/TODO.md "Feature 4"). Two rules, both on Message insert:
       while the restriction is active (channel_member.restricted_until NULL =
       indefinite; a past timestamp means the restriction has expired).
 
+Plus the per-member **unread_count** derivation (TODO "Client-calculated values
+-> LogicBank", item 1): the unread badge was computed independently in the mobile
+board and the desktop CommPanel, and they drifted (a read on the phone didn't
+clear the desktop badge). It's now derived once here:
+  * a formula recomputes channel_member.unread_count whenever the member row is
+    written (mark-as-read stamps last_read_at -> the count recomputes, ~0);
+  * an after-flush event bumps every other member's count when a message posts.
+Increment-on-post is cheap; recompute-on-read is the self-healing reconcile.
+
 Why a server rule (not just client UI): clients hide the composer as UX, but the
 authoritative check must live where every write funnels through — LogicBank, so
-mobile, desktop, and any API caller are all governed identically.
+mobile, desktop, and any API caller are all governed identically. Same for the
+unread count: one authoritative value every client reads, none recompute.
 
 Install/regen: ApiLogicServer auto-discovers modules under
 `logic/logic_discovery/` and calls `declare_logic()`. This file requires the
@@ -87,6 +97,48 @@ def _can_post(row, old_row, logic_row: LogicRow) -> bool:
     return True
 
 
+# --- unread_count derivation ------------------------------------------------
+
+def _count_unread(session, channel_id, user_id, last_read_at) -> int:
+    """Authoritative unread count for one member: the channel's messages newer
+    than last_read_at that the member didn't author. NULL last_read_at = the
+    member has never opened the channel, so everything counts."""
+    q = (session.query(models.Message)
+         .filter(models.Message.channel_id == channel_id,
+                 models.Message.author_id != user_id))
+    if last_read_at is not None:
+        q = q.filter(models.Message.posted_at > last_read_at)
+    return q.count()
+
+
+def _member_unread_count(row, old_row, logic_row: LogicRow):
+    """Formula: recompute unread_count from this member's own last_read_at.
+
+    Fires whenever the channel_member row is written — most importantly on
+    mark-as-read (a PATCH to last_read_at), which recomputes the count to ~0.
+    This is the self-healing reconcile that keeps the increment path honest."""
+    return _count_unread(logic_row.session, row.channel_id, row.user_id,
+                         row.last_read_at)
+
+
+def _bump_unread_on_message(row, old_row, logic_row: LogicRow) -> None:
+    """After a message is inserted, bump unread_count for every OTHER member of
+    the channel who hasn't read past it. The formula above only re-fires when a
+    member row itself changes; a new message doesn't touch those rows, so this
+    event carries the increment. (Cheap +1 per member; the formula reconciles the
+    exact value on the reader's next mark-as-read.)"""
+    if not logic_row.is_inserted():
+        return
+    session = logic_row.session
+    members = (session.query(models.ChannelMember)
+               .filter(models.ChannelMember.channel_id == row.channel_id,
+                       models.ChannelMember.user_id != row.author_id)
+               .all())
+    for m in members:
+        if m.last_read_at is None or m.last_read_at < row.posted_at:
+            m.unread_count = (m.unread_count or 0) + 1
+
+
 def _can_create_topic(row, old_row, logic_row: LogicRow) -> bool:
     """Constraint: only admins/dispatchers may create channel topics.
 
@@ -125,7 +177,13 @@ def declare_logic() -> None:
         calling=_can_create_topic,
         error_msg="Only admins and dispatchers can create topics.",
     )
+
+    # unread_count: derived once, read by every client (no more client compute).
+    Rule.formula(derive=models.ChannelMember.unread_count,
+                 calling=_member_unread_count)
+    Rule.after_flush_row_event(models.Message, calling=_bump_unread_on_message)
+
     log.info(
         "Fleet Dispatcher comms governance registered "
-        "(broadcast lock + mute/ban + topic-create)"
+        "(broadcast lock + mute/ban + topic-create + unread_count)"
     )

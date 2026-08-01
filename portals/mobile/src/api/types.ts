@@ -143,6 +143,7 @@ export interface ChannelMember {
   restricted_until?: string | null; // mute/ban expiry (null = none/indefinite)
   joined_at?: string;
   last_read_at?: string | null;
+  unread_count?: number; // server-derived (LogicBank); clients read, don't compute
 }
 
 // --- Content (CMS) context ---

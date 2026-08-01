@@ -534,7 +534,13 @@ CREATE TABLE channel_member (
     member_status_id  INTEGER NOT NULL DEFAULT 1 REFERENCES channel_member_status(id),
     restricted_until  TIMESTAMPTZ,           -- mute/ban expiry (NULL = indefinite/none)
     joined_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
-    last_read_at      TIMESTAMPTZ,           -- for unread counts
+    last_read_at      TIMESTAMPTZ,           -- read position (drives unread_count)
+    -- Server-derived unread badge: count of the channel's messages newer than
+    -- last_read_at and not authored by this member. Maintained by a LogicBank
+    -- rule (als-extensions/logic_discovery/comms_governance.py) so every client
+    -- reads one authoritative value instead of each recomputing it. Default 0 so
+    -- a freshly-inserted membership (before the rule fires) reads clean.
+    unread_count      INTEGER NOT NULL DEFAULT 0,
     UNIQUE (channel_id, user_id)
 );
 
@@ -811,5 +817,6 @@ COMMIT;
 --   * settlement.costs_borne_by_owner <- driver.driver_type.owner_bears_costs
 --   * settlement.driver_pay = round(gross_rate * contract_percent / 100, 2)
 --   * equipment/commodity compatibility on load assignment.
---   * channel_member.last_read_at drives per-user unread message counts.
+--   * channel_member.unread_count is derived (LogicBank) from last_read_at +
+--     the channel's messages, so clients read it instead of recomputing.
 --   * document.byte_size / checksum should match data on upload.

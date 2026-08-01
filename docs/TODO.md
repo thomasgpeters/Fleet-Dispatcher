@@ -71,7 +71,8 @@ Carried over (blocked / owned elsewhere):
 - [ ] Clickable message **toasts** (`IonToast`, 2–3s, deep-link) → realtime
 - [ ] Realtime delivery (websockets/push) — currently polling/pull-to-refresh
 - [ ] Desktop (dispatcher) messaging view → desktop portal work
-- [ ] Server-side `unread_count` (LogicBank) to replace client-side computation
+- [~] Server-side `unread_count` (LogicBank) to replace client-side computation
+      → see "Client-calculated values → LogicBank" (item 1, in progress)
 - [ ] More CMS links as needed: `driver_document`, `equipment_document`,
       `inspection_document`
 
@@ -507,6 +508,58 @@ Migration (large — `equipment` is deeply embedded):
 > integration *contract* (share `vehicle` by VIN; read Smitty `/api/Job` etc.)
 > doesn't block on the full refactor, but the per-asset `vehicle` table is the
 > shared surface, so it leads.
+
+## Client-calculated values → LogicBank (audit 2026-08-01)
+
+Audit of the C++ desktop + Vita mobile clients for **calculated values kept in
+procedural client code** (sums, counts, aggregates, default values) that belong
+in the middleware as LogicBank rules — governed once at the ALS commit so every
+client (mobile, desktop, assistant, raw API) reads the same authoritative value
+instead of each reimplementing the math and drifting. Doctrine + litmus test:
+[`LOGICBANK_RULES.md`](LOGICBANK_RULES.md) ("if only one client computed this and
+another client did the same thing, would something be wrong/inconsistent?").
+
+Sequenced smallest-blast-radius first:
+
+- [~] **1 — Unread message counts → `Rule.count`** *(highest value; live drift
+      today)*. Two independent reimplementations of the same aggregate exist:
+      mobile `ChannelsPage.tsx` pulls every message in every channel and filters
+      `author_id != me && posted_at > last_read_at` then `.length`; desktop
+      `CommPanel.cpp` keeps a parallel `unread_` map (server-fetch seed +
+      per-entry clear + Kafka-stream increment). They already disagree (a read on
+      the phone doesn't clear the desktop badge until a refetch). Both are also
+      TODO-flagged as "server-side `unread_count` (LogicBank)".
+      - LogicBank: derive `unread_count` on **`channel_member`** — count of the
+        channel's messages where `posted_at > last_read_at` (excluding the
+        member's own authored messages); forward-chains when a message posts or
+        `last_read_at` is stamped. Lands in
+        `als-extensions/logic_discovery/comms_governance.py`. Needs a
+        `channel_member.unread_count` column (schema change → `/verify-db` +
+        regen ALS).
+      - Client cutover: mobile `ChannelsPage` and desktop `CommPanel` **read**
+        `unread_count` and drop the client-side computation. Keep the Kafka bump
+        as an **optimistic** UI update; treat the ALS value as reconciling truth
+        (don't rip the realtime path out).
+- [ ] **2 — `currency` default `"USD"` → schema/rule**. Hard-coded in two
+      clients (desktop `models.h`, rendered defensively in `BoardView.cpp`; mobile
+      load form mirror). A duplicated default literal — move to a column default
+      or a small `Rule.formula` so the value is stamped at the ALS commit and the
+      clients stop carrying the fallback.
+- [ ] **3 — Waypoint next-sequence + reorder → invariant rule**. Mobile
+      `TripWaypointsPage.tsx` computes the next `seq` as `max+1` (or inserts
+      before the destination and bumps everything after, back-to-front, against
+      `UNIQUE(trip_id, seq)`) — a client-side mini-transaction fighting a unique
+      constraint; two dispatchers adding a stop concurrently can collide. Move to
+      a LogicBank insert-ordering rule (`after_flush`/sequence assignment). Bigger
+      than a formula — its own change with a short design note; schedule after #1.
+
+> Deliberately **left client-side** (pure presentation, no cross-client
+> invariant): `money()`/`dollars()` + `$`-vs-`USD` prefixing (desktop
+> `BoardView.cpp`), avatar skin-tone / trailer-color derivation (`icons.h`),
+> `.length`/empty-state checks, message truncation, assistant transcript
+> concat, and pin/saved `.count()` of a locally-held list (`CommPanel.cpp`) —
+> these format or count data the screen already holds; nothing persists a value
+> another client depends on.
 
 ## Cross-cutting
 

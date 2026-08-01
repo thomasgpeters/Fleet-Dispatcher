@@ -296,36 +296,24 @@ void CommPanel::loadChannels() {
         });
 }
 
-// Fetch the current user's memberships (role/standing) + per-channel unread, then
-// re-render so the directory/rail show badges (mirrors the mobile channel list).
+// Fetch the current user's memberships (role/standing + server-derived unread),
+// then re-render so the directory/rail show badges (mirrors the mobile list).
+// Unread is the LogicBank-maintained channel_member.unread_count — we read it,
+// we don't pull every message to recompute (see comms_governance.py).
 void CommPanel::loadDirectoryMeta() {
     api_->fetchMyMemberships(
         user_.id,
         [this](std::vector<ChannelMember> ms) {
             myMemberships_.clear();
             for (auto& m : ms) myMemberships_[m.channel_id] = m;
-            // Unread per channel: messages newer than my last_read_at, not mine.
             for (const Channel& c : channels_) {
-                const std::string cid = c.id;
-                std::string lastRead;
-                auto it = myMemberships_.find(cid);
-                if (it != myMemberships_.end()) lastRead = it->second.last_read_at;
-                api_->fetchMessages(
-                    cid,
-                    [this, cid, lastRead](std::vector<Message> msgs) {
-                        int n = 0;
-                        for (const Message& m : msgs)
-                            if (m.author_id != user_.id &&
-                                (lastRead.empty() || m.posted_at > lastRead))
-                                ++n;
-                        if (cid == selectedChannelId_) n = 0;  // currently viewing
-                        unread_[cid] = n;
-                        renderChannels();
-                        if (auto* a = Wt::WApplication::instance()) a->triggerUpdate();
-                    },
-                    [](std::string) {});
+                auto it = myMemberships_.find(c.id);
+                int n = (it != myMemberships_.end()) ? it->second.unread_count : 0;
+                if (c.id == selectedChannelId_) n = 0;  // currently viewing
+                unread_[c.id] = n;
             }
             renderChannels();
+            if (auto* a = Wt::WApplication::instance()) a->triggerUpdate();
         },
         [](std::string) { /* badges optional; ignore */ });
 }

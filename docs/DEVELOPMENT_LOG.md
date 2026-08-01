@@ -3,6 +3,36 @@
 Newest first. One entry per meaningful change set; pair with the checklist in
 [`TODO.md`](TODO.md).
 
+## 2026-08-01
+
+### Client-calculated values → LogicBank (audit, item 1: unread counts)
+- Audited both clients for calculated values kept in procedural code (sums,
+  counts, aggregates, defaults) that belong in the middleware. Findings +
+  recommendation recorded in `TODO.md` ("Client-calculated values → LogicBank").
+  Presentation-only math (money/dollars formatting, avatar/trailer colors,
+  local `.count()`/`.length`) stays client-side; the real candidates are unread
+  counts (now), the `currency = "USD"` default (next), and waypoint
+  next-sequence assignment (after that).
+- **Unread message counts → LogicBank (item 1).** The unread badge was computed
+  independently in the mobile board (`ChannelsPage.tsx` pulled every message per
+  channel and filtered) and the desktop `CommPanel` (a parallel `unread_` map),
+  and they drifted (a read on the phone didn't clear the desktop badge). Now
+  derived once server-side:
+  - Schema: `channel_member.unread_count INTEGER NOT NULL DEFAULT 0` (verified on
+    PG16 — 59 fleet tables, 0 public).
+  - LogicBank (`comms_governance.py`): a **formula** recomputes `unread_count`
+    from the member's own `last_read_at` whenever the member row is written
+    (mark-as-read → recompute), plus an **after-flush event** on `Message` insert
+    that bumps every other member's count. Increment-on-post is cheap;
+    recompute-on-read is the self-healing reconcile.
+  - Clients read `unread_count` instead of recomputing: mobile `ChannelsPage`
+    (dropped the per-channel message pull) and desktop `CommPanel::loadDirectoryMeta`
+    (dropped the per-channel `fetchMessages`). The Kafka bump stays as an
+    optimistic UI update; the ALS value reconciles. Mobile build clean.
+  - Activation: regen ALS from the updated schema + `make als-extensions` on the
+    Linux box (the formula/after-flush wiring is LogicBank-version-sensitive —
+    flagged inline).
+
 ## 2026-07-31
 
 ### Smitty integration: sequencing decided + Fleet-side consumer built
