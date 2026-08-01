@@ -1,0 +1,22 @@
+# Fleet Dispatcher — Smitty poller schedule.
+#
+# Drives the one-shot poller (fleet-dispatcher-smitty-poller.service) on an
+# interval. Default: 2 min after boot, then every 5 min. OOS (in-shop) status
+# feeds the dispatch-lock, so a tighter interval means a rig in the shop is
+# blocked from dispatch sooner — tune OnUnitActiveSec to taste.
+#
+# Enable with:  sudo systemctl enable --now fleet-dispatcher-smitty-poller.timer
+# Inspect:      systemctl list-timers fleet-dispatcher-smitty-poller.timer
+
+[Unit]
+Description=Run the Fleet Dispatcher Smitty poller periodically
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+# Catch up a missed run (e.g. host asleep) on the next opportunity.
+Persistent=true
+Unit=fleet-dispatcher-smitty-poller.service
+
+[Install]
+WantedBy=timers.target

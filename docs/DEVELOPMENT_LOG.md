@@ -5,6 +5,14 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-08-01
 
+### Smitty poller — deploy unit + timer staged
+- Added `integration/deploy/`: `fleet-dispatcher-smitty-poller.service` (Type=
+  oneshot batch sync), `fleet-dispatcher-smitty-poller.timer` (2min after boot,
+  then every 5min), and `smitty-poller.env.example` (FLEET_API_BASE/FLEET_TOKEN +
+  SMITTY_API_BASE/SMITTY_SERVICE_TOKEN/SMITTY_CUSTOMER_ID='FLEET'). One-shot +
+  timer mirrors the tick-agent scheduling pattern. Staged and ready to drop in the
+  moment Smitty ships its Phase-1 endpoints — the last remaining Fleet-side step.
+
 ### Smitty integration — turned on (Fleet-side mirror tables migrated)
 - Added `database/migrations/2026-08-01_smitty_mirror_tables.sql`: an incremental,
   idempotent migration that creates the three Smitty service-mirror tables
