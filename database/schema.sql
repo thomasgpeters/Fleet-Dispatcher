@@ -775,7 +775,11 @@ CREATE TABLE waypoint (
     lng             DOUBLE PRECISION NOT NULL CHECK (lng BETWEEN -180 AND 180),
     planned_arrival TIMESTAMPTZ,
     arrived_at      TIMESTAMPTZ,
-    UNIQUE (trip_id, seq)
+    -- DEFERRABLE so a whole reorder can happen inside one transaction with
+    -- transient duplicate seq values (checked once at COMMIT). This is what lets
+    -- waypoint ordering live in the middleware (LogicBank route_governance.py)
+    -- and lets the optimizer drop its two-phase dance. See docs/WAYPOINT_ORDERING.md.
+    UNIQUE (trip_id, seq) DEFERRABLE INITIALLY DEFERRED
 );
 
 CREATE INDEX idx_waypoint_trip ON waypoint (trip_id, seq);

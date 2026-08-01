@@ -551,13 +551,27 @@ Sequenced smallest-blast-radius first:
       `.empty() ? "USD"` fallbacks in `BoardView.cpp`'s `money()`/`dollars()`,
       keeping only the USD→`$` symbol mapping (presentation). Schema comment marks
       the column default as the single source of truth.
-- [ ] **3 — Waypoint next-sequence + reorder → invariant rule**. Mobile
-      `TripWaypointsPage.tsx` computes the next `seq` as `max+1` (or inserts
-      before the destination and bumps everything after, back-to-front, against
-      `UNIQUE(trip_id, seq)`) — a client-side mini-transaction fighting a unique
-      constraint; two dispatchers adding a stop concurrently can collide. Move to
-      a LogicBank insert-ordering rule (`after_flush`/sequence assignment). Bigger
-      than a formula — its own change with a short design note; schedule after #1.
+- [~] **3 — Waypoint next-sequence + reorder → invariant rule**. Design note:
+      [`WAYPOINT_ORDERING.md`](WAYPOINT_ORDERING.md). The mobile
+      `TripWaypointsPage.tsx` seq arithmetic (insert-before-destination + back-to-
+      front bump loop on add; two-phase `1000+i`/`i+1` on reorder; gap-leaving
+      delete) — a client mini-transaction fighting `UNIQUE(trip_id, seq)`, where
+      two concurrent adds collide — moved to the middleware:
+      - Schema: `UNIQUE(trip_id, seq)` is now **DEFERRABLE INITIALLY DEFERRED**
+        (the keystone: reshuffle a whole trip inside one commit txn with transient
+        dup seqs; checked once at COMMIT). Verified on PG16 incl. a live in-txn
+        seq swap that an immediate constraint would reject.
+      - LogicBank `route_governance.py` (new): **place-on-insert** (intermediate
+        stops before the destination), **shift-on-move** (single-row move → dense
+        1..N), **densify-on-delete** (no gaps). One authoritative ordering for
+        every client.
+      - Client cutover: add sends a trivial append hint (no bump loop); reorder
+        PATCHes only the moved stop to its slot (no two-phase); delete unchanged.
+        Mobile build clean. The geospatial optimizer (direct SQL, one txn) also
+        dropped its two-phase dance.
+      - Activation: regen ALS + `make als-extensions` on the Linux box (event-hook
+        wiring is LogicBank-version-sensitive — flagged inline). Until then add
+        still works; drag-reorder needs the rule.
 
 > Deliberately **left client-side** (pure presentation, no cross-client
 > invariant): `money()`/`dollars()` + `$`-vs-`USD` prefixing (desktop

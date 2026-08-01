@@ -5,6 +5,26 @@ Newest first. One entry per meaningful change set; pair with the checklist in
 
 ## 2026-08-01
 
+### Client-calculated values → LogicBank (item 3: waypoint ordering)
+- Design note: `docs/WAYPOINT_ORDERING.md`. The mobile `TripWaypointsPage`'s
+  `seq` arithmetic — the audit's ugliest client-side calculated value — moved to
+  the middleware. It fought `UNIQUE(trip_id, seq)` with a back-to-front bump loop
+  on add and a two-phase `1000+i`/`i+1` dance on reorder, and two concurrent adds
+  to one trip could collide.
+- **Keystone (schema):** `UNIQUE(trip_id, seq)` is now **DEFERRABLE INITIALLY
+  DEFERRED** — a whole reorder can run inside one transaction with transient
+  duplicate seqs (checked at COMMIT). Verified on PG16 (59 fleet tables) incl. a
+  live in-transaction seq swap that an immediate constraint would reject.
+- **LogicBank `route_governance.py` (new):** place-on-insert (intermediate stops
+  land before the destination), shift-on-move (a single-row move PATCH becomes a
+  dense 1..N reorder), densify-on-delete (no gaps). One ordering invariant for
+  every client. Event-hook wiring flagged LogicBank-version-sensitive.
+- **Clients simplified:** mobile add sends a trivial append hint (no bump loop);
+  reorder PATCHes only the moved stop to its slot (no two-phase); delete
+  unchanged. Mobile build clean. The geospatial optimizer (`recompute.py`, direct
+  SQL in one txn) dropped its own two-phase `_persist_order` dance too.
+- Activation: regen ALS + `make als-extensions` on the Linux box.
+
 ### Client-calculated values → LogicBank (item 2: currency default)
 - Outcome: the `'USD'` default was **already** middleware-owned — `load.currency`
   and `settlement.currency` are `NOT NULL DEFAULT 'USD'` and the desktop
