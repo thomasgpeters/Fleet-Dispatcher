@@ -197,6 +197,12 @@ Feature 7 + `INTEGRATION_SMITTY.md`):
   maintenance-responsible party for its term (e.g. Fleet-leased trailer Fleet must
   maintain; O/O who leases their own trailer). Drives cost allocation for Smitty
   service records (see `INTEGRATION_SMITTY.md` B.3/B.3a).
+- **Smitty service mirror** (Smitty is SoR; Fleet mirrors read-only, VIN-
+  correlated): `service_record` (at-cost only — no retail/markup; a LogicBank
+  `Rule.copy` snapshots `maint_responsibility` at service time),
+  `maintenance_schedule` (LogicBank derives `status` upcoming/due/overdue from the
+  clock + odometer), and `vehicle_out_of_service` (the dispatch-lock reads its
+  open windows). Kept fresh by `integration/smitty_poller.py`.
 - `load_status`: `draft`, `dispatched`, `in_transit`, `delivered`, `settled`,
   `cancelled`.
 - `app_role`: `dispatcher`, `driver`, `updater`.

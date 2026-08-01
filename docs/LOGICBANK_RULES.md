@@ -59,6 +59,21 @@ Planned (need Phase-3 Smitty-mirror tables — stubbed in the module):
 | **Status from Smitty** | `row_event` | set `vehicle_status` from a Smitty in-shop / out-of-service ingest |
 | **Owner-operator settlement** | `sum`/`formula` | weekly cap / settlement math (see `TODO.md`) |
 
+## Sibling governance modules (same install path)
+
+`fleet_governance.py` is one of three auto-discovered modules; each owns one
+bounded context's invariants:
+
+| Module | Owns |
+| --- | --- |
+| `fleet_governance.py` | dispatch lock, bundle/spec/odometer integrity, lease activity, Smitty-mirror cost/maintenance (above) |
+| `comms_governance.py` | broadcast posting lock, mute/ban, topic-create; **`channel_member.unread_count`** (formula on the member row + after-flush bump on message insert — one authoritative unread badge; clients read, don't recompute) |
+| `route_governance.py` | **waypoint `seq` ordering** — place-on-insert (intermediate stops before the destination), shift-on-move (a single-row move → dense 1..N), densify-on-delete. Needs the `waypoint` unique constraint `DEFERRABLE INITIALLY DEFERRED`. See [`WAYPOINT_ORDERING.md`](WAYPOINT_ORDERING.md) |
+
+The last two came out of the "client-calculated values → LogicBank" audit
+([`TODO.md`](TODO.md)): counts/aggregates/ordering that each client used to
+recompute (and drift on) now derive once at the ALS commit.
+
 ## How the rules are installed (with the ALS rebuild)
 
 We already reinstall our customizations after every ALS regenerate. `fleet_

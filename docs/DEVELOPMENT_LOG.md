@@ -3,7 +3,85 @@
 Newest first. One entry per meaningful change set; pair with the checklist in
 [`TODO.md`](TODO.md).
 
+## 2026-08-01
+
+### Client-calculated values → LogicBank (item 3: waypoint ordering)
+- Design note: `docs/WAYPOINT_ORDERING.md`. The mobile `TripWaypointsPage`'s
+  `seq` arithmetic — the audit's ugliest client-side calculated value — moved to
+  the middleware. It fought `UNIQUE(trip_id, seq)` with a back-to-front bump loop
+  on add and a two-phase `1000+i`/`i+1` dance on reorder, and two concurrent adds
+  to one trip could collide.
+- **Keystone (schema):** `UNIQUE(trip_id, seq)` is now **DEFERRABLE INITIALLY
+  DEFERRED** — a whole reorder can run inside one transaction with transient
+  duplicate seqs (checked at COMMIT). Verified on PG16 (59 fleet tables) incl. a
+  live in-transaction seq swap that an immediate constraint would reject.
+- **LogicBank `route_governance.py` (new):** place-on-insert (intermediate stops
+  land before the destination), shift-on-move (a single-row move PATCH becomes a
+  dense 1..N reorder), densify-on-delete (no gaps). One ordering invariant for
+  every client. Event-hook wiring flagged LogicBank-version-sensitive.
+- **Clients simplified:** mobile add sends a trivial append hint (no bump loop);
+  reorder PATCHes only the moved stop to its slot (no two-phase); delete
+  unchanged. Mobile build clean. The geospatial optimizer (`recompute.py`, direct
+  SQL in one txn) dropped its own two-phase `_persist_order` dance too.
+- Activation: regen ALS + `make als-extensions` on the Linux box.
+
+### Client-calculated values → LogicBank (item 2: currency default)
+- Outcome: the `'USD'` default was **already** middleware-owned — `load.currency`
+  and `settlement.currency` are `NOT NULL DEFAULT 'USD'` and the desktop
+  `createLoad` omits currency, so ALS already stamps it (a column default is the
+  right mechanism; a LogicBank rule would be redundant per golden rule 2). Mobile
+  already read `load.currency` directly. Removed the one real duplication — the
+  **desktop's carried default literals**: `models.h` struct initializer
+  (`currency = "USD"`) and the `.empty() ? "USD"` fallbacks in `BoardView.cpp`
+  (`money()`/`dollars()`), keeping only the USD→`$` symbol mapping (presentation).
+  Added a schema comment marking the column default as the single source of truth.
+
+### Client-calculated values → LogicBank (audit, item 1: unread counts)
+- Audited both clients for calculated values kept in procedural code (sums,
+  counts, aggregates, defaults) that belong in the middleware. Findings +
+  recommendation recorded in `TODO.md` ("Client-calculated values → LogicBank").
+  Presentation-only math (money/dollars formatting, avatar/trailer colors,
+  local `.count()`/`.length`) stays client-side; the real candidates are unread
+  counts (now), the `currency = "USD"` default (next), and waypoint
+  next-sequence assignment (after that).
+- **Unread message counts → LogicBank (item 1).** The unread badge was computed
+  independently in the mobile board (`ChannelsPage.tsx` pulled every message per
+  channel and filtered) and the desktop `CommPanel` (a parallel `unread_` map),
+  and they drifted (a read on the phone didn't clear the desktop badge). Now
+  derived once server-side:
+  - Schema: `channel_member.unread_count INTEGER NOT NULL DEFAULT 0` (verified on
+    PG16 — 59 fleet tables, 0 public).
+  - LogicBank (`comms_governance.py`): a **formula** recomputes `unread_count`
+    from the member's own `last_read_at` whenever the member row is written
+    (mark-as-read → recompute), plus an **after-flush event** on `Message` insert
+    that bumps every other member's count. Increment-on-post is cheap;
+    recompute-on-read is the self-healing reconcile.
+  - Clients read `unread_count` instead of recomputing: mobile `ChannelsPage`
+    (dropped the per-channel message pull) and desktop `CommPanel::loadDirectoryMeta`
+    (dropped the per-channel `fetchMessages`). The Kafka bump stays as an
+    optimistic UI update; the ALS value reconciles. Mobile build clean.
+  - Activation: regen ALS from the updated schema + `make als-extensions` on the
+    Linux box (the formula/after-flush wiring is LogicBank-version-sensitive —
+    flagged inline).
+
 ## 2026-07-31
+
+### Smitty integration: sequencing decided + Fleet-side consumer built
+- **Sequencing (R.6):** decided **RMA first, integration after** — the shared
+  surface + contract already exist Fleet-side, and full value is gated by Fleet
+  Phase 3, so no reason for Smitty to drop RMA now. Recorded in
+  `INTEGRATION_SMITTY.md` (flippable).
+- **Fleet-side consumer built (verified on PG16, 59 fleet tables):** mirror tables
+  `service_record` / `maintenance_schedule` / `vehicle_out_of_service` (Fleet-
+  native UUID keys, VIN-correlated, **at-cost only**). LogicBank
+  (`fleet_governance.py`): `Rule.copy` snapshots the responsible party onto a
+  service record (cost allocation at service time), a `Rule.formula` derives
+  maintenance status (upcoming/due/overdue) from `sys_clock` + odometer, and the
+  dispatch-lock now also reads open OOS windows (in-shop rig can't be dispatched).
+- **Poller** `integration/smitty_poller.py` — the thin fetch driver (scaffold): pulls
+  Smitty scoped to Fleet's customer_id (at-cost only, unresolved VINs dropped) and
+  **writes through Fleet's ALS API** so LogicBank fires on ingest. Runs once Smitty
+  ships Phase-1 endpoints.
 
 ### Doctrine: fleet business logic → LogicBank rules (+ tick pattern)
 - Established the forward-going rule: **business invariants belong in LogicBank**

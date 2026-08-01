@@ -81,10 +81,12 @@ export function TripWaypointsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tripId]);
 
-  // Add a stop of the chosen type at the driver's current GPS location, inserted
-  // before the destination so it stays last on the route. Locks FIRST (and waits)
-  // so the auto-optimizer — which reads route_locked from the DB — won't reorder
-  // the manual change (race-safe regardless of Kafka event ordering).
+  // Add a stop of the chosen type at the driver's current GPS location. We send
+  // only a trivial append hint (max seq + 1) — the middleware repositions an
+  // intermediate stop to just before the destination and shifts the rest
+  // (route_governance.py). No client-side seq arithmetic / bump loop. Locks FIRST
+  // (and waits) so the auto-optimizer — which reads route_locked from the DB —
+  // won't reorder the manual change.
   const applyAdd = async (
     pos: GeolocationPosition,
     stopTypeId: number,
@@ -92,17 +94,7 @@ export function TripWaypointsPage() {
   ) => {
     try {
       await lockOrder();
-      const dest = stops.find((s) => s.stop_type_id === 2);
-      const seq = dest
-        ? dest.seq
-        : (stops.length ? stops[stops.length - 1].seq : 0) + 1;
-      if (dest) {
-        // Bump destination (and anything after) down a slot — back to front to
-        // respect UNIQUE (trip_id, seq).
-        for (const s of stops.filter((x) => x.seq >= seq).sort((a, b) => b.seq - a.seq)) {
-          await api.updateWaypoint(s.id, { seq: s.seq + 1 });
-        }
-      }
+      const seq = stops.length ? Math.max(...stops.map((s) => s.seq)) + 1 : 1;
       await api.addWaypoint({
         trip_id: tripId,
         seq,
@@ -139,17 +131,14 @@ export function TripWaypointsPage() {
     }
   };
 
-  // Drag-reorder: persist the new order as seq = 1..N. Lock FIRST, then two-phase
-  // (offset then final) to respect UNIQUE (trip_id, seq) without collisions.
-  const persistOrder = async (ordered: Waypoint[]) => {
+  // Drag-reorder: a single gesture is a single move, so we PATCH only the moved
+  // stop to its target slot (seq = destination index + 1). The middleware shifts
+  // the crossed range to keep the order dense 1..N (route_governance.py) — no
+  // client-side two-phase offset dance. Lock FIRST so the optimizer leaves it be.
+  const moveStop = async (id: string, seq: number) => {
     try {
-      await lockOrder(); // manual reorder → optimizer leaves this trip alone
-      await Promise.all(
-        ordered.map((w, i) => api.updateWaypoint(w.id, { seq: 1000 + i })),
-      );
-      await Promise.all(
-        ordered.map((w, i) => api.updateWaypoint(w.id, { seq: i + 1 })),
-      );
+      await lockOrder();
+      await api.updateWaypoint(id, { seq });
       await load();
     } catch (e) {
       fail(e);
@@ -157,12 +146,14 @@ export function TripWaypointsPage() {
   };
 
   const handleReorder = (e: CustomEvent<ItemReorderEventDetail>) => {
-    const reordered = [...stops];
-    const [moved] = reordered.splice(e.detail.from, 1);
-    reordered.splice(e.detail.to, 0, moved);
+    const { from, to } = e.detail;
     e.detail.complete(); // finish the DOM move
+    const moved = stops[from];
+    const reordered = [...stops];
+    reordered.splice(from, 1);
+    reordered.splice(to, 0, moved);
     setStops(reordered.map((w, i) => ({ ...w, seq: i + 1 })));
-    void persistOrder(reordered);
+    void moveStop(moved.id, to + 1); // dense 1..N → target seq is the 1-based slot
   };
 
   return (

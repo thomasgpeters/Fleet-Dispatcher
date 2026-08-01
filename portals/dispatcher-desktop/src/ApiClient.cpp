@@ -473,6 +473,7 @@ fd::ChannelMember parseChannelMember(const Wt::Json::Object& res) {
     m.member_status_id = jint(a, "member_status_id");
     m.restricted_until = jstr(a, "restricted_until");
     m.last_read_at = jstr(a, "last_read_at");
+    m.unread_count = jint(a, "unread_count");
     return m;
 }
 

@@ -49,9 +49,10 @@ import { useRealtime } from "../realtime/RealtimeContext";
  * Message board — channel list with unread badges. Tapping a channel pushes its
  * detail page (`/messages/:channelId`) with a native transition + back button.
  *
- * Unread is computed client-side from `channel_member.last_read_at` vs message
- * times. A server-side `unread_count` (LogicBank) is the production approach
- * (see docs/TODO.md → middleware rules).
+ * Unread is the server-derived `channel_member.unread_count` (a LogicBank rule;
+ * see comms_governance.py). The client just reads it — no more pulling every
+ * message to recompute. The Kafka stream still bumps the badge optimistically
+ * for instant feedback; the ALS value reconciles on the next load/mark-as-read.
  */
 export function ChannelsPage() {
   const { user } = useAuth();
@@ -71,17 +72,10 @@ export function ChannelsPage() {
       const mine: Record<string, ChannelMember> = {};
       await Promise.all(
         chs.map(async (ch) => {
-          const [membership, messages] = await Promise.all([
-            api.myMembership(ch.id, user.id),
-            api.messagesForChannel(ch.id),
-          ]);
+          const membership = await api.myMembership(ch.id, user.id);
           if (membership) mine[ch.id] = membership;
-          const lastRead = membership?.last_read_at ?? null;
-          counts[ch.id] = messages.filter(
-            (m) =>
-              m.author_id !== user.id &&
-              (!lastRead || m.posted_at > lastRead),
-          ).length;
+          // Read the server-derived count — don't recompute from messages.
+          counts[ch.id] = membership?.unread_count ?? 0;
         }),
       );
       setUnread(counts);

@@ -41,10 +41,12 @@ std::array<std::string, 7> currentWeekDays() {
     return days;
 }
 
+// currency is API-guaranteed (load.currency is NOT NULL DEFAULT 'USD'), so the
+// code is always present — no client-side default literal needed.
 std::string money(const std::string& currency, double v) {
     char b[32];
     std::snprintf(b, sizeof(b), "%.2f", v);
-    return (currency.empty() ? "USD" : currency) + " " + b;
+    return currency + " " + b;
 }
 
 std::string statusName(int id) {
@@ -79,8 +81,9 @@ std::string dollars(const std::string& currency, double v) {
         if (++c % 3 == 0 && i > 0) grouped.push_back(',');
     }
     std::reverse(grouped.begin(), grouped.end());
-    const std::string sym =
-        (currency.empty() || currency == "USD") ? "$" : (currency + " ");
+    // USD renders as the "$" symbol; any other code prefixes as-is. (Symbol
+    // choice is presentation — not a default; currency is API-guaranteed.)
+    const std::string sym = (currency == "USD") ? "$" : (currency + " ");
     return (neg ? "-" : "") + sym + grouped;
 }
 

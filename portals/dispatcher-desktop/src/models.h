@@ -51,7 +51,8 @@ struct ChannelMember {
     int member_role_id = 0;     // 1=owner, 2=member, 3=admin
     int member_status_id = 1;   // 1=active, 2=muted, 3=banned
     std::string restricted_until;  // ISO8601 mute/ban expiry (empty = none/indefinite)
-    std::string last_read_at;   // ISO8601 read position (drives unread counts)
+    std::string last_read_at;   // ISO8601 read position (drives unread_count)
+    int unread_count = 0;       // server-derived (LogicBank); read, don't recompute
 };
 
 struct Message {
@@ -110,7 +111,8 @@ struct Load {
     std::string dispatch_week_id;
     std::string pickup_date;      // "YYYY-MM-DD" (may be empty)
     std::string delivery_date;    // "YYYY-MM-DD" (may be empty)
-    std::string currency = "USD";
+    std::string currency;         // from the API; default lives in the schema
+                                  // (load.currency DEFAULT 'USD'), not here
     int run_type_id = 0;
     int load_status_id = 0;
     double rate = 0.0;

@@ -31,9 +31,10 @@ FLEET_DATABASE_URL = os.environ.get(
 
 
 def _persist_order(cur, ordered) -> None:
-    """Write the new seq (1..N) two-phase to respect UNIQUE(trip_id, seq)."""
-    for i, w in enumerate(ordered):
-        cur.execute("UPDATE waypoint SET seq = %s WHERE id = %s", (1000 + i, w["id"]))
+    """Write the new seq (1..N) in one pass. The whole reorder runs in this single
+    transaction and UNIQUE(trip_id, seq) is DEFERRABLE INITIALLY DEFERRED, so
+    transient duplicate seqs are fine — the check runs once at COMMIT. (No more
+    two-phase offset dance; see docs/WAYPOINT_ORDERING.md.)"""
     for i, w in enumerate(ordered):
         cur.execute("UPDATE waypoint SET seq = %s WHERE id = %s", (i + 1, w["id"]))
 
