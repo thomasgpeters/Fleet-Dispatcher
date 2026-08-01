@@ -509,6 +509,62 @@ Migration (large — `equipment` is deeply embedded):
 > doesn't block on the full refactor, but the per-asset `vehicle` table is the
 > shared surface, so it leads.
 
+## Feature 8 — Financial spine (settlements → driver pay → IFTA) on LogicBank
+
+Strategic gap identified in the AscendTMS competitive read
+([`market/COMPETITIVE_ASCENDTMS.md`](market/COMPETITIVE_ASCENDTMS.md)): in this
+market **dispatch is the commodity; the financial workflow is the moat** — it's
+what carriers won't switch away from. It's also the layer LogicBank is *best* at:
+settlement math, pay calc, IFTA state-mile allocation, and commission splits are
+all declarative derivations over data we already hold, governed once at the ALS
+commit so every client (mobile, desktop, API) reads one authoritative figure.
+Doctrine + litmus test: [`LOGICBANK_RULES.md`](LOGICBANK_RULES.md).
+
+Standing constraint (as everywhere): money rules live in
+`als-extensions/logic_discovery/` (a `settlement_governance.py` sibling), **never**
+duplicated in client code. Schema changes → `/verify-db` on throwaway PG16 → regen
+ALS (+ `make als-extensions`); update `domain-model.md`.
+
+Sequenced (P1 = do first; value-weighted, smallest blast radius first):
+
+- [ ] **P1 — Settlements + driver pay (LogicBank).** The `settlement` table +
+      invariants already exist in `schema.sql` (contract_percent ← driver_type,
+      `driver_pay = round(gross_rate * contract_percent / 100, 2)`,
+      costs_borne_by_owner ← driver_type). Formalize them as **LogicBank rules**
+      (`Rule.formula` / `Rule.copy`) instead of leaving them as schema comments,
+      and support the real pay models (per-mile, %, hourly, per-pallet/CWT,
+      accessorials, stop pay, per-diem, fuel pass-through, deadhead). One-click
+      driver-pay run over a date range reads these derived values.
+- [ ] **P2 — Invoicing + AR/AP.** Customer invoicing off delivered loads, plus
+      accounts-receivable / accounts-payable state (open/paid/aging) and customer
+      statements. Status/aging are LogicBank formulas from dates + payments; the
+      export-to-Excel/accounting-package hand-off is a thin client/report concern.
+- [ ] **P3 — IFTA reporting (the sleeper advantage).** We already capture routes,
+      per-state mileage, and position reports in `geospatial/`; a TMS that bolted
+      IFTA on does not. Combine state-miles (geospatial) + fuel purchases (new
+      `fuel_purchase` table) → per-jurisdiction IFTA calc. Allocation math is
+      LogicBank; the state tax-rate table is reference data. Headline feature from
+      data we already collect.
+- [ ] **P4 — Commissions / branch revenue splits.** Incentivize staff/agents by
+      % or flat pay per load/activity, with manager approval + per-load override.
+      Split/approval state is LogicBank-derived; a staffer sees their own paid /
+      approved / forecast totals (read-only) — no client-side math.
+- [ ] **P5 — Factoring / instant funding integration.** External integration in
+      the **Smitty pattern** (thin agent writes through ALS; LogicBank governs) to
+      a factoring provider — submit a completed load, get funded. Keys/tokens are
+      deployment config, never committed.
+- [ ] **P6 — Smaller financial adds (independent, any order):** e-signatures on
+      confirmations; KPI/analytics surface (profitability by driver/lane/customer
+      — reads LogicBank-derived aggregates, doesn't recompute them); cargo-claim
+      handling (photo + timestamp proof, ties to the CMS `document` + position
+      data).
+
+> Why this leads the post-integration roadmap: it's the highest-value gap in the
+> competitive map, and building it on LogicBank turns the industry's stickiest
+> features into a differentiator (governed once, correct across every client)
+> rather than a me-too. P1 is mostly formalizing invariants the schema already
+> documents, so it's the cheapest start with immediate payoff.
+
 ## Client-calculated values → LogicBank (audit 2026-08-01)
 
 Audit of the C++ desktop + Vita mobile clients for **calculated values kept in
