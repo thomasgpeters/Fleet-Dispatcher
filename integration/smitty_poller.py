@@ -97,19 +97,25 @@ def _upsert(resource: str, correlation_attr: str, correlation_val: str,
 
 # --- sync passes ------------------------------------------------------------
 
-def _job_at_cost(job_id: str) -> float:
+def _job_at_cost(job_id: str) -> Optional[float]:
     """At-cost total for a Smitty Job, summed from the LINE-level at-cost columns
-    Smitty exposes (job_parts.unit_cost x qty + job_labor_items.hourly_cost x
-    hours). Retail/markup (job_total, parts_total, labor_total) is NEVER read.
-    Quantities/hours are service facts and cross the boundary. TODO: confirm the
-    exact JobPart/JobLaborItem field + filter names against Smitty's v2 shapes."""
+    (job_parts.unit_cost x quantity + job_labor_items.hourly_cost x hours).
+    Retail/markup (job_total, unit_price, rate) is NEVER read; quantities/hours are
+    service facts and do cross. Per Fleet response FR.2: a **NULL cost line = cost
+    unknown**, so return None (at-cost incomplete) rather than silently counting it
+    as $0 — Fleet's valuation only trusts complete at-cost. TODO: confirm the exact
+    JobPart/JobLaborItem field + filter names against Smitty's v2 shapes."""
     total = 0.0
     for p in _smitty_get(f"JobPart?filter[job_id]={job_id}"):
         a = p.get("attributes", {})
-        total += (a.get("unit_cost") or 0) * (a.get("quantity") or 0)
+        if a.get("unit_cost") is None:
+            return None
+        total += a["unit_cost"] * (a.get("quantity") or 0)
     for l in _smitty_get(f"JobLaborItem?filter[job_id]={job_id}"):
         a = l.get("attributes", {})
-        total += (a.get("hourly_cost") or 0) * (a.get("hours") or 0)
+        if a.get("hourly_cost") is None:
+            return None
+        total += a["hourly_cost"] * (a.get("hours") or 0)
     return round(total, 2)
 
 

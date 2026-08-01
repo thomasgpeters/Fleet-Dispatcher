@@ -722,3 +722,226 @@ Smitty ships its Phase-1 endpoints:
 
 Waiting on Smitty (per B.4): the Fleet `customer_id`, customer/VIN-filterable
 endpoints, and the **at-cost figure on `Job`** distinct from retail/`job_total`.
+---
+
+# Smitty response v2
+
+**Date:** 2026-07-31 · **Owner:** Smitty Services team ·
+**Status:** proposal, answers Fleet response v1 (F.1–F.6 + B.1–B.4)
+
+Fleet v1 is accepted in almost all respects. Smitty softens C.2 per F.3,
+renames the correlation column per F.6, and answers the four B.4 asks with
+concrete Phase 1 additions. Where the response says "Smitty proposes X;
+Fleet confirm", we're taking a sensible default so momentum on Phase 1
+isn't blocked, but Fleet has the last word on those two spots.
+
+## S.1 Accept F.3 — soften C.2 to shared column set + semantics + VIN correlation
+
+Smitty's original C.2 said "byte-identical DDL on both sides". Accepting
+Fleet's F.3 counter-proposal: **identical column set + identical semantics
++ VIN as the correlation key. Native PK types + local FKs on each side are
+allowed.** The sync layer replicates by VIN, not by identical row images.
+
+Practical consequences the Phase 1 patch bakes in:
+
+- Smitty's `vehicles` keeps `vehicle_id SMALLINT` PK. Fleet's `vehicle`
+  keeps `id UUID` PK. `vin` on each side is the correlation column both
+  sides carry with identical semantics (17-char preferred, `VARCHAR(30)`
+  on Smitty's side today per the pre-existing constraint).
+- The added mirror column on Smitty is a text FK-shape correlation:
+  `fleet_vehicle_id VARCHAR(60)` (see S.2). Not a real FK — Smitty
+  never dereferences Fleet's UUID into its own schema.
+- New Smitty tables (`maintenance_schedules`, `vehicle_out_of_service`)
+  keep `SMALLINT` PKs + `vehicle_id → vehicles(vehicle_id)` local FK
+  + `vin VARCHAR(30)` denormalized correlation. Fleet's equivalent
+  tables carry the same *columns* with UUID PKs and Fleet-local FKs.
+- The invariant "column-set drift is a bug" stays. "PK-type divergence
+  is expected."
+
+Updated in `docs/DESIGN_DECISIONS.md` under "Integrated apps share
+identical DDL" — the decision title stays for continuity but the
+body is softened to match.
+
+## S.2 Accept F.6 — rename to `fleet_vehicle_id`
+
+`vehicles.fleet_equipment_id` in Smitty's Phase 1 patch design becomes
+`vehicles.fleet_vehicle_id VARCHAR(60)`. Additive per C.1; nothing has
+shipped yet so no deprecation cycle needed — we just name it correctly
+from the start. `tasks/TODO.md §5 Phase 1` is updated to match.
+
+## S.3 Answers to B.4 asks
+
+### S.3.a Fleet gets a dedicated `customer_id` = `'FLEET'` (proposed)
+
+**Smitty proposes** seeding a new `customers` row with
+`customer_id = 'FLEET'`, `company_name = 'Fleet Dispatcher (house)'`,
+inserted by `database/seed_data.sql` as part of Phase 1. Every
+Fleet-owned rig in `vehicles` carries `customer_id = 'FLEET'` in addition
+to its (nullable) `fleet_vehicle_id` correlation.
+
+**Additive tagging column on `customers`:** we add `role VARCHAR(20)`
+with values `'fleet_house' | 'external' | 'owner_operator'`. The `FLEET`
+row gets `role = 'fleet_house'`. Enables clean querying (`WHERE role =
+'fleet_house'`) and gives us room to add owner-operator flavours later
+without a schema change.
+
+Rationale for the fixed id `'FLEET'`: Smitty's `customers.customer_id`
+is `VARCHAR(5)`, Northwind-heritage; a short mnemonic is consistent
+with the existing seed (e.g. `ALFKI`, `AROUT`). Not adopting a numeric
+surrogate because the string PK is what the entire customer table
+already uses.
+
+**[Fleet confirm]** — OK with `'FLEET'` as the house customer id? Prefer
+a different string / a UUID / an existing customer already tagged? If
+Fleet wants a different value, it's a one-line change to the seed.
+
+### S.3.b Endpoints filterable by customer_id + VIN set — enforced by the service-token middleware
+
+**Middleware-enforced, not client-supplied.** The Fleet token, on
+verification, is bound to `customer_id = 'FLEET'` (from a token-registry
+row on the ALS side). The middleware rewrites every read into a filtered
+form:
+
+- `/api/Vehicle` → `WHERE customer_id = 'FLEET'` (Fleet only ever
+  sees house-customer rigs).
+- `/api/Job` → `WHERE customer_id = 'FLEET'` (Fleet only ever sees
+  jobs on house rigs).
+- `/api/MaintenanceSchedule` and `/api/VehicleOutOfService` →
+  `WHERE vehicle_id IN (SELECT vehicle_id FROM vehicles WHERE
+  customer_id = 'FLEET')`.
+
+Fleet doesn't need to supply the filter; ALS pins it. Third-party data
+is structurally invisible on the Fleet token — not a "please filter it
+out" contract, an "impossible to see" gate.
+
+**Token-scope table** on the ALS side: `service_tokens` (or a JSON
+config file — Fleet's team to advise) mapping token → scope (customer_id +
+optional VIN set + optional field-stripping profile — see S.3.d).
+
+### S.3.c `fleet_vehicle_id` stays nullable — confirmed
+
+Restating the C.1 additive default. Third-party rigs simply leave it
+NULL. No behaviour change beyond noting it explicitly.
+
+### S.3.d Cost-stripped `/api/Job` for the Fleet token — done at the middleware
+
+The same token-registry row carries a **field-stripping profile.** When
+the Fleet token requests `/api/Job` (or `/api/JobPart`,
+`/api/JobLaborItem`), the middleware drops:
+
+- **`jobs`:** `estimated_cost`, `actual_cost`, `parts_total`,
+  `labor_total`, `job_total`, `discount_percent`.
+- **`job_parts`:** `unit_price`, `amount` — Smitty's *retail* per line.
+- **`job_labor_items`:** `rate`, `amount` — Smitty's *retail* hourly.
+
+**What DOES cross to Fleet (per B.3):** the at-cost totals + service
+facts. To make this real, Phase 1 adds two additive cost columns
+Smitty will populate going forward:
+
+- `job_parts.unit_cost REAL` — what Smitty paid for the part (mirror of
+  supplier's cost at time of pick / receive). Distinct from
+  `unit_price` (retail).
+- `job_labor_items.hourly_cost REAL` — Smitty's fully-loaded labor
+  cost/hour for the assigned mechanic. Distinct from `rate` (retail).
+
+Both are additive, nullable, and populated on write going forward. Legacy
+JobPart / JobLaborItem rows created before Phase 1 will have NULL cost
+columns — Fleet's Phase 3 consumer treats NULL as "cost unknown for this
+line" and either flags the job or uses the retail figure as a fallback
+per Fleet's own tolerance.
+
+The Fleet-token response for `/api/JobPart` therefore keeps `unit_cost`
+(new) and strips `unit_price` (existing). Fleet always sees the at-cost
+side.
+
+**[Fleet confirm]** — happy with `unit_cost` / `hourly_cost` as the
+column names + the NULL-legacy handling, or do you want a different
+shape (e.g. computed at read-time from `supplier_product.unit_cost` and
+a per-mechanic cost rate)? Column-add is committed; the source of truth
+for the cost value is Smitty-internal and can adjust without changing
+the API contract.
+
+## S.4 Cost responsibility (B.3a) — Smitty just publishes, Fleet allocates
+
+No Smitty-side model change. Smitty publishes the at-cost totals per
+service; Fleet's Feature 7 (ownership + `vehicle_lease`) does the
+allocation to the right responsible party on its side. Smitty doesn't
+need to know whether a specific tractor is Fleet-owned, owner-op, or
+Fleet-leased — that's Fleet's ledger to keep.
+
+## S.5 Sequencing — still awaiting Fleet's call
+
+R.6 open in v1 stays open; Fleet marked it "still undecided." Smitty is
+ready to start §5 Phase 1 the day Fleet greenlights, and §4b RMA
+Phase 1 Stage 2 sits behind that call. Ping when a slot is picked.
+
+## S.6 Summary of Phase 1 shape after v2
+
+The Phase 1 DDL patch (`database/patches/023_fleet_integration.sql`)
+now includes:
+
+1. Additive columns on `vehicles`: `fleet_vehicle_id`,
+   `odometer_miles`, `odometer_as_of`, `operational_status`,
+   `asset_type`, `dot_number`, `fuel_type`, `specs JSONB`.
+2. Additive column on `customers`: `role VARCHAR(20)`.
+3. Additive columns on `job_parts`: `unit_cost REAL`.
+4. Additive column on `job_labor_items`: `hourly_cost REAL`.
+5. New table `maintenance_schedules` (Smitty-native shape: SMALLINT
+   PK, local FK, denormalized VIN).
+6. New table `vehicle_out_of_service` (same shape rules).
+
+Plus a `database/seed_data.sql` addition: the `'FLEET'` house customer
+row + the token-registry / ALS middleware config for scoped +
+cost-stripped Fleet-token responses.
+
+Full checklist in `tasks/TODO.md §5 Phase 1`.
+
+---
+
+# Fleet response v2
+
+**Date:** 2026-07-31 · **Owner:** Fleet Dispatcher team ·
+**Status:** confirms Smitty v2 — Phase 1 is unblocked from Fleet's side.
+
+Smitty v2 accepted in full. Both `[Fleet confirm]` defaults are **approved**;
+no changes needed before the patch lands.
+
+## FR.1 — `customer_id = 'FLEET'` ✅ confirmed
+Approved as-is. The `VARCHAR(5)` Northwind-heritage string PK is fine — a
+mnemonic house id beats a surrogate here, and it matches the existing seed
+convention. The additive `customers.role` column (`fleet_house` / `external` /
+`owner_operator`) is a good call — keep it. Fleet's poller filters on
+`customer_id = 'FLEET'` directly (and S.3.b's middleware pinning makes that
+belt-and-suspenders — even better).
+
+## FR.2 — `job_parts.unit_cost` / `job_labor_items.hourly_cost` ✅ confirmed
+Approved — line-level at-cost is the right shape (auditable, and cleanly distinct
+from `unit_price`/`rate` retail). Fleet computes
+`service_record.at_cost_amount = Σ(unit_cost × quantity) + Σ(hourly_cost × hours)`
+in the poller. Two notes:
+- **Fleet needs the line quantities + labor hours** in the Fleet-token projection
+  (they're service facts, not pricing) to compute the sum. Please keep those.
+- **NULL-legacy handling:** Fleet treats a NULL cost line as *"at-cost unknown"*
+  and **flags the service record as cost-incomplete** rather than silently
+  counting it as $0 (a $0 part would understate TCO). No retail fallback —
+  Fleet's valuation only trusts real at-cost figures.
+
+## FR.3 — S.1/S.2/S.3.b/S.3.c/S.4 accepted
+- **S.1** soften C.2 → yes (matches F.3): shared column-set + semantics + VIN
+  correlation; native PKs each side.
+- **S.2** `fleet_vehicle_id` rename → yes.
+- **S.3.b** middleware-enforced scoping (token bound to `customer_id`) → yes, and
+  **stronger than we asked** — "structurally invisible" beats "please filter."
+- **S.3.c** `fleet_vehicle_id` nullable → yes.
+- **S.4** Smitty publishes at-cost; Fleet allocates via Feature 7 ownership/lease → yes.
+
+## FR.4 — Sequencing (R.6) is decided: **RMA first, integration after**
+See the "Sequencing (R.6)" section above (this supersedes S.5's "still open" — it
+was open only because Fleet's decision hadn't merged to the shared doc yet).
+Greenlight the integration slot **after** RMA Stages 2–3.
+
+## FR.5 — Fleet's half is already built (ready when Smitty's endpoints ship)
+Mirror tables (`service_record`, `maintenance_schedule`, `vehicle_out_of_service`),
+the LogicBank ingest rules (`fleet_governance.py`: cost-allocation snapshot,
+maintenance status, OOS dispatch-lock), and the poller
+(`integration/smitty_poller.py`, now summing line-level at-cost). Verified on PG16.
